@@ -647,8 +647,12 @@ footer{
   position:fixed;
   inset:0;
   z-index:0;
+  background-color:var(--soot);
   background-image:url('imagens/mapa-fase1-clareira-hd.jpg');
-  background-size:cover;
+  /* contain (não cover): mostra a imagem inteira sempre, sem cortar
+     pedaço em telas com proporção bem diferente da imagem — sobra uma
+     faixa no soot dos lados ou em cima/embaixo, mas nada fica de fora */
+  background-size:contain;
   background-position:center;
   background-repeat:no-repeat;
 }
@@ -992,13 +996,6 @@ footer{
   font-size:0.78rem;
   white-space:nowrap;
 }
-.fabrica-acoes-flutuantes .acao-rotacionar::after{
-  content:" (R)";
-}
-@media (max-width:480px){
-  .fabrica-acoes-flutuantes .acao-rotacionar::after{content:"";}
-}
-
 @media (prefers-reduced-motion:reduce){
   .particula,.bg,.titulo .linha,.item,.item-principal,
   .power-on,.raios,.hud-frame,.hud-status,.hud-dot,

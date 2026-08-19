@@ -24,12 +24,14 @@ function pontoDaGrade(col, row) {
   return { x: GRID_CENTER_X + localX, y: GRID_CENTER_Y + localY };
 }
 
-// mesma matemática do background-size:cover, pra mapear um ponto
-// do espaço da imagem pro pixel de tela correspondente
+// mesma matemática do background-size:contain, pra mapear um ponto
+// do espaço da imagem pro pixel de tela correspondente — a imagem inteira
+// sempre cabe na tela (com barras no soot dos lados/em cima), nunca corta
+// pedaço nem estica, mesmo em resoluções bem mais largas ou mais altas
 function imagemParaTela(ponto) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const escala = Math.max(vw / IMG_W, vh / IMG_H);
+  const escala = Math.min(vw / IMG_W, vh / IMG_H);
   const offsetX = (vw - IMG_W * escala) / 2;
   const offsetY = (vh - IMG_H * escala) / 2;
   return { x: offsetX + ponto.x * escala, y: offsetY + ponto.y * escala };
@@ -145,8 +147,6 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     fecharPainelFabricas();
     abortarColocacao();
-  } else if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey) {
-    rotacionarColocacao();
   }
 });
 
@@ -159,9 +159,9 @@ document.querySelectorAll('.carta-fabrica').forEach((carta) => {
 });
 
 // ============ ECONOMIA ============
-// celulasCol/celulasRow = pegada da fábrica no grid (nunca um bloco 2x2,
-// sempre uma fileira de 2 células — na horizontal ou na vertical,
-// dependendo da rotação escolhida pelo jogador)
+// celulasCol/celulasRow = pegada da fábrica no grid: nunca um bloco 2x2,
+// sempre uma fileira de 2 células (hoje fixa em 2x1 — rotação removida
+// temporariamente)
 const FABRICAS = {
   'usina-carvao': { nome: 'Usina de Carvão', custo: 8000, sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1 },
 };
@@ -201,7 +201,7 @@ function chaveCelula(col, row) {
 function celulaMaisProxima(mx, my) {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const escala = Math.max(vw / IMG_W, vh / IMG_H);
+  const escala = Math.min(vw / IMG_W, vh / IMG_H);
   const offsetX = (vw - IMG_W * escala) / 2;
   const offsetY = (vh - IMG_H * escala) / 2;
   const imgX = (mx - offsetX) / escala;
@@ -223,14 +223,16 @@ function centroFootprintNaTela(col, row, colSpan, rowSpan) {
 }
 
 // largura visual (no espaço da imagem) da pegada isométrica de
-// colSpan x rowSpan células — mesma fórmula do contorno de um losango
-// isométrico; por simetria dá o mesmo valor pras duas rotações (2x1 e 1x2)
+// colSpan x rowSpan células — parte do contorno do losango isométrico
+// (colSpan+rowSpan)*(TILE_W/2), com uma margem de 15% pra dentro, já que
+// o sprite é um retângulo (não um losango) e sem essa folga os cantos
+// dele passam visualmente da pegada de 2 células
 function larguraImagemParaFootprint(colSpan, rowSpan) {
-  return (colSpan + rowSpan) * (TILE_W / 2);
+  return (colSpan + rowSpan) * (TILE_W / 2) * 0.85;
 }
 
 function escalaAtual() {
-  return Math.max(window.innerWidth / IMG_W, window.innerHeight / IMG_H);
+  return Math.min(window.innerWidth / IMG_W, window.innerHeight / IMG_H);
 }
 
 function posicionarInstancia(instancia) {
@@ -345,26 +347,6 @@ function reposicionarFantasma(mx, my) {
   estadoConstrucao.wrapper.classList.toggle('fabrica-instancia--ocupada', ocupada);
 }
 
-// troca 2x1 por 1x2 (ou vice-versa) — funciona tanto arrastando o
-// fantasma quanto já com a colocação travada (aí gira em volta da célula
-// que já estava travada, sem depender do cursor)
-function rotacionarColocacao() {
-  if (!estadoConstrucao) return;
-  const est = estadoConstrucao;
-  [est.colSpan, est.rowSpan] = [est.rowSpan, est.colSpan];
-  est.larguraImagem = larguraImagemParaFootprint(est.colSpan, est.rowSpan);
-
-  if (est.travado) {
-    const ancora = clampFootprint(est.col, est.row, est.colSpan, est.rowSpan);
-    est.col = ancora.col;
-    est.row = ancora.row;
-    posicionarInstancia(est);
-    reposicionarAcoesFlutuantes();
-  } else {
-    reposicionarFantasma(ultimoMouseX, ultimoMouseY);
-  }
-}
-
 // ---- controle unificado de mouse/toque/caneta via Pointer Events ----
 // um único caminho de código pras três formas de entrada, pra nunca ter
 // mouse e toque disputando o mesmo estado num dispositivo híbrido
@@ -413,15 +395,11 @@ function mostrarAcoesFlutuantes() {
   btnCancelar.className = 'painel-voltar';
   btnCancelar.textContent = 'Cancelar';
 
-  const btnRotacionar = document.createElement('button');
-  btnRotacionar.className = 'painel-voltar acao-rotacionar';
-  btnRotacionar.textContent = 'Girar';
-
   const btnConfirmar = document.createElement('button');
   btnConfirmar.className = 'painel-confirmar';
   btnConfirmar.textContent = 'Confirmar';
 
-  barra.append(btnCancelar, btnRotacionar, btnConfirmar);
+  barra.append(btnCancelar, btnConfirmar);
   document.body.appendChild(barra);
   estadoConstrucao.barra = barra;
   reposicionarAcoesFlutuantes();
@@ -431,7 +409,6 @@ function mostrarAcoesFlutuantes() {
   // já que a barra nasce colada na célula travada) nunca aciona os botões
   setTimeout(() => {
     btnCancelar.addEventListener('click', cancelarConstrucao);
-    btnRotacionar.addEventListener('click', rotacionarColocacao);
     btnConfirmar.addEventListener('click', confirmarConstrucao);
   }, 0);
 }
@@ -453,8 +430,7 @@ function encerrarEstadoConstrucao() {
 function confirmarConstrucao() {
   if (!estadoConstrucao) return;
   const { wrapper, tinta, col, row, colSpan, rowSpan, config, larguraImagem } = estadoConstrucao;
-  // segurança: se o jogador girou a peça em cima de uma célula ocupada
-  // vizinha, não deixa confirmar (o sprite já fica acinzentado avisando)
+  // segurança: não deixa confirmar em cima de célula já ocupada
   if (footprintOcupado(col, row, colSpan, rowSpan)) return;
   removerAcoesFlutuantes();
 
