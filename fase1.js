@@ -276,10 +276,8 @@ function iniciarColocacao(tipo) {
 
   reposicionarFantasma(ultimoMouseX, ultimoMouseY);
   setTimeout(() => {
-    window.addEventListener('click', aoClicarDurantePlacement);
-    window.addEventListener('touchstart', aoTocarDurantePlacement, { passive: true });
-    window.addEventListener('touchmove', aoArrastarDurantePlacement, { passive: false });
-    window.addEventListener('touchend', aoSoltarDurantePlacement);
+    window.addEventListener('pointerdown', aoPressionarDurantePlacement);
+    window.addEventListener('pointerup', aoSoltarDurantePlacement);
   }, 0);
 }
 
@@ -293,52 +291,35 @@ function reposicionarFantasma(mx, my) {
   estadoConstrucao.wrapper.classList.toggle('fabrica-instancia--ocupada', ocupada);
 }
 
-window.addEventListener('mousemove', (e) => {
+// ---- controle unificado de mouse/toque/caneta via Pointer Events ----
+// um único caminho de código pras três formas de entrada, pra nunca ter
+// mouse e toque disputando o mesmo estado num dispositivo híbrido
+// (notebook com tela sensível ao toque, tablet com mouse, etc.)
+window.addEventListener('pointermove', (e) => {
   ultimoMouseX = e.clientX;
   ultimoMouseY = e.clientY;
   reposicionarFantasma(e.clientX, e.clientY);
 });
 
-function aoClicarDurantePlacement(e) {
+// no toque não existe "hover": o fantasma só chega onde o dedo encostou
+// quando o pointerdown acontece (no mouse isso é redundante com o
+// pointermove de hover, que já reposicionou antes)
+function aoPressionarDurantePlacement(e) {
   if (!estadoConstrucao || estadoConstrucao.travado) return;
-  if (e.target instanceof Element && e.target.closest('.fabrica-acoes-flutuantes')) return;
-  if (celulasOcupadas.has(chaveCelula(estadoConstrucao.col, estadoConstrucao.row))) return;
-  travarColocacao();
-}
-
-// ---- controle por toque (celular): dedo arrasta o fantasma, soltar trava ----
-function pontoDoToque(e) {
-  const toque = e.touches[0] || e.changedTouches[0];
-  return toque ? { x: toque.clientX, y: toque.clientY } : null;
-}
-
-function aoTocarDurantePlacement(e) {
-  if (!estadoConstrucao || estadoConstrucao.travado) return;
-  const ponto = pontoDoToque(e);
-  if (!ponto) return;
-  ultimoMouseX = ponto.x;
-  ultimoMouseY = ponto.y;
-  reposicionarFantasma(ponto.x, ponto.y);
-}
-
-function aoArrastarDurantePlacement(e) {
-  if (!estadoConstrucao || estadoConstrucao.travado) return;
-  const ponto = pontoDoToque(e);
-  if (!ponto) return;
-  e.preventDefault(); // impede o scroll/zoom da página enquanto arrasta a fábrica
-  ultimoMouseX = ponto.x;
-  ultimoMouseY = ponto.y;
-  reposicionarFantasma(ponto.x, ponto.y);
+  ultimoMouseX = e.clientX;
+  ultimoMouseY = e.clientY;
+  reposicionarFantasma(e.clientX, e.clientY);
 }
 
 function aoSoltarDurantePlacement(e) {
   if (!estadoConstrucao || estadoConstrucao.travado) return;
-  // evita o click de compatibilidade que o navegador dispara após o toque:
-  // sem isso, ele acerta o botão Confirmar/Cancelar assim que ele aparece
-  // bem embaixo do dedo, no mesmo ponto do toque
+  // evita o click de compatibilidade que alguns navegadores disparam
+  // logo depois do toque, que poderia acertar o botão Confirmar/Cancelar
+  // assim que ele aparece embaixo do dedo
   e.preventDefault();
-  const ponto = pontoDoToque(e);
-  if (ponto) reposicionarFantasma(ponto.x, ponto.y);
+  ultimoMouseX = e.clientX;
+  ultimoMouseY = e.clientY;
+  reposicionarFantasma(e.clientX, e.clientY);
   if (celulasOcupadas.has(chaveCelula(estadoConstrucao.col, estadoConstrucao.row))) return;
   travarColocacao();
 }
@@ -357,17 +338,23 @@ function mostrarAcoesFlutuantes() {
   const btnCancelar = document.createElement('button');
   btnCancelar.className = 'painel-voltar';
   btnCancelar.textContent = 'Cancelar';
-  btnCancelar.addEventListener('click', cancelarConstrucao);
 
   const btnConfirmar = document.createElement('button');
   btnConfirmar.className = 'painel-confirmar';
   btnConfirmar.textContent = 'Confirmar';
-  btnConfirmar.addEventListener('click', confirmarConstrucao);
 
   barra.append(btnCancelar, btnConfirmar);
   document.body.appendChild(barra);
   estadoConstrucao.barra = barra;
   reposicionarAcoesFlutuantes();
+
+  // só liga os botões no próximo tick: assim o mesmo toque/clique que
+  // travou a colocação (e que pode terminar embaixo do botão Confirmar,
+  // já que a barra nasce colada na célula travada) nunca aciona os botões
+  setTimeout(() => {
+    btnCancelar.addEventListener('click', cancelarConstrucao);
+    btnConfirmar.addEventListener('click', confirmarConstrucao);
+  }, 0);
 }
 
 function removerAcoesFlutuantes() {
@@ -378,10 +365,8 @@ function removerAcoesFlutuantes() {
 }
 
 function encerrarEstadoConstrucao() {
-  window.removeEventListener('click', aoClicarDurantePlacement);
-  window.removeEventListener('touchstart', aoTocarDurantePlacement);
-  window.removeEventListener('touchmove', aoArrastarDurantePlacement);
-  window.removeEventListener('touchend', aoSoltarDurantePlacement);
+  window.removeEventListener('pointerdown', aoPressionarDurantePlacement);
+  window.removeEventListener('pointerup', aoSoltarDurantePlacement);
   estadoConstrucao = null;
   btnFabricas.disabled = false;
 }
