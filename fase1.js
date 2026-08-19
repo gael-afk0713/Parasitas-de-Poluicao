@@ -275,7 +275,12 @@ function iniciarColocacao(tipo) {
   btnFabricas.disabled = true;
 
   reposicionarFantasma(ultimoMouseX, ultimoMouseY);
-  setTimeout(() => window.addEventListener('click', aoClicarDurantePlacement), 0);
+  setTimeout(() => {
+    window.addEventListener('click', aoClicarDurantePlacement);
+    window.addEventListener('touchstart', aoTocarDurantePlacement, { passive: true });
+    window.addEventListener('touchmove', aoArrastarDurantePlacement, { passive: false });
+    window.addEventListener('touchend', aoSoltarDurantePlacement);
+  }, 0);
 }
 
 function reposicionarFantasma(mx, my) {
@@ -297,6 +302,43 @@ window.addEventListener('mousemove', (e) => {
 function aoClicarDurantePlacement(e) {
   if (!estadoConstrucao || estadoConstrucao.travado) return;
   if (e.target instanceof Element && e.target.closest('.fabrica-acoes-flutuantes')) return;
+  if (celulasOcupadas.has(chaveCelula(estadoConstrucao.col, estadoConstrucao.row))) return;
+  travarColocacao();
+}
+
+// ---- controle por toque (celular): dedo arrasta o fantasma, soltar trava ----
+function pontoDoToque(e) {
+  const toque = e.touches[0] || e.changedTouches[0];
+  return toque ? { x: toque.clientX, y: toque.clientY } : null;
+}
+
+function aoTocarDurantePlacement(e) {
+  if (!estadoConstrucao || estadoConstrucao.travado) return;
+  const ponto = pontoDoToque(e);
+  if (!ponto) return;
+  ultimoMouseX = ponto.x;
+  ultimoMouseY = ponto.y;
+  reposicionarFantasma(ponto.x, ponto.y);
+}
+
+function aoArrastarDurantePlacement(e) {
+  if (!estadoConstrucao || estadoConstrucao.travado) return;
+  const ponto = pontoDoToque(e);
+  if (!ponto) return;
+  e.preventDefault(); // impede o scroll/zoom da página enquanto arrasta a fábrica
+  ultimoMouseX = ponto.x;
+  ultimoMouseY = ponto.y;
+  reposicionarFantasma(ponto.x, ponto.y);
+}
+
+function aoSoltarDurantePlacement(e) {
+  if (!estadoConstrucao || estadoConstrucao.travado) return;
+  // evita o click de compatibilidade que o navegador dispara após o toque:
+  // sem isso, ele acerta o botão Confirmar/Cancelar assim que ele aparece
+  // bem embaixo do dedo, no mesmo ponto do toque
+  e.preventDefault();
+  const ponto = pontoDoToque(e);
+  if (ponto) reposicionarFantasma(ponto.x, ponto.y);
   if (celulasOcupadas.has(chaveCelula(estadoConstrucao.col, estadoConstrucao.row))) return;
   travarColocacao();
 }
@@ -337,6 +379,9 @@ function removerAcoesFlutuantes() {
 
 function encerrarEstadoConstrucao() {
   window.removeEventListener('click', aoClicarDurantePlacement);
+  window.removeEventListener('touchstart', aoTocarDurantePlacement);
+  window.removeEventListener('touchmove', aoArrastarDurantePlacement);
+  window.removeEventListener('touchend', aoSoltarDurantePlacement);
   estadoConstrucao = null;
   btnFabricas.disabled = false;
 }
