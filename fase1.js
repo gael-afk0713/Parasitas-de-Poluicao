@@ -162,11 +162,31 @@ document.querySelectorAll('.carta-fabrica').forEach((carta) => {
 // celulasCol/celulasRow = pegada da fábrica no grid: nunca um bloco 2x2,
 // sempre uma fileira de 2 células (hoje fixa em 2x1 — rotação removida
 // temporariamente)
+// ganhoPorTick/poluicaoPorTick = quanto cada UNIDADE dessa construção
+// rende/polui a cada tick de TICK_ECONOMIA_MS (somado por quantidade
+// possuída — 3 usinas rendem 3x o ganhoPorTick por tick)
 const FABRICAS = {
-  'usina-carvao': { nome: 'Usina de Carvão', custo: 8000, sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1 },
+  'usina-carvao': {
+    nome: 'Usina de Carvão', custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
+    sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1,
+  },
 };
 
-let dinheiro = 50000;
+// cada unidade adicional da MESMA construção custa 15% a mais que a
+// anterior: preço da unidade N = custo base × 1.15^(N-1) — genérico pra
+// qualquer entrada de FABRICAS, não só a usina de carvão
+const MULTIPLICADOR_CUSTO_REPETIDO = 1.15;
+const TICK_ECONOMIA_MS = 3000;
+const quantidadePorTipo = {};
+
+function precoAtual(tipo) {
+  const config = FABRICAS[tipo];
+  const quantidade = quantidadePorTipo[tipo] || 0;
+  return Math.round(config.custo * Math.pow(MULTIPLICADOR_CUSTO_REPETIDO, quantidade));
+}
+
+let dinheiro = 5000;
+let poluicaoTotal = 0;
 let totalFabricas = 1;
 const celulasOcupadas = new Set();
 
@@ -184,12 +204,32 @@ function atualizarHudFabricas() {
 }
 function atualizarCartasFabricas() {
   document.querySelectorAll('.carta-fabrica').forEach((carta) => {
-    const config = FABRICAS[carta.dataset.fabrica];
-    carta.disabled = config.custo > dinheiro;
+    const tipo = carta.dataset.fabrica;
+    const preco = precoAtual(tipo);
+    const custoEl = carta.querySelector('.carta-fabrica-custo');
+    if (custoEl) custoEl.textContent = formatarDinheiro(preco);
+    carta.disabled = preco > dinheiro;
   });
 }
 atualizarHudDinheiro();
 atualizarHudFabricas();
+
+// ============ TICK DE ECONOMIA (ganho + poluição por construção) ============
+function tickEconomia() {
+  let ganhoDoTick = 0;
+  for (const tipo in quantidadePorTipo) {
+    const quantidade = quantidadePorTipo[tipo];
+    if (!quantidade) continue;
+    const config = FABRICAS[tipo];
+    ganhoDoTick += config.ganhoPorTick * quantidade;
+    poluicaoTotal += config.poluicaoPorTick * quantidade;
+  }
+  if (ganhoDoTick === 0) return;
+  dinheiro += ganhoDoTick;
+  atualizarHudDinheiro();
+  if (painelFabricas.classList.contains('aberto')) atualizarCartasFabricas();
+}
+setInterval(tickEconomia, TICK_ECONOMIA_MS);
 
 // ============ COLOCAÇÃO DE FÁBRICAS NO GRID ============
 function chaveCelula(col, row) {
@@ -323,6 +363,9 @@ function iniciarColocacao(tipo) {
   estadoConstrucao = {
     tipo, config, wrapper, tinta,
     colSpan, rowSpan,
+    // preço travado no início da colocação (com a escala por quantidade
+    // já possuída), pra cobrar o mesmo valor mostrado no card
+    precoCompra: precoAtual(tipo),
     larguraImagem: larguraImagemParaFootprint(colSpan, rowSpan),
     travado: false, col: null, row: null, barra: null,
   };
@@ -429,7 +472,7 @@ function encerrarEstadoConstrucao() {
 
 function confirmarConstrucao() {
   if (!estadoConstrucao) return;
-  const { wrapper, tinta, col, row, colSpan, rowSpan, config, larguraImagem } = estadoConstrucao;
+  const { wrapper, tinta, col, row, colSpan, rowSpan, tipo, precoCompra, larguraImagem } = estadoConstrucao;
   // segurança: não deixa confirmar em cima de célula já ocupada
   if (footprintOcupado(col, row, colSpan, rowSpan)) return;
   removerAcoesFlutuantes();
@@ -437,8 +480,9 @@ function confirmarConstrucao() {
   tinta.classList.add('fabrica-tinta--sucesso');
   wrapper.classList.add('fabrica-instancia--construida');
 
-  dinheiro -= config.custo;
+  dinheiro -= precoCompra;
   totalFabricas += 1;
+  quantidadePorTipo[tipo] = (quantidadePorTipo[tipo] || 0) + 1;
   atualizarHudDinheiro();
   atualizarHudFabricas();
   marcarFootprintOcupado(col, row, colSpan, rowSpan);
