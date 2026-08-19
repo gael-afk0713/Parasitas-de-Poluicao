@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parasitas de Poluição</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div class="power-on" aria-hidden="true"></div>
+
+  <div class="bg" aria-hidden="true"></div>
+  <div class="raios" aria-hidden="true"></div>
+  <div class="vinheta" aria-hidden="true"></div>
+  <div class="grao" aria-hidden="true"></div>
+  <div class="fuligem" id="fuligem"></div>
+
+  <div class="hud-frame" aria-hidden="true">
+    <span class="hud-corner hud-corner--tl"></span>
+    <span class="hud-corner hud-corner--tr"></span>
+    <span class="hud-corner hud-corner--bl"></span>
+    <span class="hud-corner hud-corner--br"></span>
+  </div>
+
+  <div class="hud-status" aria-hidden="true">
+    <span class="hud-dot"></span>
+    Sistema Corporativo Online
+  </div>
+
+  <main>
+    <p class="titulo-overline">Simulação de Colapso Corporativo</p>
+    <h1 class="titulo">
+      <span class="linha">Parasitas</span>
+      <span class="linha">de Poluição</span>
+    </h1>
+
+    <nav class="menu">
+      <button class="item item-principal" id="btn-novo-jogo">Novo Jogo</button>
+      <button class="item" id="btn-continuar">Continuar</button>
+      <button class="item" id="btn-como-jogar">Como Jogar</button>
+      <button class="item" id="btn-creditos">Créditos</button>
+    </nav>
+  </main>
+
+  <footer>
+    <span class="relogio" id="relogio">00:00:00</span><span class="footer-sep">·</span>protótipo · v0.1
+  </footer>
+
+  <section class="painel" id="painel-como-jogar" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Manual</p>
+      <h2 class="painel-titulo">Como Jogar</h2>
+      <ul class="painel-lista">
+        <li>Você assume o comando de uma empresa em ascensão.</li>
+        <li>Cada decisão — desmatar, poluir rios, abrir novas fábricas — acelera o lucro, mas tem um custo ambiental.</li>
+        <li>As escolhas que você faz no início definem quais fases você vai enfrentar mais à frente.</li>
+        <li>Quando a exploração atinge o limite, a empresa colapsa — e você se torna o Guardião da Natureza.</li>
+        <li>A partir daí, o objetivo se inverte: restaurar tudo o que foi destruído.</li>
+      </ul>
+      <button class="painel-voltar" data-fechar="painel-como-jogar">← Voltar</button>
+    </div>
+  </section>
+
+  <section class="painel" id="painel-creditos" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Ficha Técnica</p>
+      <h2 class="painel-titulo">Créditos</h2>
+      <ul class="painel-lista painel-lista--creditos">
+        <li><span>Roteiro &amp; Design</span>você</li>
+        <li><span>Desenvolvimento</span>Claude</li>
+        <li><span>Arte de fundo</span>gerada com IA</li>
+      </ul>
+      <button class="painel-voltar" data-fechar="painel-creditos">← Voltar</button>
+    </div>
+  </section>
+
+  <section class="painel" id="painel-novo-jogo" aria-hidden="true">
+    <div class="painel-conteudo painel-conteudo--largo">
+      <p class="painel-rotulo">Novo Jogo</p>
+      <h2 class="painel-titulo">Criar Save</h2>
+
+      <div class="slots">
+        <button class="slot slot-ativo" data-slot="1">Save 1</button>
+        <button class="slot" data-slot="2">Save 2</button>
+        <button class="slot" data-slot="3">Save 3</button>
+      </div>
+
+      <div class="campo">
+        <label for="campo-nome-save">Nome do Save</label>
+        <input type="text" id="campo-nome-save" maxlength="24" placeholder="ex: 1ª tentativa">
+      </div>
+
+      <div class="campo-linha">
+        <div class="campo">
+          <label for="campo-nome-jogador">Nome do Jogador</label>
+          <input type="text" id="campo-nome-jogador" maxlength="20" placeholder="seu nome">
+        </div>
+        <div class="campo">
+          <label for="campo-nome-empresa">Nome da Empresa</label>
+          <input type="text" id="campo-nome-empresa" maxlength="24" placeholder="ex: Nortec Ind.">
+        </div>
+      </div>
+
+      <div class="campo">
+        <label>Dificuldade</label>
+        <div class="dificuldades">
+          <button class="dificuldade dificuldade-ativa" data-dificuldade="Iniciante">Iniciante</button>
+          <button class="dificuldade" data-dificuldade="Médio">Médio</button>
+          <button class="dificuldade" data-dificuldade="Expert">Expert</button>
+        </div>
+      </div>
+
+      <p class="painel-status" id="status-novo-jogo"></p>
+
+      <div class="painel-acoes">
+        <button class="painel-voltar" data-fechar="painel-novo-jogo">← Voltar</button>
+        <button class="painel-confirmar" id="btn-comecar">Começar</button>
+      </div>
+    </div>
+  </section>
+
+<script src="script.js"></script>
+</body>
+</html>
