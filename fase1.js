@@ -145,6 +145,8 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     fecharPainelFabricas();
     abortarColocacao();
+  } else if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    rotacionarColocacao();
   }
 });
 
@@ -157,8 +159,11 @@ document.querySelectorAll('.carta-fabrica').forEach((carta) => {
 });
 
 // ============ ECONOMIA ============
+// celulasCol/celulasRow = pegada da fábrica no grid (nunca um bloco 2x2,
+// sempre uma fileira de 2 células — na horizontal ou na vertical,
+// dependendo da rotação escolhida pelo jogador)
 const FABRICAS = {
-  'usina-carvao': { nome: 'Usina de Carvão', custo: 8000, sprite: 'imagens/usina-carvao.png', larguraImagem: TILE_W },
+  'usina-carvao': { nome: 'Usina de Carvão', custo: 8000, sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1 },
 };
 
 let dinheiro = 50000;
@@ -211,8 +216,17 @@ function celulaMaisProxima(mx, my) {
   };
 }
 
-function centroCelulaNaTela(col, row) {
-  return pontoNaTela(col + 0.5, row + 0.5);
+// centro na tela de uma pegada de colSpan x rowSpan células, começando
+// em (col, row) — pra pegada 1x1 isso é o mesmo que o centro da célula
+function centroFootprintNaTela(col, row, colSpan, rowSpan) {
+  return pontoNaTela(col + colSpan / 2, row + rowSpan / 2);
+}
+
+// largura visual (no espaço da imagem) da pegada isométrica de
+// colSpan x rowSpan células — mesma fórmula do contorno de um losango
+// isométrico; por simetria dá o mesmo valor pras duas rotações (2x1 e 1x2)
+function larguraImagemParaFootprint(colSpan, rowSpan) {
+  return (colSpan + rowSpan) * (TILE_W / 2);
 }
 
 function escalaAtual() {
@@ -220,7 +234,7 @@ function escalaAtual() {
 }
 
 function posicionarInstancia(instancia) {
-  const ponto = centroCelulaNaTela(instancia.col, instancia.row);
+  const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
   instancia.wrapper.style.left = ponto.x + 'px';
   instancia.wrapper.style.top = ponto.y + 'px';
   instancia.wrapper.style.width = (instancia.larguraImagem * escalaAtual()) + 'px';
@@ -228,9 +242,45 @@ function posicionarInstancia(instancia) {
 
 function reposicionarAcoesFlutuantes() {
   if (!estadoConstrucao || !estadoConstrucao.barra) return;
-  const ponto = centroCelulaNaTela(estadoConstrucao.col, estadoConstrucao.row);
-  estadoConstrucao.barra.style.left = ponto.x + 'px';
-  estadoConstrucao.barra.style.top = (ponto.y + 16) + 'px';
+  const barra = estadoConstrucao.barra;
+  const ponto = centroFootprintNaTela(estadoConstrucao.col, estadoConstrucao.row, estadoConstrucao.colSpan, estadoConstrucao.rowSpan);
+  barra.style.top = (ponto.y + 16) + 'px';
+  // clampa o centro horizontal pra barra (agora com 3 botões) nunca
+  // vazar pra fora da tela em telas estreitas, perto das bordas do grid
+  const margem = 8;
+  const metadeLargura = barra.offsetWidth / 2;
+  const minCentro = metadeLargura + margem;
+  const maxCentro = window.innerWidth - metadeLargura - margem;
+  const centroX = Math.min(Math.max(ponto.x, minCentro), maxCentro);
+  barra.style.left = centroX + 'px';
+}
+
+// true se alguma célula da pegada colSpan x rowSpan (a partir de col,row)
+// já estiver ocupada
+function footprintOcupado(col, row, colSpan, rowSpan) {
+  for (let dc = 0; dc < colSpan; dc++) {
+    for (let dr = 0; dr < rowSpan; dr++) {
+      if (celulasOcupadas.has(chaveCelula(col + dc, row + dr))) return true;
+    }
+  }
+  return false;
+}
+
+function marcarFootprintOcupado(col, row, colSpan, rowSpan) {
+  for (let dc = 0; dc < colSpan; dc++) {
+    for (let dr = 0; dr < rowSpan; dr++) {
+      celulasOcupadas.add(chaveCelula(col + dc, row + dr));
+    }
+  }
+}
+
+// garante que a pegada colSpan x rowSpan, começando em (col,row), caiba
+// inteira dentro do grid — desliza a âncora pra dentro se preciso
+function clampFootprint(col, row, colSpan, rowSpan) {
+  return {
+    col: Math.min(Math.max(col, 0), GRID_N - colSpan),
+    row: Math.min(Math.max(row, 0), GRID_N - rowSpan),
+  };
 }
 
 let ultimoMouseX = window.innerWidth / 2;
@@ -266,9 +316,12 @@ function iniciarColocacao(tipo) {
   const { wrapper, tinta } = criarSprite(config);
   wrapper.classList.add('fabrica-instancia--fantasma');
 
+  const colSpan = config.celulasCol;
+  const rowSpan = config.celulasRow;
   estadoConstrucao = {
     tipo, config, wrapper, tinta,
-    larguraImagem: config.larguraImagem,
+    colSpan, rowSpan,
+    larguraImagem: larguraImagemParaFootprint(colSpan, rowSpan),
     travado: false, col: null, row: null, barra: null,
   };
 
@@ -283,12 +336,33 @@ function iniciarColocacao(tipo) {
 
 function reposicionarFantasma(mx, my) {
   if (!estadoConstrucao || estadoConstrucao.travado) return;
-  const { col, row } = celulaMaisProxima(mx, my);
+  const bruto = celulaMaisProxima(mx, my);
+  const { col, row } = clampFootprint(bruto.col, bruto.row, estadoConstrucao.colSpan, estadoConstrucao.rowSpan);
   estadoConstrucao.col = col;
   estadoConstrucao.row = row;
   posicionarInstancia(estadoConstrucao);
-  const ocupada = celulasOcupadas.has(chaveCelula(col, row));
+  const ocupada = footprintOcupado(col, row, estadoConstrucao.colSpan, estadoConstrucao.rowSpan);
   estadoConstrucao.wrapper.classList.toggle('fabrica-instancia--ocupada', ocupada);
+}
+
+// troca 2x1 por 1x2 (ou vice-versa) — funciona tanto arrastando o
+// fantasma quanto já com a colocação travada (aí gira em volta da célula
+// que já estava travada, sem depender do cursor)
+function rotacionarColocacao() {
+  if (!estadoConstrucao) return;
+  const est = estadoConstrucao;
+  [est.colSpan, est.rowSpan] = [est.rowSpan, est.colSpan];
+  est.larguraImagem = larguraImagemParaFootprint(est.colSpan, est.rowSpan);
+
+  if (est.travado) {
+    const ancora = clampFootprint(est.col, est.row, est.colSpan, est.rowSpan);
+    est.col = ancora.col;
+    est.row = ancora.row;
+    posicionarInstancia(est);
+    reposicionarAcoesFlutuantes();
+  } else {
+    reposicionarFantasma(ultimoMouseX, ultimoMouseY);
+  }
 }
 
 // ---- controle unificado de mouse/toque/caneta via Pointer Events ----
@@ -320,7 +394,7 @@ function aoSoltarDurantePlacement(e) {
   ultimoMouseX = e.clientX;
   ultimoMouseY = e.clientY;
   reposicionarFantasma(e.clientX, e.clientY);
-  if (celulasOcupadas.has(chaveCelula(estadoConstrucao.col, estadoConstrucao.row))) return;
+  if (footprintOcupado(estadoConstrucao.col, estadoConstrucao.row, estadoConstrucao.colSpan, estadoConstrucao.rowSpan)) return;
   travarColocacao();
 }
 
@@ -339,11 +413,15 @@ function mostrarAcoesFlutuantes() {
   btnCancelar.className = 'painel-voltar';
   btnCancelar.textContent = 'Cancelar';
 
+  const btnRotacionar = document.createElement('button');
+  btnRotacionar.className = 'painel-voltar acao-rotacionar';
+  btnRotacionar.textContent = 'Girar';
+
   const btnConfirmar = document.createElement('button');
   btnConfirmar.className = 'painel-confirmar';
   btnConfirmar.textContent = 'Confirmar';
 
-  barra.append(btnCancelar, btnConfirmar);
+  barra.append(btnCancelar, btnRotacionar, btnConfirmar);
   document.body.appendChild(barra);
   estadoConstrucao.barra = barra;
   reposicionarAcoesFlutuantes();
@@ -353,6 +431,7 @@ function mostrarAcoesFlutuantes() {
   // já que a barra nasce colada na célula travada) nunca aciona os botões
   setTimeout(() => {
     btnCancelar.addEventListener('click', cancelarConstrucao);
+    btnRotacionar.addEventListener('click', rotacionarColocacao);
     btnConfirmar.addEventListener('click', confirmarConstrucao);
   }, 0);
 }
@@ -373,7 +452,10 @@ function encerrarEstadoConstrucao() {
 
 function confirmarConstrucao() {
   if (!estadoConstrucao) return;
-  const { wrapper, tinta, col, row, config } = estadoConstrucao;
+  const { wrapper, tinta, col, row, colSpan, rowSpan, config, larguraImagem } = estadoConstrucao;
+  // segurança: se o jogador girou a peça em cima de uma célula ocupada
+  // vizinha, não deixa confirmar (o sprite já fica acinzentado avisando)
+  if (footprintOcupado(col, row, colSpan, rowSpan)) return;
   removerAcoesFlutuantes();
 
   tinta.classList.add('fabrica-tinta--sucesso');
@@ -383,8 +465,8 @@ function confirmarConstrucao() {
   totalFabricas += 1;
   atualizarHudDinheiro();
   atualizarHudFabricas();
-  celulasOcupadas.add(chaveCelula(col, row));
-  instanciasConstruidas.push({ wrapper, col, row, larguraImagem: config.larguraImagem });
+  marcarFootprintOcupado(col, row, colSpan, rowSpan);
+  instanciasConstruidas.push({ wrapper, col, row, colSpan, rowSpan, larguraImagem });
 
   setTimeout(() => tinta.remove(), 550);
   encerrarEstadoConstrucao();

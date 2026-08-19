@@ -975,7 +975,10 @@ footer{
   left:0;
   z-index:3;
   display:flex;
-  gap:0.6rem;
+  flex-wrap:wrap;
+  justify-content:center;
+  gap:0.5rem;
+  max-width:min(92vw, 360px);
   transform:translate(-50%, 0);
   animation:acoes-surgir 0.2s ease-out forwards;
 }
@@ -985,8 +988,15 @@ footer{
 }
 .fabrica-acoes-flutuantes .painel-voltar,
 .fabrica-acoes-flutuantes .painel-confirmar{
-  padding:0.55rem 1.1rem;
+  padding:0.5rem 0.9rem;
   font-size:0.78rem;
+  white-space:nowrap;
+}
+.fabrica-acoes-flutuantes .acao-rotacionar::after{
+  content:" (R)";
+}
+@media (max-width:480px){
+  .fabrica-acoes-flutuantes .acao-rotacionar::after{content:"";}
 }
 
 @media (prefers-reduced-motion:reduce){
