@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 460" width="400" height="460">
+  <defs>
+    <linearGradient id="tanque-corpo" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#dff1f5"/>
+      <stop offset="0.55" stop-color="#aed7e2"/>
+      <stop offset="1" stop-color="#82b9c9"/>
+    </linearGradient>
+    <linearGradient id="tanque-topo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2fbfd"/>
+      <stop offset="1" stop-color="#c3e4ec"/>
+    </linearGradient>
+    <linearGradient id="perna" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4c6b74"/>
+      <stop offset="1" stop-color="#33484f"/>
+    </linearGradient>
+    <linearGradient id="casa-parede" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#5a95a6"/>
+      <stop offset="1" stop-color="#3f7383"/>
+    </linearGradient>
+  </defs>
+
+  <!-- pernas de sustentação (treliça em X) -->
+  <g stroke="url(#perna)" stroke-width="10" stroke-linecap="round" fill="none">
+    <path d="M120 300 L100 452"/>
+    <path d="M280 300 L300 452"/>
+    <path d="M150 292 L340 452"/>
+    <path d="M250 292 L60 452"/>
+    <path d="M112 372 L288 372"/>
+  </g>
+
+  <!-- casa de bombas na base -->
+  <g>
+    <path d="M138 372 L262 372 L262 452 L138 452 Z" fill="url(#casa-parede)"/>
+    <path d="M138 372 L200 350 L262 372 L200 394 Z" fill="#7fbccb"/>
+    <rect x="176" y="404" width="30" height="48" fill="#274046"/>
+    <rect x="150" y="386" width="22" height="18" fill="#cdeaf0" opacity="0.85"/>
+    <rect x="228" y="386" width="22" height="18" fill="#cdeaf0" opacity="0.85"/>
+  </g>
+
+  <!-- cano vertical ligando a casa de bombas ao tanque -->
+  <rect x="188" y="128" width="24" height="180" fill="#2c4750"/>
+  <rect x="192" y="128" width="6" height="180" fill="#4c6b74"/>
+
+  <!-- corpo cilíndrico do reservatório -->
+  <path d="M92 96 L92 244 A108 30 0 0 0 308 244 L308 96 Z" fill="url(#tanque-corpo)" stroke="#5f97a6" stroke-width="4"/>
+  <!-- faixa amber de identificação da usina, mesma cor de destaque do jogo -->
+  <path d="M92 176 L92 200 A108 30 0 0 0 308 200 L308 176 A108 30 0 0 1 92 176 Z" fill="#d99a35" opacity="0.85"/>
+  <!-- topo elíptico do reservatório -->
+  <ellipse cx="200" cy="96" rx="108" ry="30" fill="url(#tanque-topo)" stroke="#5f97a6" stroke-width="4"/>
+  <ellipse cx="200" cy="96" rx="80" ry="20" fill="#eaf7fa" opacity="0.6"/>
+
+  <!-- tampa/respiro no topo -->
+  <rect x="176" y="60" width="48" height="20" rx="4" fill="#c3e4ec" stroke="#5f97a6" stroke-width="3"/>
+  <ellipse cx="200" cy="60" rx="24" ry="9" fill="#eaf7fa" stroke="#5f97a6" stroke-width="3"/>
+
+  <!-- névoa/vapor sutil saindo do respiro, reforça o tema "água" -->
+  <g fill="#eaf7fa" opacity="0.55">
+    <ellipse cx="188" cy="34" rx="12" ry="7"/>
+    <ellipse cx="206" cy="20" rx="15" ry="8"/>
+    <ellipse cx="196" cy="8" rx="10" ry="6"/>
+  </g>
+</svg>

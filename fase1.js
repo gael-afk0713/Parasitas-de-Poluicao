@@ -99,6 +99,21 @@ function lerSaveAtivo() {
   }
 }
 
+// toast único (#boas-vindas) reaproveitado tanto pra mensagem de boas-vindas
+// quanto pro aviso narrativo de poluição — mesmo elemento, conteúdo trocado
+let timerToast = null;
+function mostrarToast(...conteudo) {
+  const el = document.getElementById('boas-vindas');
+  if (!el) return;
+  el.textContent = '';
+  el.append(...conteudo);
+  el.classList.remove('visivel');
+  void el.offsetWidth; // força reflow, garante que reinicia a transição mesmo se já estava visível
+  requestAnimationFrame(() => el.classList.add('visivel'));
+  clearTimeout(timerToast);
+  timerToast = setTimeout(() => el.classList.remove('visivel'), 5200);
+}
+
 function aplicarSaveAtivo() {
   const saveAtivo = lerSaveAtivo();
   if (!saveAtivo) return;
@@ -107,17 +122,11 @@ function aplicarSaveAtivo() {
   if (hudEmpresa) hudEmpresa.textContent = saveAtivo.empresa;
   document.title = `${saveAtivo.empresa} · Fase 1 · Parasitas de Poluição`;
 
-  const boasVindas = document.getElementById('boas-vindas');
-  if (boasVindas) {
-    boasVindas.textContent = '';
-    const nomeJogador = document.createElement('strong');
-    nomeJogador.textContent = saveAtivo.jogador;
-    const nomeEmpresa = document.createElement('strong');
-    nomeEmpresa.textContent = saveAtivo.empresa;
-    boasVindas.append('Bem-vindo(a), ', nomeJogador, '. A ', nomeEmpresa, ' está pronta pra crescer.');
-    requestAnimationFrame(() => boasVindas.classList.add('visivel'));
-    setTimeout(() => boasVindas.classList.remove('visivel'), 4200);
-  }
+  const nomeJogador = document.createElement('strong');
+  nomeJogador.textContent = saveAtivo.jogador;
+  const nomeEmpresa = document.createElement('strong');
+  nomeEmpresa.textContent = saveAtivo.empresa;
+  mostrarToast('Bem-vindo(a), ', nomeJogador, '. A ', nomeEmpresa, ' está pronta pra crescer.');
 }
 aplicarSaveAtivo();
 
@@ -150,27 +159,68 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-document.querySelectorAll('.carta-fabrica').forEach((carta) => {
-  carta.addEventListener('click', () => {
-    if (carta.disabled) return;
-    fecharPainelFabricas();
-    iniciarColocacao(carta.dataset.fabrica);
-  });
+// delegação no container (os cards são renderizados dinamicamente a
+// partir de FABRICAS, então não existem ainda neste ponto do script)
+document.getElementById('lista-fabricas').addEventListener('click', (e) => {
+  const carta = e.target.closest('.carta-fabrica');
+  if (!carta || carta.disabled) return;
+  fecharPainelFabricas();
+  iniciarColocacao(carta.dataset.fabrica);
 });
 
 // ============ ECONOMIA ============
-// celulasCol/celulasRow = pegada da fábrica no grid: nunca um bloco 2x2,
-// sempre uma fileira de 2 células (hoje fixa em 2x1 — rotação removida
-// temporariamente)
-// ganhoPorTick/poluicaoPorTick = quanto cada UNIDADE dessa construção
-// rende/polui a cada tick de TICK_ECONOMIA_MS (somado por quantidade
-// possuída — 3 usinas rendem 3x o ganhoPorTick por tick)
+// ícones reaproveitados nos cards de construção (mesmo viewBox 24x24 e
+// classe .icone-fabrica dos outros ícones do HUD)
+const ICONES_CONSTRUCAO = {
+  fabrica: '<path d="M3 21V13l4 3v-3l4 3v-3l4 3v5H3Z"/><rect x="17" y="7" width="3" height="14"/><path d="M2 21h20"/>',
+  usina: '<path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z"/><path d="M8.5 15a3.5 3.5 0 0 0 3.5 3.5"/>',
+};
+
+// celulasCol/celulasRow = pegada da construção no grid.
+// ganhoPorTick/poluicaoPorTick = quanto cada UNIDADE rende/polui a cada
+// tick de TICK_ECONOMIA_MS (multiplicado pela quantidade possuída).
+// bonusAdjacencia = fração extra de ganho que essa construção dá a CADA
+// vizinha ortogonal (só usinas de suporte têm isso — ver calcularGanhoInstancia)
 const FABRICAS = {
   'usina-carvao': {
-    nome: 'Usina de Carvão', custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
+    nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
+    descricao: 'Energia barata, alto custo ambiental.',
+    custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
     sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1,
   },
+  'usina-agua': {
+    nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
+    descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
+    custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
+    sprite: 'imagens/usina-agua.svg', celulasCol: 1, celulasRow: 1,
+  },
 };
+
+// teto global: uma construção não pode receber mais que +60% de ganho
+// somando o bônus de TODAS as usinas vizinhas — sem isso, cercar uma
+// fábrica de usinas de água vira ganho infinito
+const BONUS_ADJACENCIA_MAX = 0.60;
+
+function renderizarCartasFabricas() {
+  const lista = document.getElementById('lista-fabricas');
+  for (const tipo in FABRICAS) {
+    const config = FABRICAS[tipo];
+    const carta = document.createElement('button');
+    carta.className = 'carta-fabrica';
+    carta.dataset.fabrica = tipo;
+    carta.innerHTML = `
+      <svg class="icone-fabrica" viewBox="0 0 24 24" aria-hidden="true">${ICONES_CONSTRUCAO[config.icone] || ICONES_CONSTRUCAO.fabrica}</svg>
+      <span class="carta-fabrica-texto">
+        <span class="carta-fabrica-categoria">${config.categoria}</span>
+        <span class="carta-fabrica-nome">${config.nome}</span>
+        <span class="carta-fabrica-desc">${config.descricao}</span>
+      </span>
+      <span class="carta-fabrica-custo"></span>
+    `;
+    lista.appendChild(carta);
+  }
+}
+renderizarCartasFabricas();
 
 // cada unidade adicional da MESMA construção custa 15% a mais que a
 // anterior: preço da unidade N = custo base × 1.15^(N-1) — genérico pra
@@ -192,6 +242,8 @@ const celulasOcupadas = new Set();
 
 const hudDinheiroEl = document.getElementById('hud-dinheiro');
 const hudFabricasEl = document.getElementById('hud-fabricas');
+const hudPoluicaoEl = document.getElementById('hud-poluicao');
+const hudStatPoluicaoEl = document.querySelector('.hud-stat--poluicao');
 
 function formatarDinheiro(valor) {
   return 'R$ ' + valor.toLocaleString('pt-BR');
@@ -211,22 +263,94 @@ function atualizarCartasFabricas() {
     carta.disabled = preco > dinheiro;
   });
 }
+
+// níveis de severidade visual do HUD de poluição — puramente estético
+// por enquanto, sem nenhum efeito de jogo além do aviso narrativo abaixo
+const LIMIAR_POLUICAO_ATENCAO = 500;
+const LIMIAR_POLUICAO_CRITICO = 1500;
+let avisoPoluicaoMostrado = false;
+
+function atualizarHudPoluicao() {
+  hudPoluicaoEl.textContent = poluicaoTotal.toLocaleString('pt-BR');
+  const nivel = poluicaoTotal >= LIMIAR_POLUICAO_CRITICO ? 'critico'
+    : poluicaoTotal >= LIMIAR_POLUICAO_ATENCAO ? 'atencao' : 'normal';
+  hudStatPoluicaoEl.dataset.nivel = nivel;
+  if (nivel === 'critico' && !avisoPoluicaoMostrado) {
+    avisoPoluicaoMostrado = true;
+    const forte = document.createElement('strong');
+    forte.textContent = 'níveis críticos';
+    mostrarToast('Os índices de poluição da região já atingem ', forte, '. A floresta ao redor sente cada usina.');
+  }
+}
+
+function pulsarGanhoNoHud() {
+  hudDinheiroEl.classList.remove('pulso-ganho');
+  void hudDinheiroEl.offsetWidth; // força reflow pra reiniciar a animação
+  hudDinheiroEl.classList.add('pulso-ganho');
+}
+
 atualizarHudDinheiro();
 atualizarHudFabricas();
+atualizarHudPoluicao();
+atualizarCartasFabricas();
 
 // ============ TICK DE ECONOMIA (ganho + poluição por construção) ============
-function tickEconomia() {
-  let ganhoDoTick = 0;
-  for (const tipo in quantidadePorTipo) {
-    const quantidade = quantidadePorTipo[tipo];
-    if (!quantidade) continue;
-    const config = FABRICAS[tipo];
-    ganhoDoTick += config.ganhoPorTick * quantidade;
-    poluicaoTotal += config.poluicaoPorTick * quantidade;
+// duas pegadas (col/row/colSpan/rowSpan) são vizinhas ortogonais se
+// alguma célula de uma encosta numa célula da outra — diagonal não conta
+function footprintsVizinhos(a, b) {
+  for (let dc = 0; dc < a.colSpan; dc++) {
+    for (let dr = 0; dr < a.rowSpan; dr++) {
+      const col = a.col + dc, row = a.row + dr;
+      const candidatas = [[col + 1, row], [col - 1, row], [col, row + 1], [col, row - 1]];
+      for (const [vc, vr] of candidatas) {
+        if (vc >= b.col && vc < b.col + b.colSpan && vr >= b.row && vr < b.row + b.rowSpan) return true;
+      }
+    }
   }
-  if (ganhoDoTick === 0) return;
+  return false;
+}
+
+// ganho efetivo de UMA instância construída no tick atual, já somando o
+// bônus de todas as vizinhas ortogonais com bonusAdjacencia (ex: Usina
+// de Água), respeitando o teto BONUS_ADJACENCIA_MAX
+function calcularGanhoInstancia(instancia) {
+  const config = FABRICAS[instancia.tipo];
+  let bonus = 0;
+  for (const outra of instanciasConstruidas) {
+    if (outra === instancia) continue;
+    const configOutra = FABRICAS[outra.tipo];
+    if (!configOutra.bonusAdjacencia) continue;
+    if (footprintsVizinhos(instancia, outra)) bonus += configOutra.bonusAdjacencia;
+  }
+  bonus = Math.min(bonus, BONUS_ADJACENCIA_MAX);
+  return Math.round(config.ganhoPorTick * (1 + bonus));
+}
+
+function mostrarNumeroFlutuante(instancia, valor) {
+  const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
+  const numero = document.createElement('div');
+  numero.className = 'numero-flutuante';
+  numero.textContent = '+' + formatarDinheiro(valor);
+  numero.style.left = ponto.x + 'px';
+  numero.style.top = ponto.y + 'px';
+  document.body.appendChild(numero);
+  setTimeout(() => numero.remove(), 1150);
+}
+
+function tickEconomia() {
+  if (instanciasConstruidas.length === 0) return;
+  let ganhoDoTick = 0;
+  instanciasConstruidas.forEach((instancia) => {
+    const config = FABRICAS[instancia.tipo];
+    const ganho = calcularGanhoInstancia(instancia);
+    ganhoDoTick += ganho;
+    poluicaoTotal += config.poluicaoPorTick;
+    mostrarNumeroFlutuante(instancia, ganho);
+  });
   dinheiro += ganhoDoTick;
   atualizarHudDinheiro();
+  atualizarHudPoluicao();
+  pulsarGanhoNoHud();
   if (painelFabricas.classList.contains('aberto')) atualizarCartasFabricas();
 }
 setInterval(tickEconomia, TICK_ECONOMIA_MS);
@@ -486,7 +610,7 @@ function confirmarConstrucao() {
   atualizarHudDinheiro();
   atualizarHudFabricas();
   marcarFootprintOcupado(col, row, colSpan, rowSpan);
-  instanciasConstruidas.push({ wrapper, col, row, colSpan, rowSpan, larguraImagem });
+  instanciasConstruidas.push({ wrapper, col, row, colSpan, rowSpan, larguraImagem, tipo });
 
   setTimeout(() => tinta.remove(), 550);
   encerrarEstadoConstrucao();

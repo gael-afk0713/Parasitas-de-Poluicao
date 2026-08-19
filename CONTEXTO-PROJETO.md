@@ -28,7 +28,13 @@ imagens/
   mapa-fase1-clareira.jpg fundo original da Fase 1 (floresta + clareira + lagoa), 1024x572
   mapa-fase1-clareira-hd.jpg  mesma imagem, upscale local 2x (Lanczos+sharpen) — é a que
                               está em uso hoje no CSS, pra não ficar borrada em telas grandes
-  usina-carvao.png         sprite isométrico da Usina de Carvão, PNG RGBA transparente, 644x740
+  usina-carvao.png         sprite isométrico da Usina de Carvão, PNG RGBA transparente, 644x740,
+                              gerado com IA
+  usina-agua.svg            sprite isométrico da Usina de Água, SVG desenhado à mão (não IA —
+                              o gerador de imagem ficou sem crédito nessa sessão; se algum dia
+                              gerar uma versão em PNG no mesmo estilo do carvão, é só trocar o
+                              campo `sprite` da entrada 'usina-agua' em FABRICAS, o pipeline de
+                              sprite/máscara aceita os dois formatos sem mudança de código)
 ```
 
 Não existe build step, bundler ou dependências — é tudo `<script>`/`<link>`
@@ -44,6 +50,10 @@ direto. `index.html` e `fase1.html` carregam o **mesmo** `style.css`.
 --amber-dim:#8a5d1f;
 --rust:#8a4a2f;          /* usada como "cor de erro/cancelar" no lugar de vermelho puro */
 --moss-bright:#8fbf72;   /* usada como "cor de sucesso/confirmar" */
+--agua:#5f97a6;          /* acento das construções de categoria "Usina" (água), contraste
+                             de propósito com o âmbar/rust do carvão — só usado no sprite/
+                             ícone da Usina de Água, a UI/chrome continua toda em âmbar */
+--agua-dim:#3f7383;
 ```
 
 Fontes (Google Fonts, já linkadas no `<head>` dos dois HTMLs):
@@ -84,14 +94,21 @@ em vez de sombras pesadas, glow sutil em âmbar pra estados ativos/hover.
 ### `fase1.html` / `fase1.js` — Fase 1 (grid + construção)
 
 **Fundo e câmera:** a imagem de fundo é um `<div class="fase1-bg">` com
-`background-size:cover`. Como o grid é desenhado por JS (não é parte da
-imagem), existe uma função `imagemParaTela(ponto)` que replica exatamente a
-matemática do `background-size:cover` (escala = `max(vw/IMG_W, vh/IMG_H)`,
-depois centraliza) pra converter qualquer ponto do **espaço da imagem
-original** (1024x572) pro **pixel de tela atual**. Isso é usado em tudo:
-grid, sprites de fábrica, cálculo de célula sob o cursor. Se a janela for
-redimensionada, tudo reflui corretamente porque nada depende de posição
-absoluta fixa — só de `window.innerWidth/innerHeight` recalculados.
+`background-size:contain` (era `cover` até essa mudança — `cover` cortava a
+imagem em telas com proporção bem diferente da imagem original, tipo
+monitores ultrawide ou notebooks comuns; `contain` sempre mostra a imagem
+inteira, sobrando faixa no `--soot` dos lados ou em cima/embaixo quando a
+proporção não bate, mas nunca corta nem estica). Como o grid é desenhado por
+JS (não é parte da imagem), existe uma função `imagemParaTela(ponto)` que
+replica exatamente a mesma matemática do `background-size:contain` (escala =
+`min(vw/IMG_W, vh/IMG_H)`, depois centraliza) pra converter qualquer ponto do
+**espaço da imagem original** (1024x572) pro **pixel de tela atual**. Isso é
+usado em tudo: grid, sprites de construção, cálculo de célula sob o cursor.
+Se a janela for redimensionada, tudo reflui corretamente porque nada depende
+de posição absoluta fixa — só de `window.innerWidth/innerHeight`
+recalculados. **Se algum dia trocar de `contain` pra `cover` no CSS de
+novo, tem que trocar `min` por `max` em `imagemParaTela`, `celulaMaisProxima`
+e `escalaAtual` juntos — os três têm que usar a mesma fórmula.**
 
 **Grid isométrico:** desenhado num `<canvas id="grid-fase1">` por cima do
 fundo (não redesenha a imagem, só traça linhas). Constantes em `fase1.js`:
@@ -121,25 +138,53 @@ foi removida a pedido do usuário.
 **Célula sob o cursor:** `celulaMaisProxima(mx, my)` faz o caminho inverso
 (de pixel de tela pra `{col, row}`) invertendo a mesma matemática. Sempre
 clampa pro grid (`0` a `GRID_N-1`), então mesmo o cursor fora do grid faz
-snap pra célula válida mais próxima. `centroCelulaNaTela(col, row)` devolve
-o centro de uma célula específica (`pontoNaTela(col+0.5, row+0.5)`).
+snap pra célula válida mais próxima.
 
-**HUD** (`.hud-fase1`, topo da tela): três blocos — **Empresa** (vem do save
-ativo, ou "—" se abrir a página direto sem passar pelo Novo Jogo),
+**Pegada multi-célula (footprint):** cada construção ocupa `celulasCol` x
+`celulasRow` células (não necessariamente 1x1 — a Usina de Carvão é 2x1, a
+Usina de Água é 1x1). `centroFootprintNaTela(col, row, colSpan, rowSpan)`
+devolve o centro na tela de toda a pegada (generaliza o antigo
+`centroCelulaNaTela`, que só existia pra 1x1).
+`larguraImagemParaFootprint(colSpan, rowSpan)` calcula a largura visual do
+sprite a partir do contorno do losango isométrico da pegada
+(`(colSpan+rowSpan)*(TILE_W/2)`), com uma margem de 15% pra dentro — o
+sprite é um retângulo, a pegada é um losango, sem essa folga os cantos do
+retângulo escapam visualmente da pegada. `footprintOcupado`/
+`marcarFootprintOcupado` conferem/marcam **todas** as células da pegada em
+`celulasOcupadas` (um `Set` de chaves `"col,row"`), não só uma.
+`clampFootprint` desliza a pegada pra dentro do grid se o cursor estiver
+perto da borda, garantindo que ela sempre caiba inteira.
+
+**HUD** (`.hud-fase1`, topo da tela): quatro blocos — **Empresa** (vem do
+save ativo, ou "—" se abrir a página direto sem passar pelo Novo Jogo),
 **Caixa** (dinheiro, formatado em `pt-BR` via `toLocaleString`, começa em
-`R$ 50.000`) e **Fábricas** (contador, começa em `1` — a fábrica inicial da
-empresa, que hoje é só o número no HUD, **não tem sprite no grid**).
+`R$ 5.000` — pulsa em `--moss-bright` por um instante toda vez que rende
+dinheiro num tick, classe `.pulso-ganho`), **Fábricas** (contador de TODAS
+as construções, começa em `1` — a fábrica inicial da empresa, que é só o
+número no HUD, **não tem sprite no grid**) e **Poluição** (total acumulado,
+puramente informativo/atmosférico por enquanto — muda de cor conforme a
+gravidade via `data-nivel` no `.hud-stat--poluicao`: `normal` até 500,
+`atencao` até 1500, `critico` depois disso; cruzar o `critico` dispara um
+toast único de aviso narrativo, ver abaixo).
 
-**Toast de boas-vindas:** se existe save ativo no localStorage, mostra
-"Bem-vindo(a), {jogador}. A {empresa} está pronta pra crescer." por ~4s ao
-carregar a Fase 1.
+**Toast (`#boas-vindas`, reaproveitado):** a função genérica `mostrarToast(...conteudo)`
+troca o conteúdo do elemento e reinicia a transição — é usada tanto pra
+"Bem-vindo(a), {jogador}..." ao carregar a fase (se existe save ativo) quanto
+pro aviso de poluição crítica. Não crie um segundo elemento de toast pra
+uma mensagem nova; reaproveite `mostrarToast`.
 
 **Botão "Fábricas"** (fixo embaixo, centro) abre um painel-gaveta
-(`.painel-fabricas`, sobe de baixo) com cards de construção. Hoje só existe
-um: **Usina de Carvão** (`custo: 8000`, sprite `usina-carvao.png`,
-`larguraImagem: TILE_W` — ver seção de bug corrigido abaixo). O card fica
-`disabled` automaticamente se o saldo não for suficiente
-(`atualizarCartasFabricas()`, chamada sempre que o painel abre).
+(`.painel-fabricas`, sobe de baixo). **Os cards não são mais HTML
+hardcoded** — `renderizarCartasFabricas()` gera um `<button class="carta-fabrica">`
+pra cada entrada de `FABRICAS` (ícone via `ICONES_CONSTRUCAO[config.icone]`,
+nome, categoria, descrição; o preço é preenchido depois por
+`atualizarCartasFabricas()`). Adicionar uma construção nova é só adicionar
+uma entrada em `FABRICAS` — não mexe em `fase1.html`. Os clicks nos cards
+usam **delegação de evento** no container `#lista-fabricas` (não
+`querySelectorAll(...).forEach(...)`), porque os cards não existem no DOM
+no momento em que o script começa a rodar. O card fica `disabled`
+automaticamente se o saldo não for suficiente pro preço **atual** daquele
+tipo (ver escala de preço abaixo).
 
 **Fluxo de construção completo** (estado controlado por `estadoConstrucao`,
 objeto global em `fase1.js`):
@@ -147,27 +192,38 @@ objeto global em `fase1.js`):
 1. Clicar no card fecha o painel e chama `iniciarColocacao(tipo)`, que cria
    um `<div class="fabrica-instancia fabrica-instancia--fantasma">`
    (`position:fixed`, `pointer-events:none`, `transform:translate(-50%,-100%)`
-   — âncora é o **centro-inferior** do sprite) contendo o `<img>` do sprite
-   (opacity 0.5 via CSS) mais uma `<div class="fabrica-tinta">` usada só
-   pro flash de confirmar/cancelar (ver abaixo).
-2. `window.addEventListener('mousemove', ...)` chama
-   `reposicionarFantasma(x, y)` a cada movimento, que acha a célula mais
-   próxima e reposiciona o wrapper ali (`posicionarInstancia`). Se a célula
-   já está ocupada (`celulasOcupadas`, um `Set` de chaves `"col,row"`), o
-   sprite fica meio acinzentado (`filter:grayscale(...)`) como aviso.
-3. Um listener de `click` no `window` (**só é anexado depois de um
-   `setTimeout(…, 0)`**, pra não capturar o mesmo clique que abriu a
-   colocação) chama `aoClicarDurantePlacement`: se a célula atual estiver
-   ocupada, ignora o clique (não trava); senão, chama `travarColocacao()` —
-   sprite fica opaco, aparecem os botões flutuantes **Confirmar**/
-   **Cancelar** (reaproveitam as classes `.painel-confirmar`/
-   `.painel-voltar` já existentes, mesma paleta do resto do jogo).
+   — âncora é o **centro-inferior** da pegada, não de uma célula) contendo o
+   `<img>` do sprite (opacity 0.5 via CSS, aceita `.png` ou `.svg`) mais uma
+   `<div class="fabrica-tinta">` usada só pro flash de confirmar/cancelar.
+2. **Controle unificado por Pointer Events** (`pointermove`/`pointerdown`/
+   `pointerup` — não mouse e touch separados): `pointermove` no `window`
+   chama `reposicionarFantasma(x, y)` continuamente (cobre hover de mouse E
+   arrastar o dedo no toque), que acha a pegada mais próxima do cursor
+   (já clampada pro grid) e reposiciona o wrapper ali (`posicionarInstancia`).
+   Se alguma célula da pegada já está ocupada, o sprite fica acinzentado
+   (`filter:grayscale(...)`) como aviso. Um único código funciona pra
+   mouse, toque e caneta ao mesmo tempo — importante em dispositivo híbrido
+   (notebook touchscreen, tablet com mouse), onde dois sistemas separados
+   já causaram bug de conflito antes.
+3. `pointerdown`/`pointerup` no `window` (**só são anexados depois de um
+   `setTimeout(…, 0)`**, pra não capturar o mesmo evento que abriu a
+   colocação) chamam `aoPressionarDurantePlacement`/`aoSoltarDurantePlacement`:
+   no `pointerup`, se a pegada atual estiver ocupada, ignora (não trava);
+   senão, chama `travarColocacao()` — sprite fica opaco, aparecem os botões
+   flutuantes **Confirmar**/**Cancelar** (reaproveitam `.painel-confirmar`/
+   `.painel-voltar`). `aoSoltarDurantePlacement` chama `e.preventDefault()`
+   pra evitar o click de compatibilidade que alguns navegadores disparam
+   logo após um toque, que senão acertaria o botão Confirmar assim que ele
+   aparece embaixo do dedo. Pelo mesmo motivo, os `click` listeners dos
+   botões Confirmar/Cancelar só são ligados um tick depois de criados.
 4. **Confirmar:** aplica `.fabrica-tinta--sucesso` (pisca `--moss-bright`
-   via `mask-image` recortada no formato exato do sprite, não é um
-   retângulo), desconta o custo do `dinheiro`, incrementa
-   `totalFabricas`, marca a célula em `celulasOcupadas`, guarda a
-   instância em `instanciasConstruidas` (array, usado pra reposicionar
-   tudo em resize).
+   via `mask-image` recortada no formato exato do sprite), desconta o
+   **preço travado no início da colocação** (`estadoConstrucao.precoCompra`,
+   não o `config.custo` cru — ver escala de preço abaixo) do `dinheiro`,
+   incrementa `totalFabricas` e `quantidadePorTipo[tipo]`, marca todas as
+   células da pegada em `celulasOcupadas`, guarda a instância (com `tipo`!)
+   em `instanciasConstruidas` (array, é a fonte de verdade pro tick de
+   economia E pra reposicionar tudo em resize).
 5. **Cancelar:** aplica `.fabrica-tinta--erro` (pisca `--rust`), remove o
    sprite depois da animação, nada é descontado.
 6. **Escape** a qualquer momento cancela silenciosamente
@@ -185,10 +241,54 @@ precisa ter `larguraImagem` **direto nele** (não só dentro de
 tamanho "auto" instável que parecia mudar de tamanho conforme a posição na
 tela. A correção está em `iniciarColocacao()`.
 
-**Tamanho do sprite:** hoje `larguraImagem: TILE_W` (80, no espaço da
-imagem) — ou seja, a fábrica renderiza com a **mesma largura do
-quadradinho do grid**, escalando junto com ele em qualquer resolução (usa a
-mesma `escalaAtual()` que o resto).
+**Rotação:** já existiu (tecla R + botão "Girar", trocava 2x1 por 1x2) e foi
+**removida a pedido do usuário** — a pegada da Usina de Carvão é fixa em 2x1
+hoje. A infraestrutura de pegada multi-célula continua toda lá; reintroduzir
+rotação seria só voltar a trocar `colSpan`/`rowSpan` num botão/tecla, igual
+antes.
+
+### Economia: escala de preço, tick, adjacência
+
+**Escala de preço por unidade repetida** (genérica, vale pra qualquer
+entrada de `FABRICAS`): cada unidade adicional da MESMA construção custa
+15% a mais que a anterior — preço da unidade N = `custo` base ×
+`MULTIPLICADOR_CUSTO_REPETIDO^(N-1)`, calculado em `precoAtual(tipo)` a
+partir de `quantidadePorTipo[tipo]`. O preço é **travado no momento em que
+a colocação começa** (`estadoConstrucao.precoCompra`), não recalculado no
+confirmar — evita cobrar um valor diferente do que apareceu no card.
+
+**Tick de economia** (`tickEconomia()`, `setInterval` a cada
+`TICK_ECONOMIA_MS` = 3000ms): itera **por instância construída**
+(`instanciasConstruidas`), não por tipo/quantidade agregado — isso é
+necessário porque o bônus de adjacência é por construção específica, não
+por tipo. Pra cada instância: calcula o ganho efetivo
+(`calcularGanhoInstancia`), soma no `dinheiro`, soma a poluição base
+(`config.poluicaoPorTick`, sem bônus — o bônus de adjacência só afeta
+ganho, não poluição) no `poluicaoTotal`, e mostra um número flutuante
+(`mostrarNumeroFlutuante`, `.numero-flutuante`, sobe e some em ~1.15s) com
+o valor já bonificado sobre a construção.
+
+**Bônus de adjacência** (`bonusAdjacencia` na config de uma construção —
+hoje só a Usina de Água tem, `0.20` = +20%): `footprintsVizinhos(a, b)`
+detecta se duas pegadas são vizinhas **ortogonais** (compartilham uma
+aresta — diagonal não conta, foi escolha deliberada porque diagonal em
+grid isométrico é visualmente confuso pro jogador). `calcularGanhoInstancia`
+soma o `bonusAdjacencia` de CADA vizinha que tiver essa propriedade e
+aplica o total ao `ganhoPorTick` da instância, com teto em
+`BONUS_ADJACENCIA_MAX` (0.60 = +60%) pra impedir cercar uma fábrica de
+usinas de água pra ganho descontrolado. O sistema é genérico: qualquer
+construção futura com `bonusAdjacencia` funciona igual, sem código novo.
+
+**Valores atuais** (ajustar aqui se rebalancear):
+
+| Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | bônus adjacência |
+|---|---|---|---|---|---|---|
+| Usina de Carvão | Fábrica | 2x1 | R$ 4.500 | R$ 225 | 15 | — |
+| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | +20%/vizinha (teto 60%) |
+
+Caixa inicial do jogador: R$ 5.000. Filosofia: a primeira construção deve
+consumir a maior parte do caixa inicial (decisão pesada) mas se pagar em
+~1 minuto de jogo (não travar o ritmo).
 
 ## Fluxo de dados entre telas
 
@@ -223,17 +323,28 @@ padrão sem quebrar.
 
 - Sprite da "fábrica inicial" (hoje é só um número `1` no HUD, sem
   representação visual no grid).
-- Mais tipos de fábrica além da Usina de Carvão (o painel de construção já
-  é genérico via objeto `FABRICAS`, é só adicionar entradas — mas cada uma
-  precisa de um sprite isométrico no mesmo ângulo).
-- Nenhuma mecânica de dano ambiental, poluição, ou "custo ecológico" ainda
-  — o card da usina já tem a frase "alto custo ambiental" mas isso não
-  afeta nada no jogo hoje.
+- Mais construções além de Usina de Carvão e Usina de Água — o painel já é
+  100% genérico via `FABRICAS` (cards renderizados dinamicamente, escala de
+  preço e bônus de adjacência já genéricos), é só adicionar entrada nova +
+  sprite (`.png` ou `.svg`, o pipeline aceita os dois).
+- Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
+  usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
+  é reversível (ver seção "Rotação" acima).
+- **Poluição** agora existe e acumula de verdade (`poluicaoTotal`, HUD com
+  severidade de cor, toast único ao cruzar o limiar crítico), mas ainda é
+  só atmosférico — não afeta nada mecanicamente (não reduz ganho, não
+  aproxima o colapso da empresa de verdade). Esse é o próximo elo natural
+  pra puxar a narrativa: ligar `poluicaoTotal` a algum evento de colapso.
 - Nenhum evento de colapso da empresa nem a segunda metade do jogo
-  ("Guardião da Natureza" / restauração).
+  ("Guardião da Natureza" / restauração) — só a pincelada narrativa do
+  toast de poluição crítica, sem gameplay real de fase 2.
 - Botão "Continuar" no menu principal existe visualmente mas não tem
   handler de clique ainda (não carrega um save salvo).
 - Sem persistência real de save entre sessões do navegador além do
   `localStorage['parasitas-save-ativo']` (que guarda só o save *ativo*, não
   os 3 slots — os 3 slots do painel Novo Jogo vivem só em memória durante
   aquela visita à tela de menu, não sobrevivem a um F5).
+- Gerador de imagem IA ficou sem crédito durante essa sessão — a Usina de
+  Água usa um SVG desenhado à mão em vez de um PNG gerado (ver seção de
+  imagens no topo do arquivo). Se quiser trocar por um PNG no estilo do
+  carvão mais pra frente, é só gerar e trocar o campo `sprite`.

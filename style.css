@@ -6,6 +6,8 @@
   --amber-dim:#8a5d1f;
   --rust:#8a4a2f;
   --moss-bright:#8fbf72;
+  --agua:#5f97a6;        /* acento das construções de "usina" (água), contraste com o âmbar do carvão */
+  --agua-dim:#3f7383;
 }
 
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -707,6 +709,34 @@ footer{
 
 .hud-stat--fabrica .hud-stat-valor{color:var(--paper);}
 
+/* ---- poluição: cor sobe de gravidade conforme o total acumulado ---- */
+.icone-poluicao{
+  display:block;
+  flex-shrink:0;
+  width:24px;height:24px;
+  fill:none;
+  stroke:var(--paper-dim);
+  stroke-width:1.6;
+  stroke-linejoin:round;
+  stroke-linecap:round;
+  transition:stroke 0.4s ease;
+}
+.icone-poluicao circle{fill:rgba(157,148,127,0.25);stroke:none;}
+.hud-stat--poluicao .hud-stat-valor{color:var(--paper-dim);transition:color 0.4s ease;}
+.hud-stat--poluicao[data-nivel="atencao"] .icone-poluicao,
+.hud-stat--poluicao[data-nivel="atencao"] .hud-stat-valor{color:var(--amber);stroke:var(--amber);}
+.hud-stat--poluicao[data-nivel="atencao"] .icone-poluicao circle{fill:rgba(217,154,53,0.25);}
+.hud-stat--poluicao[data-nivel="critico"] .icone-poluicao,
+.hud-stat--poluicao[data-nivel="critico"] .hud-stat-valor{color:var(--rust);stroke:var(--rust);}
+.hud-stat--poluicao[data-nivel="critico"] .icone-poluicao circle{fill:rgba(138,74,47,0.35);}
+
+/* ---- pulso na Caixa a cada tick que rende dinheiro ---- */
+.hud-stat-valor.pulso-ganho{animation:pulso-ganho 0.6s ease-out;}
+@keyframes pulso-ganho{
+  0%{color:var(--moss-bright);text-shadow:0 0 10px rgba(143,191,114,0.7);}
+  100%{color:var(--amber);text-shadow:none;}
+}
+
 .hud-stat--empresa{
   padding-right:2.2rem;
   margin-right:0.2rem;
@@ -898,6 +928,14 @@ footer{
   gap:0.2rem;
   flex:1;
 }
+.carta-fabrica-categoria{
+  font-family:'JetBrains Mono',monospace;
+  font-weight:600;
+  font-size:0.6rem;
+  letter-spacing:0.16em;
+  text-transform:uppercase;
+  color:var(--amber-dim);
+}
 .carta-fabrica-nome{
   font-family:'Space Grotesk',sans-serif;
   font-weight:700;
@@ -996,6 +1034,28 @@ footer{
   font-size:0.78rem;
   white-space:nowrap;
 }
+
+/* ---- número flutuante de ganho, sobe e some sobre a construção ---- */
+.numero-flutuante{
+  position:fixed;
+  top:0;
+  left:0;
+  z-index:4;
+  font-family:'JetBrains Mono',monospace;
+  font-weight:700;
+  font-size:0.8rem;
+  color:var(--moss-bright);
+  text-shadow:0 1px 5px rgba(11,9,6,0.85);
+  pointer-events:none;
+  transform:translate(-50%, 0);
+  animation:numero-subir 1.15s ease-out forwards;
+}
+@keyframes numero-subir{
+  0%{opacity:0;transform:translate(-50%, 8px);}
+  18%{opacity:1;transform:translate(-50%, 0);}
+  100%{opacity:0;transform:translate(-50%, -36px);}
+}
+
 @media (prefers-reduced-motion:reduce){
   .particula,.bg,.titulo .linha,.item,.item-principal,
   .power-on,.raios,.hud-frame,.hud-status,.hud-dot,
@@ -1009,4 +1069,6 @@ footer{
   .painel-fabricas, .painel-fabricas-conteudo{transition:opacity 0.15s ease !important;transform:none !important;}
   .fabrica-acoes-flutuantes{animation:none !important;opacity:1;transform:translate(-50%, 0) !important;}
   .fabrica-tinta--sucesso, .fabrica-tinta--erro{animation:none !important;opacity:0.6 !important;}
+  .numero-flutuante{animation:none !important;opacity:0.9;transform:translate(-50%, -14px) !important;}
+  .hud-stat-valor.pulso-ganho{animation:none !important;}
 }
