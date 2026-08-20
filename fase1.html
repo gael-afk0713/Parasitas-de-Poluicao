@@ -22,8 +22,11 @@
       <span class="hud-stat-valor" id="hud-empresa">—</span>
     </div>
     <div class="hud-stat">
-      <span class="hud-stat-rotulo">Caixa</span>
-      <span class="hud-stat-valor" id="hud-dinheiro">R$ 5.000</span>
+      <span class="hud-stat-texto">
+        <span class="hud-stat-rotulo">Caixa</span>
+        <span class="hud-stat-valor" id="hud-dinheiro">R$ 5.000</span>
+        <span class="hud-stat-meta" id="hud-meta"></span>
+      </span>
     </div>
     <div class="hud-stat hud-stat--fabrica">
       <svg class="icone-fabrica hud-fabrica-icone" viewBox="0 0 24 24" aria-hidden="true">
@@ -65,6 +68,58 @@
       </div>
 
       <div class="lista-fabricas" id="lista-fabricas"></div>
+    </div>
+  </section>
+
+  <section class="painel painel--fim" id="tela-vitoria" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Fase 1 Completa</p>
+      <h2 class="painel-titulo">Expansão Garantida</h2>
+      <p class="painel-explicacao">
+        Sua empresa atingiu a meta de caixa — o crescimento que você buscou
+        desde o início. Mas nada disso veio de graça: o rastro ambiental já
+        está posto, e ele não desaparece só porque o balanço fechou no azul.
+      </p>
+      <ul class="painel-lista painel-lista--stats">
+        <li><span>Tempo jogado</span><strong id="vitoria-tempo">—</strong></li>
+        <li><span>Caixa final</span><strong id="vitoria-caixa">—</strong></li>
+        <li><span>Poluição acumulada</span><strong id="vitoria-poluicao">—</strong></li>
+        <li><span>Construções</span><strong id="vitoria-fabricas">—</strong></li>
+      </ul>
+      <p class="painel-nota">
+        A próxima etapa — quando a empresa colapsa de vez e você vira o
+        Guardião da Natureza — ainda não existe no jogo. Essa tela é onde a
+        Fase 1 termina por enquanto.
+      </p>
+      <div class="painel-acoes painel-acoes--fim">
+        <a class="painel-confirmar" href="index.html">Voltar ao Menu</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="painel painel--fim" id="tela-colapso" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Fim de Jogo</p>
+      <h2 class="painel-titulo">A Empresa Colapsou</h2>
+      <p class="painel-explicacao">
+        A poluição acumulada passou do que a região — e a fiscalização —
+        conseguiam absorver. Entre multas, protestos e o colapso ambiental,
+        não sobrou empresa para tocar.
+      </p>
+      <ul class="painel-lista painel-lista--stats">
+        <li><span>Tempo jogado</span><strong id="colapso-tempo">—</strong></li>
+        <li><span>Caixa final</span><strong id="colapso-caixa">—</strong></li>
+        <li><span>Poluição acumulada</span><strong id="colapso-poluicao">—</strong></li>
+        <li><span>Construções</span><strong id="colapso-fabricas">—</strong></li>
+      </ul>
+      <p class="painel-nota">
+        É aqui, na história, que você viraria o Guardião da Natureza pra
+        restaurar o que foi destruído — essa parte do jogo ainda não existe,
+        então a Fase 1 termina neste colapso por enquanto.
+      </p>
+      <div class="painel-acoes painel-acoes--fim">
+        <a class="painel-confirmar" href="index.html">Voltar ao Menu</a>
+      </div>
     </div>
   </section>
 

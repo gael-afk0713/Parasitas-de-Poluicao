@@ -48,7 +48,42 @@
 
   <footer>
     <span class="relogio" id="relogio">00:00:00</span><span class="footer-sep">·</span>protótipo · v0.1
+    <span class="footer-sep footer-conta-sep" id="footer-conta-sep" hidden>·</span>
+    <span class="footer-conta" id="footer-conta" hidden></span>
   </footer>
+
+  <section class="painel painel--login" id="painel-login" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Acesso</p>
+      <h2 class="painel-titulo">Entrar</h2>
+      <p class="painel-explicacao">
+        Crie um usuário e senha pra guardar seu progresso neste navegador.
+        Se o usuário já existir, é só entrar com a senha certa — se não
+        existir, uma conta nova é criada na hora.
+      </p>
+
+      <div class="campo">
+        <label for="campo-login-usuario">Usuário</label>
+        <input type="text" id="campo-login-usuario" maxlength="20" autocomplete="username" placeholder="seu usuário">
+      </div>
+      <div class="campo">
+        <label for="campo-login-senha">Senha</label>
+        <input type="password" id="campo-login-senha" maxlength="40" autocomplete="current-password" placeholder="sua senha">
+      </div>
+
+      <p class="painel-status" id="status-login"></p>
+
+      <div class="painel-acoes painel-acoes--fim">
+        <button class="painel-confirmar" id="btn-entrar">Entrar</button>
+      </div>
+
+      <p class="painel-nota">
+        Fica guardado só neste navegador (sem servidor) — não é uma conta
+        de verdade sincronizada entre aparelhos, só separa o progresso de
+        quem usa este computador.
+      </p>
+    </div>
+  </section>
 
   <section class="painel" id="painel-como-jogar" aria-hidden="true">
     <div class="painel-conteudo">
@@ -84,9 +119,18 @@
       <h2 class="painel-titulo">Criar Save</h2>
 
       <div class="slots">
-        <button class="slot slot-ativo" data-slot="1">Save 1</button>
-        <button class="slot" data-slot="2">Save 2</button>
-        <button class="slot" data-slot="3">Save 3</button>
+        <button class="slot slot-ativo" data-slot="1">
+          <span class="slot-titulo">Save 1</span>
+          <span class="slot-sub"></span>
+        </button>
+        <button class="slot" data-slot="2">
+          <span class="slot-titulo">Save 2</span>
+          <span class="slot-sub"></span>
+        </button>
+        <button class="slot" data-slot="3">
+          <span class="slot-titulo">Save 3</span>
+          <span class="slot-sub"></span>
+        </button>
       </div>
 
       <div class="campo">

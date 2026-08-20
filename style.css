@@ -480,6 +480,29 @@ footer{
   font-size:0.72rem;
 }
 
+.painel-lista--stats{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+.painel-lista--stats li{
+  display:flex;
+  justify-content:space-between;
+  align-items:baseline;
+  padding:0.7rem 0;
+  padding-left:0;
+  border-bottom:1px solid rgba(239,232,214,0.08);
+  font-family:'JetBrains Mono',monospace;
+}
+.painel-lista--stats li::before{display:none;}
+.painel-lista--stats li span{
+  color:var(--paper-dim);
+  letter-spacing:0.06em;
+  text-transform:uppercase;
+  font-size:0.72rem;
+}
+.painel-lista--stats li strong{color:var(--amber);font-size:0.95rem;}
+
 .painel-voltar{
   font-family:'JetBrains Mono',monospace;
   font-weight:600;
@@ -512,6 +535,9 @@ footer{
 }
 .slot{
   flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:0.3rem;
   font-family:'JetBrains Mono',monospace;
   font-weight:600;
   font-size:0.78rem;
@@ -523,6 +549,13 @@ footer{
   padding:0.75rem 0.5rem;
   cursor:pointer;
   transition:color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.slot-sub{
+  font-weight:400;
+  font-size:0.62rem;
+  letter-spacing:0.04em;
+  opacity:0.75;
+  text-transform:none;
 }
 .slot:hover, .slot:focus-visible{color:var(--paper);border-color:rgba(217,154,53,0.5);outline:none;}
 .slot-ativo, .slot-ativo:hover{
@@ -612,6 +645,47 @@ footer{
   flex-wrap:wrap;
   margin-top:0.5rem;
 }
+.painel-acoes--fim{justify-content:flex-end;}
+
+.painel-explicacao{
+  font-size:0.9rem;
+  line-height:1.55;
+  color:var(--paper-dim);
+  margin-bottom:1.6rem;
+}
+.painel-nota{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.66rem;
+  line-height:1.6;
+  letter-spacing:0.02em;
+  color:var(--paper-dim);
+  opacity:0.7;
+  margin-top:1.2rem;
+  padding-top:1rem;
+  border-top:1px solid rgba(239,232,214,0.1);
+}
+
+/* ---- indicador de conta logada no rodapé ---- */
+.footer-conta{
+  display:inline-flex;
+  align-items:center;
+  gap:0.5rem;
+}
+.footer-conta-usuario{color:var(--paper);}
+.footer-conta-sair{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.66rem;
+  letter-spacing:0.08em;
+  text-transform:uppercase;
+  background:none;
+  border:none;
+  color:var(--paper-dim);
+  cursor:pointer;
+  text-decoration:underline;
+  text-underline-offset:2px;
+  padding:0;
+}
+.footer-conta-sair:hover, .footer-conta-sair:focus-visible{color:var(--amber);outline:none;}
 
 .painel-confirmar{
   font-family:'JetBrains Mono',monospace;
@@ -619,6 +693,7 @@ footer{
   font-size:0.85rem;
   letter-spacing:0.1em;
   text-transform:uppercase;
+  text-decoration:none;
   background:var(--amber);
   border:1px solid var(--amber);
   color:var(--soot);
@@ -709,6 +784,14 @@ footer{
 
 .hud-stat--fabrica .hud-stat-valor{color:var(--paper);}
 
+.hud-stat-meta{
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.6rem;
+  letter-spacing:0.06em;
+  color:var(--paper-dim);
+  opacity:0.75;
+}
+
 /* ---- poluição: cor sobe de gravidade conforme o total acumulado ---- */
 .icone-poluicao{
   display:block;
@@ -734,6 +817,13 @@ footer{
 .hud-stat-valor.pulso-ganho{animation:pulso-ganho 0.6s ease-out;}
 @keyframes pulso-ganho{
   0%{color:var(--moss-bright);text-shadow:0 0 10px rgba(143,191,114,0.7);}
+  100%{color:var(--amber);text-shadow:none;}
+}
+
+/* ---- pulso na Caixa quando leva multa de fiscalização ---- */
+.hud-stat-valor.pulso-multa{animation:pulso-multa 0.7s ease-out;}
+@keyframes pulso-multa{
+  0%{color:var(--rust);text-shadow:0 0 10px rgba(138,74,47,0.7);}
   100%{color:var(--amber);text-shadow:none;}
 }
 
@@ -1070,5 +1160,5 @@ footer{
   .fabrica-acoes-flutuantes{animation:none !important;opacity:1;transform:translate(-50%, 0) !important;}
   .fabrica-tinta--sucesso, .fabrica-tinta--erro{animation:none !important;opacity:0.6 !important;}
   .numero-flutuante{animation:none !important;opacity:0.9;transform:translate(-50%, -14px) !important;}
-  .hud-stat-valor.pulso-ganho{animation:none !important;}
+  .hud-stat-valor.pulso-ganho, .hud-stat-valor.pulso-multa{animation:none !important;}
 }

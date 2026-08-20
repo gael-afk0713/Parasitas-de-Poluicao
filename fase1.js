@@ -114,21 +114,37 @@ function mostrarToast(...conteudo) {
   timerToast = setTimeout(() => el.classList.remove('visivel'), 5200);
 }
 
+// info do save escolhido no menu — inclui `usuario` (dona da conta) e
+// `slot`, usados mais abaixo pra ler/gravar o progresso persistido
+const saveAtivoInfo = lerSaveAtivo();
+
 function aplicarSaveAtivo() {
-  const saveAtivo = lerSaveAtivo();
-  if (!saveAtivo) return;
+  if (!saveAtivoInfo) return;
 
   const hudEmpresa = document.getElementById('hud-empresa');
-  if (hudEmpresa) hudEmpresa.textContent = saveAtivo.empresa;
-  document.title = `${saveAtivo.empresa} · Fase 1 · Parasitas de Poluição`;
+  if (hudEmpresa) hudEmpresa.textContent = saveAtivoInfo.empresa;
+  document.title = `${saveAtivoInfo.empresa} · Fase 1 · Parasitas de Poluição`;
 
   const nomeJogador = document.createElement('strong');
-  nomeJogador.textContent = saveAtivo.jogador;
+  nomeJogador.textContent = saveAtivoInfo.jogador;
   const nomeEmpresa = document.createElement('strong');
-  nomeEmpresa.textContent = saveAtivo.empresa;
+  nomeEmpresa.textContent = saveAtivoInfo.empresa;
   mostrarToast('Bem-vindo(a), ', nomeJogador, '. A ', nomeEmpresa, ' está pronta pra crescer.');
 }
 aplicarSaveAtivo();
+
+// ============ DIFICULDADE ============
+// escolhida no painel Novo Jogo, ignorada até agora — passa a valer pra
+// ganho (recompensa o risco), velocidade de acúmulo de poluição e
+// severidade das multas de fiscalização (ver seções mais abaixo)
+const DIFICULDADES = {
+  'Iniciante': { multGanho: 1.0, multPoluicao: 0.65, multMulta: 0.6 },
+  'Médio': { multGanho: 1.0, multPoluicao: 1.0, multMulta: 1.0 },
+  'Expert': { multGanho: 1.3, multPoluicao: 1.5, multMulta: 1.5 },
+};
+function configDificuldade() {
+  return DIFICULDADES[saveAtivoInfo?.dificuldade] || DIFICULDADES['Médio'];
+}
 
 // ============ PAINEL DE FÁBRICAS ============
 const btnFabricas = document.getElementById('btn-fabricas');
@@ -238,6 +254,8 @@ function precoAtual(tipo) {
 let dinheiro = 5000;
 let poluicaoTotal = 0;
 let totalFabricas = 1;
+let tempoJogadoAcumulado = 0; // segundos, restaurado do progresso salvo (se houver)
+const inicioSessaoMs = Date.now();
 const celulasOcupadas = new Set();
 
 const hudDinheiroEl = document.getElementById('hud-dinheiro');
@@ -323,7 +341,7 @@ function calcularGanhoInstancia(instancia) {
     if (footprintsVizinhos(instancia, outra)) bonus += configOutra.bonusAdjacencia;
   }
   bonus = Math.min(bonus, BONUS_ADJACENCIA_MAX);
-  return Math.round(config.ganhoPorTick * (1 + bonus));
+  return Math.round(config.ganhoPorTick * (1 + bonus) * configDificuldade().multGanho);
 }
 
 function mostrarNumeroFlutuante(instancia, valor) {
@@ -338,13 +356,13 @@ function mostrarNumeroFlutuante(instancia, valor) {
 }
 
 function tickEconomia() {
-  if (instanciasConstruidas.length === 0) return;
+  if (jogoEncerrado || instanciasConstruidas.length === 0) return;
   let ganhoDoTick = 0;
   instanciasConstruidas.forEach((instancia) => {
     const config = FABRICAS[instancia.tipo];
     const ganho = calcularGanhoInstancia(instancia);
     ganhoDoTick += ganho;
-    poluicaoTotal += config.poluicaoPorTick;
+    poluicaoTotal += Math.round(config.poluicaoPorTick * configDificuldade().multPoluicao);
     mostrarNumeroFlutuante(instancia, ganho);
   });
   dinheiro += ganhoDoTick;
@@ -352,8 +370,81 @@ function tickEconomia() {
   atualizarHudPoluicao();
   pulsarGanhoNoHud();
   if (painelFabricas.classList.contains('aberto')) atualizarCartasFabricas();
+  verificarFimDeJogo();
+  salvarProgresso();
 }
 setInterval(tickEconomia, TICK_ECONOMIA_MS);
+
+// ============ FISCALIZAÇÃO AMBIENTAL (multas por poluição) ============
+const FISCALIZACAO_INTERVALO_MS = 25000;
+const FATOR_MULTA = 0.3;
+
+function pulsarMultaNoHud() {
+  hudDinheiroEl.classList.remove('pulso-multa');
+  void hudDinheiroEl.offsetWidth;
+  hudDinheiroEl.classList.add('pulso-multa');
+}
+
+function aplicarFiscalizacao() {
+  if (jogoEncerrado || poluicaoTotal <= 0) return;
+  const multa = Math.round(poluicaoTotal * FATOR_MULTA * configDificuldade().multMulta);
+  if (multa <= 0) return;
+  dinheiro = Math.max(0, dinheiro - multa);
+  atualizarHudDinheiro();
+  atualizarCartasFabricas();
+  pulsarMultaNoHud();
+  const valorEl = document.createElement('strong');
+  valorEl.textContent = formatarDinheiro(multa);
+  mostrarToast('Fiscalização ambiental: multa de ', valorEl, ' pela poluição acumulada.');
+  salvarProgresso();
+}
+setInterval(aplicarFiscalizacao, FISCALIZACAO_INTERVALO_MS);
+
+// ============ META DE VITÓRIA / COLAPSO DA EMPRESA ============
+const META_CAIXA = 60000;
+const LIMIAR_COLAPSO = 4000;
+let jogoEncerrado = null; // null | 'colapso' | 'vitoria'
+
+function segundosJogados() {
+  return tempoJogadoAcumulado + Math.floor((Date.now() - inicioSessaoMs) / 1000);
+}
+function formatarTempo(segundosTotais) {
+  const min = Math.floor(segundosTotais / 60);
+  const seg = segundosTotais % 60;
+  return `${min}min ${String(seg).padStart(2, '0')}s`;
+}
+function preencherEstatisticasFim(prefixo) {
+  document.getElementById(`${prefixo}-tempo`).textContent = formatarTempo(segundosJogados());
+  document.getElementById(`${prefixo}-caixa`).textContent = formatarDinheiro(dinheiro);
+  document.getElementById(`${prefixo}-poluicao`).textContent = poluicaoTotal.toLocaleString('pt-BR');
+  document.getElementById(`${prefixo}-fabricas`).textContent = String(totalFabricas);
+}
+function pausarConstrucao() {
+  abortarColocacao();
+  btnFabricas.disabled = true;
+}
+function mostrarTelaVitoria() {
+  pausarConstrucao();
+  preencherEstatisticasFim('vitoria');
+  document.getElementById('tela-vitoria').classList.add('aberto');
+}
+function mostrarTelaColapso() {
+  pausarConstrucao();
+  preencherEstatisticasFim('colapso');
+  document.getElementById('tela-colapso').classList.add('aberto');
+}
+function verificarFimDeJogo() {
+  if (jogoEncerrado) return;
+  if (poluicaoTotal >= LIMIAR_COLAPSO) {
+    jogoEncerrado = 'colapso';
+    mostrarTelaColapso();
+  } else if (dinheiro >= META_CAIXA) {
+    jogoEncerrado = 'vitoria';
+    mostrarTelaVitoria();
+  }
+}
+const hudMetaEl = document.getElementById('hud-meta');
+if (hudMetaEl) hudMetaEl.textContent = 'meta ' + formatarDinheiro(META_CAIXA);
 
 // ============ COLOCAÇÃO DE FÁBRICAS NO GRID ============
 function chaveCelula(col, row) {
@@ -475,6 +566,7 @@ function criarSprite(config) {
 }
 
 function iniciarColocacao(tipo) {
+  if (jogoEncerrado) return;
   const config = FABRICAS[tipo];
   if (!config) return;
   abortarColocacao();
@@ -614,6 +706,7 @@ function confirmarConstrucao() {
 
   setTimeout(() => tinta.remove(), 550);
   encerrarEstadoConstrucao();
+  salvarProgresso();
 }
 
 function cancelarConstrucao() {
@@ -639,3 +732,94 @@ window.addEventListener('resize', () => {
   instanciasConstruidas.forEach(posicionarInstancia);
   reposicionarAcoesFlutuantes();
 });
+
+// ============ AUTOSAVE / RESTAURAÇÃO DE PROGRESSO ============
+// progresso vive dentro do mesmo save persistido pelo menu
+// (parasitas-saves-{usuario}[slot].progresso) — não é uma chave separada
+function chaveSavesContaAtual() {
+  return saveAtivoInfo?.usuario ? `parasitas-saves-${saveAtivoInfo.usuario}` : null;
+}
+function lerTodosSavesContaAtual() {
+  const chave = chaveSavesContaAtual();
+  if (!chave) return {};
+  try {
+    return JSON.parse(localStorage.getItem(chave)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function salvarProgresso() {
+  const chave = chaveSavesContaAtual();
+  if (!chave || !saveAtivoInfo?.slot) return; // abriu fase1.html sem vir do menu — nada pra gravar
+  const todos = lerTodosSavesContaAtual();
+  const existente = todos[saveAtivoInfo.slot] || {};
+  todos[saveAtivoInfo.slot] = {
+    ...existente,
+    slot: saveAtivoInfo.slot,
+    nomeSave: saveAtivoInfo.nomeSave,
+    jogador: saveAtivoInfo.jogador,
+    empresa: saveAtivoInfo.empresa,
+    dificuldade: saveAtivoInfo.dificuldade,
+    atualizadoEm: Date.now(),
+    progresso: {
+      dinheiro,
+      poluicaoTotal,
+      totalFabricas,
+      quantidadePorTipo: { ...quantidadePorTipo },
+      instancias: instanciasConstruidas.map((i) => ({
+        tipo: i.tipo, col: i.col, row: i.row, colSpan: i.colSpan, rowSpan: i.rowSpan,
+      })),
+      tempoJogadoSegundos: segundosJogados(),
+      colapsada: jogoEncerrado === 'colapso',
+      vitoriaAlcancada: jogoEncerrado === 'vitoria',
+    },
+  };
+  localStorage.setItem(chave, JSON.stringify(todos));
+}
+window.addEventListener('beforeunload', salvarProgresso);
+
+// reconstrói o estado salvo (dinheiro, poluição, construções no grid) em
+// vez de começar do zero — chamada uma vez, no fim do carregamento
+function restaurarProgresso() {
+  const chave = chaveSavesContaAtual();
+  if (!chave || !saveAtivoInfo?.slot) return;
+  const progresso = lerTodosSavesContaAtual()[saveAtivoInfo.slot]?.progresso;
+  if (!progresso) return;
+
+  dinheiro = progresso.dinheiro ?? dinheiro;
+  poluicaoTotal = progresso.poluicaoTotal ?? poluicaoTotal;
+  totalFabricas = progresso.totalFabricas ?? totalFabricas;
+  Object.assign(quantidadePorTipo, progresso.quantidadePorTipo || {});
+  tempoJogadoAcumulado = progresso.tempoJogadoSegundos || 0;
+
+  (progresso.instancias || []).forEach((dados) => {
+    const config = FABRICAS[dados.tipo];
+    if (!config) return; // segurança: construção que não existe mais no jogo
+    const { wrapper, tinta } = criarSprite(config);
+    tinta.remove(); // instância restaurada já nasce "pronta", sem flash de confirmação
+    wrapper.classList.add('fabrica-instancia--travada', 'fabrica-instancia--construida');
+    const instancia = {
+      wrapper, tipo: dados.tipo, col: dados.col, row: dados.row,
+      colSpan: dados.colSpan, rowSpan: dados.rowSpan,
+      larguraImagem: larguraImagemParaFootprint(dados.colSpan, dados.rowSpan),
+    };
+    posicionarInstancia(instancia);
+    marcarFootprintOcupado(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
+    instanciasConstruidas.push(instancia);
+  });
+
+  atualizarHudDinheiro();
+  atualizarHudFabricas();
+  atualizarHudPoluicao();
+  atualizarCartasFabricas();
+
+  if (progresso.colapsada) {
+    jogoEncerrado = 'colapso';
+    mostrarTelaColapso();
+  } else if (progresso.vitoriaAlcancada) {
+    jogoEncerrado = 'vitoria';
+    mostrarTelaVitoria();
+  }
+}
+restaurarProgresso();

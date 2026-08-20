@@ -74,22 +74,76 @@ em vez de sombras pesadas, glow sutil em âmbar pra estados ativos/hover.
 - Navegação do menu por teclado (setas + Enter/Espaço nativo dos botões).
 - Painel **Como Jogar** — lista estática de regras.
 - Painel **Créditos**.
-- Painel **Novo Jogo**:
-  - 3 slots de save guardados **em memória** (objeto `saves` em `script.js`,
-    não em localStorage) enquanto o jogador está nessa tela — trocar de slot
-    troca os campos exibidos.
-  - Campos: nome do save, nome do jogador, nome da empresa, dificuldade
-    (Iniciante/Médio/Expert).
-  - Validação com "tremor" visual se faltar campo.
-  - Ao clicar **Começar** com os campos válidos: salva
-    `{slot, nomeSave, jogador, empresa, dificuldade}` no
-    `localStorage['parasitas-save-ativo']` e redireciona (após ~900ms, pra
-    dar tempo de ver a mensagem de sucesso) pra `fase1.html`.
 - Todos os painéis compartilham o padrão `.painel` / `.painel-conteudo` /
   `.painel-voltar` — abrir/fechar via classe `.aberto`, Escape fecha.
 - Há um bloco `@media (prefers-reduced-motion: reduce)` que desliga as
   animações decorativas — **sempre atualizar esse bloco ao adicionar uma
   animação nova**, é convenção já estabelecida no projeto.
+
+#### Contas locais (login/cadastro obrigatório)
+
+`#painel-login` é um `.painel` **sempre aberto ao carregar a página se não
+houver sessão válida** (`abrirGateLogin()` chamado direto no fim do script,
+não depende de clique em nada) — cobre a tela inteira e bloqueia interação
+com o menu atrás até logar. **Diferente dos outros painéis, o Escape global
+pula esse aqui de propósito** (`document.querySelectorAll('.painel.aberto:not(#painel-login)')`)
+— não dá pra sair sem entrar.
+
+**Isso NÃO é autenticação de verdade.** Não existe servidor (é só
+HTML/JS/CSS estático, GitHub Pages). Usuário+senha ficam 100% no
+`localStorage` do navegador:
+
+```js
+localStorage['parasitas-contas']  // { [usuarioMinusculo]: { usuario, senhaHash, criadoEm } }
+localStorage['parasitas-sessao']  // usuarioMinusculo logado, ou ausente
+```
+
+- `hashSenha(usuario, senha)` usa `crypto.subtle.digest('SHA-256', ...)`
+  (Web Crypto — exige contexto seguro: `https://` ou `http://localhost`,
+  os dois ambientes usados neste projeto) com um salt fixo + o usuário, só
+  pra não guardar a senha em texto puro. **Não é criptografia robusta**,
+  não tem como recuperar senha esquecida, e qualquer pessoa com acesso ao
+  mesmo navegador pode inspecionar/apagar isso pelo DevTools. Serve só pra
+  separar o progresso de pessoas diferentes no mesmo computador — a tela de
+  login já deixa esse aviso explícito pro jogador.
+- Mesmo formulário faz login E cadastro: usuário existe → confere a senha;
+  não existe → cria a conta na hora com essa senha.
+- `sessaoAtual()` devolve a chave (usuário em minúsculas) logada, ou `null`
+  se não houver sessão ou se a sessão apontar pra uma conta apagada.
+- Indicador no rodapé (`#footer-conta`, escondido via `hidden` até logar)
+  mostra o usuário + botão **Sair** (`encerrarSessao()` + reabre o gate).
+
+#### Painel Novo Jogo — saves persistidos de verdade, por conta
+
+Os 3 slots **não vivem mais só em memória** — persistem em
+`localStorage['parasitas-saves-{usuario}']` (namespaced pela conta logada,
+via `chaveSavesConta()`), formato:
+
+```js
+{ 1: { slot, nomeSave, jogador, empresa, dificuldade, criadoEm, atualizadoEm,
+       progresso: null | {...} } | null,
+  2: ..., 3: ... }
+```
+
+- `renderSlotAtual()` pré-preenche os campos com o que já estiver salvo
+  naquele slot (ou campos vazios); os botões de slot mostram um subtítulo
+  (`.slot-sub`) com o nome da empresa, "vazio", ou "{empresa} · R$ X" se já
+  tiver progresso jogado.
+- **Cada campo grava no localStorage a cada tecla digitada**
+  (`atualizarCampoSlot`) — um rascunho sobrevive a um F5 mesmo sem clicar
+  Começar.
+- **Começar decide entre continuar ou recomeçar**: se nome/jogador/empresa/
+  dificuldade batem exatamente com o que já estava salvo naquele slot
+  (`snapshotSlotAtual`, capturado ao selecionar o slot) E existe
+  `progresso`, o progresso é preservado; qualquer campo diferente conta
+  como recomeçar do zero (zera `progresso`). Escreve
+  `localStorage['parasitas-save-ativo']` com `{usuario, slot, nomeSave,
+  jogador, empresa, dificuldade}` (agora inclui `usuario` — é a ponte que
+  `fase1.js` usa pra saber onde ler/gravar o progresso) e redireciona.
+- **Botão "Continuar"** (menu principal, hoje funcional): pega o save de
+  `atualizadoEm` mais recente entre os 3 slots da conta logada e vai direto
+  pra `fase1.html`; se a conta não tiver nenhum save ainda, abre o painel
+  Novo Jogo com um aviso em vez de não fazer nada.
 
 ### `fase1.html` / `fase1.js` — Fase 1 (grid + construção)
 
@@ -290,19 +344,103 @@ Caixa inicial do jogador: R$ 5.000. Filosofia: a primeira construção deve
 consumir a maior parte do caixa inicial (decisão pesada) mas se pagar em
 ~1 minuto de jogo (não travar o ritmo).
 
-## Fluxo de dados entre telas
+### Dificuldade, fiscalização, meta de vitória e colapso
 
-Única ponte entre `index.html` e `fase1.html`: `localStorage`, chave
-**`parasitas-save-ativo`**, formato:
+A dificuldade escolhida no Novo Jogo (`saveAtivoInfo.dificuldade`) **era
+capturada e nunca usada** — agora alimenta uma tabela de multiplicadores,
+`DIFICULDADES` (`configDificuldade()` lê a do save ativo, cai pra 'Médio'
+se faltar/for desconhecida):
 
-```json
-{ "slot": 1, "nomeSave": "...", "jogador": "...", "empresa": "...", "dificuldade": "Iniciante" }
+| Dificuldade | ganho | poluição | multa | intenção |
+|---|---|---|---|---|
+| Iniciante | 1.0x | 0.65x | 0.6x | mais seguro, ritmo normal |
+| Médio | 1.0x | 1.0x | 1.0x | padrão |
+| Expert | 1.3x | 1.5x | 1.5x | cresce mais rápido, mas colapsa mais rápido também |
+
+`multGanho` entra em `calcularGanhoInstancia` (depois do bônus de
+adjacência); `multPoluicao` entra no acúmulo de `poluicaoTotal` dentro de
+`tickEconomia`; `multMulta` entra na fiscalização abaixo. Isso também dá um
+motivo estratégico real pra Usina de Água: ela é a ferramenta pra crescer
+sem escalar a poluição na mesma proporção, especialmente relevante no
+Expert.
+
+**Fiscalização ambiental** (`aplicarFiscalizacao()`, `setInterval` a cada
+`FISCALIZACAO_INTERVALO_MS` = 25000ms): se `poluicaoTotal > 0`, desconta
+`multa = round(poluicaoTotal * FATOR_MULTA(0.3) * multMulta)` do `dinheiro`
+(nunca deixa negativo, `Math.max(0, ...)`), pulsa a Caixa em `--rust`
+(`.pulso-multa`, mesma ideia do `.pulso-ganho` mas pra multa) e mostra
+toast via `mostrarToast`. Como `poluicaoTotal` nunca diminui, a multa cresce
+ao longo da partida — é intencional, cria uma rampa de pressão que fica
+pesada perto do limiar de colapso.
+
+**Meta de vitória / colapso** (`verificarFimDeJogo()`, chamada no fim de
+todo `tickEconomia`): `META_CAIXA` = 60000 e `LIMIAR_COLAPSO` = 4000 são
+**iguais nas três dificuldades** — só a VELOCIDADE de chegar neles muda
+(via os multiplicadores acima), não os alvos. Colapso é checado antes da
+vitória (se os dois baterem no mesmo tick, colapso ganha — o tema do jogo é
+que o crescimento insustentável cobra a conta). `jogoEncerrado` (`null` |
+`'colapso'` | `'vitoria'`) trava novas construções
+(`iniciarColocacao`/`btnFabricas.disabled`) e mostra uma tela cheia
+(`#tela-vitoria` / `#tela-colapso`, reaproveitam o padrão `.painel`) com
+estatísticas da partida e um link "Voltar ao Menu". **Isso não é a Fase 2
+de verdade** — as duas telas dizem explicitamente que o "Guardião da
+Natureza" ainda não existe, é só o gancho narrativo onde a Fase 1 termina
+por enquanto.
+
+### Autosave e restauração de progresso
+
+O progresso da Fase 1 vive **dentro do mesmo save** persistido pelo menu
+(`localStorage['parasitas-saves-{usuario}'][slot].progresso`), não numa
+chave separada:
+
+```js
+progresso: {
+  dinheiro, poluicaoTotal, totalFabricas, quantidadePorTipo,
+  instancias: [{ tipo, col, row, colSpan, rowSpan }],  // sem o wrapper DOM, só os dados
+  tempoJogadoSegundos, colapsada, vitoriaAlcancada,
+}
 ```
 
-Escrito por `script.js` (painel Novo Jogo) ao confirmar; lido por
-`fase1.js` (`lerSaveAtivo()` / `aplicarSaveAtivo()`) ao carregar a Fase 1.
-Se não existir (ex: abrir `fase1.html` direto), a página cai em valores
-padrão sem quebrar.
+- `salvarProgresso()` é chamada: a cada `tickEconomia` (3s), depois de
+  `confirmarConstrucao`, e num listener de `beforeunload` (rede de
+  segurança pra pegar o estado mais recente mesmo se o jogador fechar a
+  aba entre ticks). Se `saveAtivoInfo` não tiver `usuario`/`slot` (ex:
+  abriu `fase1.html` direto, sem vir do menu), é um no-op silencioso.
+- `restaurarProgresso()` roda **uma vez, no fim do carregamento** (depois
+  de tudo mais estar definido — precisa de `FABRICAS`, `criarSprite`,
+  `posicionarInstancia` etc.). Recria cada instância salva chamando
+  `criarSprite` normalmente, mas pulando o fantasma/travamento: aplica
+  direto as classes `--travada --construida` (o mesmo estado final de uma
+  construção confirmada) e remove a `.fabrica-tinta` na hora (ela só existe
+  during o flash de confirmação, que não faz sentido pra algo restaurado).
+  Se `colapsada`/`vitoriaAlcancada` estiver marcado, mostra a tela de fim
+  imediatamente — um save que colapsou continua colapsado ao reabrir, não
+  dá pra "revivê-lo" jogando de novo.
+- `tempoJogadoSegundos` acumula corretamente entre sessões:
+  `tempoJogadoAcumulado` (vem do progresso restaurado) +
+  `Date.now() - inicioSessaoMs` (tempo da sessão atual), calculado em
+  `segundosJogados()`.
+
+## Fluxo de dados entre telas
+
+Duas pontes entre `index.html` e `fase1.html`, ambas em `localStorage`:
+
+1. **`parasitas-save-ativo`** — qual save está em uso agora:
+   ```json
+   { "usuario": "fulano", "slot": 1, "nomeSave": "...", "jogador": "...", "empresa": "...", "dificuldade": "Iniciante" }
+   ```
+   Escrito por `script.js` (Começar ou Continuar); lido por `fase1.js`
+   (`lerSaveAtivo()`, guardado em `saveAtivoInfo`) ao carregar a Fase 1.
+   Se não existir (ex: abrir `fase1.html` direto), a página cai em valores
+   padrão sem quebrar — só não autosalva nem restaura nada, já que não sabe
+   pra qual conta/slot gravar.
+2. **`parasitas-saves-{usuario}`** — os 3 slots daquela conta, incluindo o
+   `progresso` de cada um (ver seção acima). Escrito tanto por `script.js`
+   (campos do formulário) quanto por `fase1.js` (autosave do progresso).
+
+E uma terceira chave que não é save, é sessão: **`parasitas-sessao`** (qual
+conta está logada) + **`parasitas-contas`** (todas as contas locais, ver
+seção de login acima).
 
 ## Preferências de fluxo de trabalho do autor
 
@@ -330,21 +468,35 @@ padrão sem quebrar.
 - Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
   usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
   é reversível (ver seção "Rotação" acima).
-- **Poluição** agora existe e acumula de verdade (`poluicaoTotal`, HUD com
-  severidade de cor, toast único ao cruzar o limiar crítico), mas ainda é
-  só atmosférico — não afeta nada mecanicamente (não reduz ganho, não
-  aproxima o colapso da empresa de verdade). Esse é o próximo elo natural
-  pra puxar a narrativa: ligar `poluicaoTotal` a algum evento de colapso.
-- Nenhum evento de colapso da empresa nem a segunda metade do jogo
-  ("Guardião da Natureza" / restauração) — só a pincelada narrativa do
-  toast de poluição crítica, sem gameplay real de fase 2.
-- Botão "Continuar" no menu principal existe visualmente mas não tem
-  handler de clique ainda (não carrega um save salvo).
-- Sem persistência real de save entre sessões do navegador além do
-  `localStorage['parasitas-save-ativo']` (que guarda só o save *ativo*, não
-  os 3 slots — os 3 slots do painel Novo Jogo vivem só em memória durante
-  aquela visita à tela de menu, não sobrevivem a um F5).
+- **Poluição agora afeta o jogo de verdade**: multa periódica proporcional
+  (fiscalização), e cruzar `LIMIAR_COLAPSO` termina a partida (tela de
+  colapso). O que ainda falta é a Fase 2 jogável de verdade ("Guardião da
+  Natureza" / restauração) — hoje colapso e vitória são as DUAS telas de
+  fim da Fase 1, cada uma com uma nota explícita de que a próxima etapa
+  ainda não existe.
+- **Contas locais, saves persistidos e autosave já funcionam** (login
+  obrigatório, 3 slots reais por conta, progresso da Fase 1 salvo e
+  restaurado). O que ainda falta nessa frente:
+  - Sem recuperação de senha (não tem como, não existe backend/e-mail).
+  - Sem exportar/importar save (útil pra levar progresso pra outro
+    navegador, já que a "conta" não sincroniza de verdade).
+  - Só 3 slots por conta, sem opção de apagar um slot individualmente pelo
+    painel Novo Jogo (dá pra sobrescrever mudando os campos, mas não tem
+    botão "apagar save").
+- Sprite da "fábrica inicial" (hoje é só um número `1` no HUD, sem
+  representação visual no grid).
+- Mais construções além de Usina de Carvão e Usina de Água — o painel já é
+  100% genérico via `FABRICAS` (cards renderizados dinamicamente, escala de
+  preço e bônus de adjacência já genéricos), é só adicionar entrada nova +
+  sprite (`.png` ou `.svg`, o pipeline aceita os dois).
+- Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
+  usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
+  é reversível (ver seção "Rotação" acima).
 - Gerador de imagem IA ficou sem crédito durante essa sessão — a Usina de
   Água usa um SVG desenhado à mão em vez de um PNG gerado (ver seção de
   imagens no topo do arquivo). Se quiser trocar por um PNG no estilo do
   carvão mais pra frente, é só gerar e trocar o campo `sprite`.
+- Valores de balanceamento novos (multiplicadores de dificuldade,
+  `FATOR_MULTA`, `FISCALIZACAO_INTERVALO_MS`, `META_CAIXA`,
+  `LIMIAR_COLAPSO`) são um primeiro palpite, testados só por automação de
+  navegador — vale jogar de verdade pra sentir o ritmo e ajustar.
