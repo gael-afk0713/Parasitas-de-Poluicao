@@ -30,23 +30,28 @@ imagens/
                               está em uso hoje no CSS, pra não ficar borrada em telas grandes
   usina-carvao.png         sprite isométrico da Usina de Carvão, PNG RGBA transparente, 644x740,
                               gerado com IA
-  usina-agua.svg            sprite isométrico da Usina de Água, SVG desenhado à mão (não IA —
-                              o gerador de imagem ficou sem crédito nessa sessão; se algum dia
-                              gerar uma versão em PNG no mesmo estilo do carvão, é só trocar o
-                              campo `sprite` da entrada 'usina-agua' em FABRICAS, o pipeline de
-                              sprite/máscara aceita os dois formatos sem mudança de código)
-  madeireira.svg             sprite da Madeireira, SVG à mão (mesmo motivo acima)
-  refinaria-petroleo.svg     sprite da Refinaria de Petróleo, SVG à mão, pegada 3x1
-  usina-eolica.svg           sprite da Usina Eólica, SVG à mão
-  estacao-tratamento.svg     sprite da Estação de Tratamento, SVG à mão
+  usina-agua.png            sprite da Usina de Água, PNG RGBA transparente, 414x1299 (torre estreita
+                              e alta), gerado com IA a partir da descrição escrita pelo Claude
+  madeireira.png             sprite da Madeireira, PNG RGBA transparente, 1342x677 (composição bem
+                              larga: pilha de toras + galpão + tábuas lado a lado), gerado com IA
+  refinaria-petroleo.png     sprite da Refinaria de Petróleo, PNG RGBA transparente, 900x789
+                              (quase quadrado — sobe mais do que se espalha no chão), gerado com IA
+  usina-eolica.png           sprite da Usina Eólica, PNG RGBA transparente, 474x1327 (torre estreita
+                              e alta), gerado com IA
+  estacao-tratamento.png     sprite da Estação de Tratamento, PNG RGBA transparente, 996x731 (dois
+                              tanques lado a lado), gerado com IA
 ```
 
-Os quatro últimos são **placeholders temporários** — o autor vai gerar a arte
-final via IA a partir das descrições que o Claude escreveu num chat separado
-(mesmo estilo isométrico da `usina-carvao.png`, fundo transparente, sem
-sombra de chão, sem texto/marca d'água) e trocar o campo `sprite` de cada
-entrada em `FABRICAS` quando a imagem chegar — o pipeline aceita `.png` ou
-`.svg` sem mudança de código.
+Todos os 6 sprites de construção hoje são PNGs de verdade (gerados com IA a
+partir de descrições que o Claude escreveu, no mesmo estilo isométrico —
+fundo transparente, sem sombra de chão, sem texto/marca d'água). Os SVGs
+desenhados à mão que existiram como placeholder temporário (madeireira,
+refinaria, água, eólica, tratamento) foram **removidos** do repositório
+depois que a arte final chegou — não ficaram como fallback, pra não haver
+dois arquivos por construção confundindo qual está em uso. O pipeline de
+sprite/máscara (`criarSprite` em `fase1.js`) continua aceitando `.svg` sem
+mudança de código nenhuma, caso alguma construção futura precise de novo de
+um placeholder desenhado à mão antes da arte final ficar pronta.
 
 Não existe build step, bundler ou dependências — é tudo `<script>`/`<link>`
 direto. `index.html` e `fase1.html` carregam o **mesmo** `style.css`.
@@ -224,9 +229,18 @@ perto da borda, garantindo que ela sempre caiba inteira.
 save ativo, ou "—" se abrir a página direto sem passar pelo Novo Jogo),
 **Caixa** (dinheiro, formatado em `pt-BR` via `toLocaleString`, começa em
 `R$ 5.000` — pulsa em `--moss-bright` por um instante toda vez que rende
-dinheiro num tick, classe `.pulso-ganho`), **Fábricas** (contador de TODAS
-as construções, começa em `1` — a fábrica inicial da empresa, que é só o
-número no HUD, **não tem sprite no grid**) e **Poluição** (total acumulado,
+dinheiro num tick, classe `.pulso-ganho`), **Fábricas** (`totalFabricas`,
+contador de TODAS as construções — começa em `0` e é sempre igual a
+`instanciasConstruidas.length`, incrementado ao confirmar uma construção e
+decrementado ao vender uma. **Bug já corrigido, não reintroduzir**: até
+essa correção o contador começava em `1` — pensado como "a fábrica inicial
+da empresa" que não tem sprite no grid — e por isso mostrava sempre um a
+mais do que o número real de construções no grid; com o recurso de venda
+isso ficou visivelmente errado (vender a única construção ainda mostrava
+`1` em vez de `0`). `restaurarProgresso()` recalcula esse valor a partir do
+array de instâncias reconstruído, em vez de confiar no número salvo — isso
+autocorrige saves antigos que ainda carregavam a contagem inflada) e
+**Poluição** (total acumulado,
 puramente informativo/atmosférico por enquanto — muda de cor conforme a
 gravidade via `data-nivel` no `.hud-stat--poluicao`: `normal` até 500,
 `atencao` até 1500, `critico` depois disso; cruzar o `critico` dispara um
@@ -374,11 +388,21 @@ que rendem.
 | Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
 | Usina de Carvão | Fábrica | 2x1 | R$ 4.500 | R$ 225 | 15 | — |
-| Madeireira | Fábrica | 2x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
-| Refinaria de Petróleo | Fábrica | 3x1 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
+| Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
+| Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
 | Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
 | Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%) |
-| Estação de Tratamento | Usina | 1x1 | R$ 5.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -20 (fixo, jogo inteiro, todo tick) |
+| Estação de Tratamento | Usina | 2x1 | R$ 5.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -20 (fixo, jogo inteiro, todo tick) |
+
+As pegadas de Madeireira/Refinaria/Estação foram ajustadas depois que a
+arte final (PNG) chegou, substituindo os chutes originais feitos em cima
+dos placeholders SVG: a regra usada foi "pegada elongada (ex: 3x1) pra
+desenho bem espalhado na horizontal, pegada compacta (ex: 2x2) pra desenho
+quase quadrado (sobe mais do que se espalha)". A largura RENDERIZADA do
+sprite só depende de `celulasCol + celulasRow` (ver
+`larguraImagemParaFootprint`), não de qual dos dois é maior — trocar a
+composição de uma pegada (2x2 vs 3x1 vs 1x3, todas somam 4) muda **qual
+formato de célula é reservado no grid**, não o tamanho do sprite na tela.
 
 Caixa inicial do jogador: R$ 5.000. Filosofia: a primeira construção deve
 consumir a maior parte do caixa inicial (decisão pesada) mas se pagar em
@@ -387,6 +411,38 @@ desenhadas pra dar variedade de arquétipo (barata/suja, cara/agressiva,
 suporte de ganho, suporte de limpeza local, suporte de limpeza global) em
 vez de só "mais uma fábrica com número diferente" — o objetivo era reduzir
 a monotonia relatada pelo jogador ("só comprar fábrica e deixar farmar").
+
+### Destaque de adjacência no grid (durante a colocação)
+
+Enquanto uma colocação está em andamento, o grid destaca com uma cor de
+fundo (preenchimento do losango isométrico da célula, `preencherCelula`/
+`preencherFootprint` em `fase1.js`) os quadrados afetados por adjacência —
+verde (família do `--moss-bright`) pra efeito de ganho, azul (família do
+`--agua`) pra efeito de redução de poluição:
+
+- **Sempre** que há uma colocação ativa: os quadrados de construções JÁ
+  existentes que hoje dão/recebem efeito de adjacência umas das outras
+  (a "rede" atual), num tom mais fraco (`COR_DESTAQUE_*_EXISTENTE`) — puramente
+  informativo, não depende do que está sendo colocado.
+- **Só se** a construção sendo colocada tiver ela mesma `bonusAdjacencia`
+  ou `reducaoPoluicaoAdjacencia`: os quadrados das vizinhas que ela vai
+  afetar SE for confirmada na posição atual do fantasma, num tom mais
+  forte (`COR_DESTAQUE_*_FANTASMA`) com contorno — o jogador vê o efeito
+  antes de confirmar, não precisa adivinhar ou confirmar-e-conferir.
+
+Implementado em `desenharDestaquesAdjacencia()`, chamada por
+`redesenharCena()` (grid base + destaques) sempre que a célula sob o
+fantasma muda (`reposicionarFantasma`, com uma checagem de "mudou de
+célula" pra não redesenhar o canvas inteiro a cada pixel de movimento do
+mouse) e ao encerrar qualquer colocação (`encerrarEstadoConstrucao`, que
+redesenha sem destaques já que `estadoConstrucao` volta a `null`). **A
+função de desenho da grade original, `desenharGrid()`, continua chamada
+sozinha (sem destaques) na pintura inicial da página e no listener de
+resize do topo do arquivo** — nesse ponto do carregamento
+`FABRICAS`/`instanciasConstruidas`/`estadoConstrucao` ainda não existem
+(TDZ), então `desenharDestaquesAdjacencia()` só pode ser chamada depois
+que tudo isso é declarado mais abaixo no arquivo; `redesenharCena()` fica
+definida perto de `reposicionarFantasma`, não lá no topo.
 
 ### Dificuldade, fiscalização, meta de vitória e colapso
 
@@ -609,8 +665,6 @@ seção de login acima).
   pra não empilhar upgrade com adjacência de forma difícil de comunicar no
   card/painel, mas é um ponto de rebalanceamento possível se upgrade em
   Usina de Água/Eólica parecer fraco perto de melhorar uma Fábrica.
-- Sprite da "fábrica inicial" (hoje é só um número `1` no HUD, sem
-  representação visual no grid).
 - Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
   usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
   é reversível (ver seção "Rotação" acima).
@@ -629,13 +683,10 @@ seção de login acima).
   - Só 3 slots por conta, sem opção de apagar um slot individualmente pelo
     painel Novo Jogo (dá pra sobrescrever mudando os campos, mas não tem
     botão "apagar save").
-- **4 construções novas (Madeireira, Refinaria de Petróleo, Usina Eólica,
-  Estação de Tratamento) usam sprites SVG placeholder desenhados à mão** —
-  igual aconteceu com a Usina de Água, o gerador de imagem IA ficou sem
-  crédito. O autor vai gerar a arte final a partir de descrições de prompt
-  (escritas num chat separado) e trocar o campo `sprite` de cada entrada em
-  `FABRICAS` quando a imagem chegar — o pipeline aceita `.png` ou `.svg`
-  sem mudança de código, é literalmente só trocar o valor da string.
+- ~~4 construções novas usavam sprites SVG placeholder~~ — **resolvido**: o
+  autor gerou a arte final via IA a partir das descrições de prompt e
+  mandou os PNGs, já trocados em `FABRICAS` e commitados; os SVGs foram
+  removidos do repositório (ver seção de imagens no topo do arquivo).
 - Valores de balanceamento (multiplicadores de dificuldade, `FATOR_MULTA`,
   `FISCALIZACAO_INTERVALO_MS`, `META_CAIXA` = 90000, `LIMIAR_COLAPSO` = 6000,
   custo/ganho/poluição das 6 construções) são ajustados por raciocínio +

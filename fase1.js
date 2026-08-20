@@ -271,31 +271,41 @@ const FABRICAS = {
     nome: 'Madeireira', categoria: 'Fábrica', icone: 'madeireira',
     descricao: 'Desmatamento: mais barata, rende menos, polui menos.',
     custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
-    sprite: 'imagens/madeireira.svg', celulasCol: 2, celulasRow: 1,
+    // pegada mais larga (3x1): o desenho real é bem espalhado na horizontal
+    // (pilha de toras + galpão + tábuas lado a lado), a pegada antiga (2x1)
+    // ficava apertada perto do desenho de verdade
+    sprite: 'imagens/madeireira.png', celulasCol: 3, celulasRow: 1,
   },
   'refinaria-petroleo': {
     nome: 'Refinaria de Petróleo', categoria: 'Fábrica', icone: 'refinaria',
     descricao: 'Ganho pesado, poluição desproporcional. Alto risco.',
     custo: 12000, ganhoPorTick: 600, poluicaoPorTick: 48,
-    sprite: 'imagens/refinaria-petroleo.svg', celulasCol: 3, celulasRow: 1,
+    // pegada compacta (2x2 em vez de 3x1): o desenho real é praticamente
+    // quadrado (torres sobem mais do que se espalham no chão) — 3x1 tinha
+    // sido um chute de antes da arte final existir, pra uma composição bem
+    // mais alongada do que a que chegou
+    sprite: 'imagens/refinaria-petroleo.png', celulasCol: 2, celulasRow: 2,
   },
   'usina-agua': {
     nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
     descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
     custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
-    sprite: 'imagens/usina-agua.svg', celulasCol: 1, celulasRow: 1,
+    sprite: 'imagens/usina-agua.png', celulasCol: 1, celulasRow: 1,
   },
   'usina-eolica': {
     nome: 'Usina Eólica', categoria: 'Usina', icone: 'eolica',
     descricao: 'Quase não polui; reduz a poluição das vizinhas.',
     custo: 2500, ganhoPorTick: 60, poluicaoPorTick: 1, reducaoPoluicaoAdjacencia: 0.25,
-    sprite: 'imagens/usina-eolica.svg', celulasCol: 1, celulasRow: 1,
+    sprite: 'imagens/usina-eolica.png', celulasCol: 1, celulasRow: 1,
   },
   'estacao-tratamento': {
     nome: 'Estação de Tratamento', categoria: 'Usina', icone: 'tratamento',
     descricao: 'Não rende nada; limpa poluição acumulada da região inteira.',
     custo: 5000, ganhoPorTick: 0, poluicaoPorTick: 0, reducaoGlobalPorTick: 20,
-    sprite: 'imagens/estacao-tratamento.svg', celulasCol: 1, celulasRow: 1,
+    // pegada 2x1: são dois tanques lado a lado, mais larga que uma
+    // construção de célula única (a pegada antiga, 1x1, era pequena demais
+    // pro par de tanques do desenho real)
+    sprite: 'imagens/estacao-tratamento.png', celulasCol: 2, celulasRow: 1,
   },
 };
 
@@ -379,7 +389,7 @@ function precoAtual(tipo) {
 
 let dinheiro = 5000;
 let poluicaoTotal = 0;
-let totalFabricas = 1;
+let totalFabricas = 0;
 let tempoJogadoAcumulado = 0; // segundos, restaurado do progresso salvo (se houver)
 const inicioSessaoMs = Date.now();
 const celulasOcupadas = new Set();
@@ -868,15 +878,98 @@ function iniciarColocacao(tipo) {
   }, 0);
 }
 
+// ---- destaque no grid dos quadrados afetados por adjacência, enquanto
+// uma colocação está em andamento ----
+// preenche o losango isométrico de UMA célula com uma cor (mesmo contorno
+// de losango usado pra desenhar o grid, só que preenchido em vez de traçado)
+function preencherCelula(col, row, corPreenchimento, corContorno) {
+  const p1 = pontoNaTela(col, row);
+  const p2 = pontoNaTela(col + 1, row);
+  const p3 = pontoNaTela(col + 1, row + 1);
+  const p4 = pontoNaTela(col, row + 1);
+  ctx.beginPath();
+  ctx.moveTo(p1.x, p1.y);
+  ctx.lineTo(p2.x, p2.y);
+  ctx.lineTo(p3.x, p3.y);
+  ctx.lineTo(p4.x, p4.y);
+  ctx.closePath();
+  ctx.fillStyle = corPreenchimento;
+  ctx.fill();
+  if (corContorno) {
+    ctx.strokeStyle = corContorno;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+}
+function preencherFootprint(col, row, colSpan, rowSpan, corPreenchimento, corContorno) {
+  for (let dc = 0; dc < colSpan; dc++) {
+    for (let dr = 0; dr < rowSpan; dr++) {
+      preencherCelula(col + dc, row + dr, corPreenchimento, corContorno);
+    }
+  }
+}
+
+// verde (mesma família do --moss-bright) pro efeito de ganho, azul (mesma
+// família do --agua) pro efeito de redução de poluição — "existente" é
+// mais fraco (rede já montada, só informativo), "fantasma" é mais forte
+// (o que ESSA colocação vai criar se for confirmada onde está agora)
+const COR_DESTAQUE_GANHO_EXISTENTE = 'rgba(143,191,114,0.16)';
+const COR_DESTAQUE_GANHO_FANTASMA = 'rgba(143,191,114,0.42)';
+const COR_DESTAQUE_POLUICAO_EXISTENTE = 'rgba(95,151,166,0.16)';
+const COR_DESTAQUE_POLUICAO_FANTASMA = 'rgba(95,151,166,0.42)';
+const COR_CONTORNO_DESTAQUE = 'rgba(239,232,214,0.55)';
+
+// enquanto uma colocação está em andamento, destaca: (1) os quadrados de
+// construções JÁ existentes que hoje dão/recebem efeito de adjacência
+// umas nas outras (a rede atual, sempre visível durante a colocação,
+// independente do que está sendo colocado) e (2) se a construção sendo
+// colocada tiver ela mesma um efeito de adjacência, os quadrados das
+// vizinhas que ela vai afetar SE for confirmada na posição atual do
+// fantasma (destaque mais forte que o da rede existente)
+function desenharDestaquesAdjacencia() {
+  if (!estadoConstrucao) return;
+
+  instanciasConstruidas.forEach((origem) => {
+    const config = FABRICAS[origem.tipo];
+    if (!config.bonusAdjacencia && !config.reducaoPoluicaoAdjacencia) return;
+    const cor = config.bonusAdjacencia ? COR_DESTAQUE_GANHO_EXISTENTE : COR_DESTAQUE_POLUICAO_EXISTENTE;
+    instanciasConstruidas.forEach((vizinha) => {
+      if (vizinha === origem) return;
+      if (footprintsVizinhos(origem, vizinha)) preencherFootprint(vizinha.col, vizinha.row, vizinha.colSpan, vizinha.rowSpan, cor);
+    });
+  });
+
+  const configFantasma = estadoConstrucao.config;
+  const temEfeito = configFantasma.bonusAdjacencia || configFantasma.reducaoPoluicaoAdjacencia;
+  if (temEfeito && estadoConstrucao.col !== null) {
+    const cor = configFantasma.bonusAdjacencia ? COR_DESTAQUE_GANHO_FANTASMA : COR_DESTAQUE_POLUICAO_FANTASMA;
+    const alvo = { col: estadoConstrucao.col, row: estadoConstrucao.row, colSpan: estadoConstrucao.colSpan, rowSpan: estadoConstrucao.rowSpan };
+    instanciasConstruidas.forEach((vizinha) => {
+      if (footprintsVizinhos(alvo, vizinha)) preencherFootprint(vizinha.col, vizinha.row, vizinha.colSpan, vizinha.rowSpan, cor, COR_CONTORNO_DESTAQUE);
+    });
+  }
+}
+
+// grid base + destaques por cima — usada em todo redesenho depois que o
+// jogo termina de carregar (a primeira pintura do grid, lá no topo do
+// arquivo, continua chamando desenharGrid() sozinha: FABRICAS/
+// instanciasConstruidas/estadoConstrucao ainda não existem nesse ponto)
+function redesenharCena() {
+  desenharGrid();
+  desenharDestaquesAdjacencia();
+}
+
 function reposicionarFantasma(mx, my) {
   if (!estadoConstrucao || estadoConstrucao.travado) return;
   const bruto = celulaMaisProxima(mx, my);
   const { col, row } = clampFootprint(bruto.col, bruto.row, estadoConstrucao.colSpan, estadoConstrucao.rowSpan);
+  const mudouCelula = estadoConstrucao.col !== col || estadoConstrucao.row !== row;
   estadoConstrucao.col = col;
   estadoConstrucao.row = row;
   posicionarInstancia(estadoConstrucao);
   const ocupada = footprintOcupado(col, row, estadoConstrucao.colSpan, estadoConstrucao.rowSpan);
   estadoConstrucao.wrapper.classList.toggle('fabrica-instancia--ocupada', ocupada);
+  if (mudouCelula) redesenharCena();
 }
 
 // ---- controle unificado de mouse/toque/caneta via Pointer Events ----
@@ -957,6 +1050,7 @@ function encerrarEstadoConstrucao() {
   window.removeEventListener('pointerup', aoSoltarDurantePlacement);
   estadoConstrucao = null;
   btnFabricas.disabled = false;
+  redesenharCena(); // limpa os destaques de adjacência do grid (estadoConstrucao já é null aqui)
 }
 
 function confirmarConstrucao() {
@@ -1009,6 +1103,7 @@ window.addEventListener('resize', () => {
   if (estadoConstrucao) posicionarInstancia(estadoConstrucao);
   instanciasConstruidas.forEach(posicionarInstancia);
   reposicionarAcoesFlutuantes();
+  redesenharCena(); // reafirma os destaques por cima do grid limpo que atualizarTudo() acabou de redesenhar
 });
 
 // ============ AUTOSAVE / RESTAURAÇÃO DE PROGRESSO ============
@@ -1068,7 +1163,6 @@ function restaurarProgresso() {
 
   dinheiro = progresso.dinheiro ?? dinheiro;
   poluicaoTotal = progresso.poluicaoTotal ?? poluicaoTotal;
-  totalFabricas = progresso.totalFabricas ?? totalFabricas;
   Object.assign(quantidadePorTipo, progresso.quantidadePorTipo || {});
   tempoJogadoAcumulado = progresso.tempoJogadoSegundos || 0;
 
@@ -1093,6 +1187,11 @@ function restaurarProgresso() {
     instanciasConstruidas.push(instancia);
     wrapper.addEventListener('click', () => abrirPainelInstancia(instancia));
   });
+
+  // recalculado a partir das instâncias de verdade (não confia no número
+  // salvo) — assim autocorrige saves antigos, de antes da contagem bater
+  // certo com o que está realmente construído no grid
+  totalFabricas = instanciasConstruidas.length;
 
   atualizarHudDinheiro();
   atualizarHudFabricas();
