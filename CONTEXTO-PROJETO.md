@@ -35,7 +35,18 @@ imagens/
                               gerar uma versão em PNG no mesmo estilo do carvão, é só trocar o
                               campo `sprite` da entrada 'usina-agua' em FABRICAS, o pipeline de
                               sprite/máscara aceita os dois formatos sem mudança de código)
+  madeireira.svg             sprite da Madeireira, SVG à mão (mesmo motivo acima)
+  refinaria-petroleo.svg     sprite da Refinaria de Petróleo, SVG à mão, pegada 3x1
+  usina-eolica.svg           sprite da Usina Eólica, SVG à mão
+  estacao-tratamento.svg     sprite da Estação de Tratamento, SVG à mão
 ```
+
+Os quatro últimos são **placeholders temporários** — o autor vai gerar a arte
+final via IA a partir das descrições que o Claude escreveu num chat separado
+(mesmo estilo isométrico da `usina-carvao.png`, fundo transparente, sem
+sombra de chão, sem texto/marca d'água) e trocar o campo `sprite` de cada
+entrada em `FABRICAS` quando a imagem chegar — o pipeline aceita `.png` ou
+`.svg` sem mudança de código.
 
 Não existe build step, bundler ou dependências — é tudo `<script>`/`<link>`
 direto. `index.html` e `fase1.html` carregam o **mesmo** `style.css`.
@@ -333,16 +344,49 @@ aplica o total ao `ganhoPorTick` da instância, com teto em
 usinas de água pra ganho descontrolado. O sistema é genérico: qualquer
 construção futura com `bonusAdjacencia` funciona igual, sem código novo.
 
+**Redução de poluição por adjacência** (`reducaoPoluicaoAdjacencia` na
+config — hoje só a Usina Eólica tem, `0.25` = -25%): espelha o mecanismo
+acima, mas em vez de bonificar o ganho da vizinha, reduz a poluição/tick
+dela. `calcularPoluicaoInstancia(instancia)` soma o `reducaoPoluicaoAdjacencia`
+de cada vizinha ortogonal que tiver essa propriedade, aplica com teto em
+`REDUCAO_ADJACENCIA_MAX` (0.50 = -50%) sobre o `poluicaoPorTick` **antes**
+de aplicar o `multPoluicao` da dificuldade. É o mecanismo oposto e
+simétrico ao bônus de ganho — dá pra rodear uma fábrica suja de eólicas pra
+mitigar (não eliminar) o dano ambiental dela, sem tocar no ganho.
+
+**Redução global de poluição** (`reducaoGlobalPorTick` na config — hoje só
+a Estação de Tratamento tem, `20`): diferente dos dois mecanismos acima,
+**não é por adjacência** — é um valor fixo abatido uma vez por tick do
+`poluicaoTotal` do jogo inteiro, não importa onde a construção está no
+grid. Somado em `tickEconomia` (`reducaoGlobalDoTick`) e aplicado depois de
+somar toda a poluição do tick, sempre travado em `Math.max(0, ...)` pra não
+deixar `poluicaoTotal` negativo. Deliberadamente **não passa pelo
+`multPoluicao` da dificuldade** — a eficácia absoluta da Estação é
+constante em qualquer dificuldade, então ela fica proporcionalmente mais
+fraca contra o ritmo mais rápido de poluição do Expert (empurra o jogador a
+construir mais de uma se estiver jogando no nível difícil). A Estação não
+rende dinheiro nenhum (`ganhoPorTick: 0`) — é puramente uma ferramenta de
+mitigação, o preço dela compete por espaço no orçamento contra construções
+que rendem.
+
 **Valores atuais** (ajustar aqui se rebalancear):
 
-| Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | bônus adjacência |
+| Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
 | Usina de Carvão | Fábrica | 2x1 | R$ 4.500 | R$ 225 | 15 | — |
-| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | +20%/vizinha (teto 60%) |
+| Madeireira | Fábrica | 2x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
+| Refinaria de Petróleo | Fábrica | 3x1 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
+| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
+| Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%) |
+| Estação de Tratamento | Usina | 1x1 | R$ 5.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -20 (fixo, jogo inteiro, todo tick) |
 
 Caixa inicial do jogador: R$ 5.000. Filosofia: a primeira construção deve
 consumir a maior parte do caixa inicial (decisão pesada) mas se pagar em
-~1 minuto de jogo (não travar o ritmo).
+~1 minuto de jogo (não travar o ritmo). As 4 construções novas foram
+desenhadas pra dar variedade de arquétipo (barata/suja, cara/agressiva,
+suporte de ganho, suporte de limpeza local, suporte de limpeza global) em
+vez de só "mais uma fábrica com número diferente" — o objetivo era reduzir
+a monotonia relatada pelo jogador ("só comprar fábrica e deixar farmar").
 
 ### Dificuldade, fiscalização, meta de vitória e colapso
 
@@ -374,8 +418,11 @@ ao longo da partida — é intencional, cria uma rampa de pressão que fica
 pesada perto do limiar de colapso.
 
 **Meta de vitória / colapso** (`verificarFimDeJogo()`, chamada no fim de
-todo `tickEconomia`): `META_CAIXA` = 60000 e `LIMIAR_COLAPSO` = 4000 são
-**iguais nas três dificuldades** — só a VELOCIDADE de chegar neles muda
+todo `tickEconomia`): `META_CAIXA` = 90000 e `LIMIAR_COLAPSO` = 6000 (+50%
+em relação aos valores anteriores — reajustados quando as 4 construções
+novas entraram, porque o ganho/tick disponível subiu bastante com a
+Refinaria e a Madeireira, e as metas antigas ficavam curtas demais/rápidas
+demais em cima do novo teto de ganho) são **iguais nas três dificuldades** — só a VELOCIDADE de chegar neles muda
 (via os multiplicadores acima), não os alvos. Colapso é checado antes da
 vitória (se os dois baterem no mesmo tick, colapso ganha — o tema do jogo é
 que o crescimento insustentável cobra a conta). `jogoEncerrado` (`null` |
@@ -421,6 +468,55 @@ progresso: {
   `Date.now() - inicioSessaoMs` (tempo da sessão atual), calculado em
   `segundosJogados()`.
 
+### Painel de Configurações (Esc / botão de engrenagem)
+
+`#painel-config` (mesmo padrão `.painel`/`.painel-conteudo` dos outros) é
+acessível de duas formas equivalentes: a tecla **Esc** ou o botão de
+engrenagem fixo no canto superior direito (`#btn-config`) — o botão existe
+porque não há tecla Esc em celular/tablet. De dentro dele: **Salvar agora**
+(chama `salvarProgresso()` fora do ciclo normal do tick e mostra confirmação
+em `#status-config`), **Voltar ao Menu** (salva e redireciona pra
+`index.html` sem encerrar a sessão) e **Sair da Sessão** (salva, remove
+`parasitas-sessao` do `localStorage` e redireciona — volta a pedir login).
+
+**Esc é "em camadas"**, não abre o painel de configurações incondicionalmente:
+```js
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || jogoEncerrado) return;
+  if (painelConfig.classList.contains('aberto')) { fecharPainelConfig(); return; }
+  const haAlgoParaFechar = painelFabricas.classList.contains('aberto') || estadoConstrucao !== null;
+  if (haAlgoParaFechar) { fecharPainelFabricas(); abortarColocacao(); return; }
+  abrirPainelConfig();
+});
+```
+Ou seja: se as Configurações já estão abertas, Esc fecha elas. Senão, se
+tiver o painel de Fábricas aberto OU uma colocação em andamento, Esc fecha
+**isso** primeiro (comportamento que já existia). Só quando não há mais
+nada pra fechar é que Esc abre as Configurações. Fica desabilitado
+inteiramente se `jogoEncerrado` (não faz sentido pausar numa tela de fim de
+jogo). **Se algum painel novo for adicionado no futuro, ele precisa entrar
+nessa cadeia de prioridade antes do `abrirPainelConfig()` final**, senão Esc
+vai pular direto pras Configurações em vez de fechar o painel novo.
+
+### HUD responsivo (mobile)
+
+`.hud-fase1` não tinha nenhuma regra de responsividade — com o botão de
+engrenagem novo no canto e nomes de empresa mais longos, em telas estreitas
+(testado em iPhone 13, 390px) o botão sobrepunha a Caixa e as estatísticas
+de Fábricas/Poluição saíam inteiramente da tela. As regras de correção
+ficam no **final do arquivo `style.css`, de propósito** (não dentro do
+`@media (max-width:640px)` original lá no topo, que cobre só `index.html`):
+como a regra de mobile e a regra "base" de `.hud-fase1`/`.hud-stat` têm a
+mesma especificidade CSS, a que vem **depois** no arquivo vence o empate —
+colocar o bloco mobile antes das regras base (erro cometido e corrigido
+nessa sessão) faz ele ser silenciosamente ignorado em qualquer largura de
+tela. **Se mexer em `.hud-fase1`/`.hud-stat*` de novo, lembrar que existe
+uma segunda definição pra mobile lá embaixo no arquivo.** A correção
+também precisou de `min-width:0` no `.hud-stat--empresa` e no
+`.hud-stat-texto` dele — sem isso, o `max-width`/`text-overflow:ellipsis`
+do nome da empresa não tem efeito nenhum dentro de um item flex, é um
+detalhe clássico (e não óbvio) do modelo de flexbox.
+
 ## Fluxo de dados entre telas
 
 Duas pontes entre `index.html` e `fase1.html`, ambas em `localStorage`:
@@ -461,10 +557,6 @@ seção de login acima).
 
 - Sprite da "fábrica inicial" (hoje é só um número `1` no HUD, sem
   representação visual no grid).
-- Mais construções além de Usina de Carvão e Usina de Água — o painel já é
-  100% genérico via `FABRICAS` (cards renderizados dinamicamente, escala de
-  preço e bônus de adjacência já genéricos), é só adicionar entrada nova +
-  sprite (`.png` ou `.svg`, o pipeline aceita os dois).
 - Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
   usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
   é reversível (ver seção "Rotação" acima).
@@ -483,20 +575,19 @@ seção de login acima).
   - Só 3 slots por conta, sem opção de apagar um slot individualmente pelo
     painel Novo Jogo (dá pra sobrescrever mudando os campos, mas não tem
     botão "apagar save").
-- Sprite da "fábrica inicial" (hoje é só um número `1` no HUD, sem
-  representação visual no grid).
-- Mais construções além de Usina de Carvão e Usina de Água — o painel já é
-  100% genérico via `FABRICAS` (cards renderizados dinamicamente, escala de
-  preço e bônus de adjacência já genéricos), é só adicionar entrada nova +
-  sprite (`.png` ou `.svg`, o pipeline aceita os dois).
-- Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
-  usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
-  é reversível (ver seção "Rotação" acima).
-- Gerador de imagem IA ficou sem crédito durante essa sessão — a Usina de
-  Água usa um SVG desenhado à mão em vez de um PNG gerado (ver seção de
-  imagens no topo do arquivo). Se quiser trocar por um PNG no estilo do
-  carvão mais pra frente, é só gerar e trocar o campo `sprite`.
-- Valores de balanceamento novos (multiplicadores de dificuldade,
-  `FATOR_MULTA`, `FISCALIZACAO_INTERVALO_MS`, `META_CAIXA`,
-  `LIMIAR_COLAPSO`) são um primeiro palpite, testados só por automação de
-  navegador — vale jogar de verdade pra sentir o ritmo e ajustar.
+- **4 construções novas (Madeireira, Refinaria de Petróleo, Usina Eólica,
+  Estação de Tratamento) usam sprites SVG placeholder desenhados à mão** —
+  igual aconteceu com a Usina de Água, o gerador de imagem IA ficou sem
+  crédito. O autor vai gerar a arte final a partir de descrições de prompt
+  (escritas num chat separado) e trocar o campo `sprite` de cada entrada em
+  `FABRICAS` quando a imagem chegar — o pipeline aceita `.png` ou `.svg`
+  sem mudança de código, é literalmente só trocar o valor da string.
+- Valores de balanceamento (multiplicadores de dificuldade, `FATOR_MULTA`,
+  `FISCALIZACAO_INTERVALO_MS`, `META_CAIXA` = 90000, `LIMIAR_COLAPSO` = 6000,
+  custo/ganho/poluição das 6 construções) são ajustados por raciocínio +
+  automação de navegador, não por playtesting humano longo — vale jogar de
+  verdade pra sentir o ritmo e ajustar se ainda estiver monótono ou rápido
+  demais.
+- Painel de Configurações (Esc / engrenagem) cobre salvar/menu/sair — não
+  tem ainda opções de áudio, idioma, ou dificuldade-em-tempo-real (a
+  dificuldade é fixada na criação do save, não muda depois).

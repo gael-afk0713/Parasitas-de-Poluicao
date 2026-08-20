@@ -168,11 +168,60 @@ btnFabricas.addEventListener('click', () => {
   aberto ? fecharPainelFabricas() : abrirPainelFabricas();
 });
 fecharFabricasBtn.addEventListener('click', fecharPainelFabricas);
+
+// ============ PAINEL DE CONFIGURAÇÕES (Esc / botão de engrenagem) ============
+const btnConfig = document.getElementById('btn-config');
+const painelConfig = document.getElementById('painel-config');
+const statusConfig = document.getElementById('status-config');
+
+function abrirPainelConfig() {
+  statusConfig.textContent = '';
+  statusConfig.classList.remove('visivel');
+  painelConfig.classList.add('aberto');
+  painelConfig.setAttribute('aria-hidden', 'false');
+}
+function fecharPainelConfig() {
+  painelConfig.classList.remove('aberto');
+  painelConfig.setAttribute('aria-hidden', 'true');
+}
+btnConfig.addEventListener('click', abrirPainelConfig);
+
+document.getElementById('btn-config-continuar').addEventListener('click', fecharPainelConfig);
+
+document.getElementById('btn-config-salvar').addEventListener('click', () => {
+  salvarProgresso();
+  statusConfig.textContent = 'Progresso salvo.';
+  statusConfig.classList.add('visivel', 'painel-status--sucesso');
+});
+
+document.getElementById('btn-config-menu').addEventListener('click', () => {
+  salvarProgresso();
+  window.location.href = 'index.html';
+});
+
+document.getElementById('btn-config-sair').addEventListener('click', () => {
+  salvarProgresso();
+  localStorage.removeItem('parasitas-sessao');
+  window.location.href = 'index.html';
+});
+
+// Esc é em camadas: primeiro fecha o que estiver por cima (painel de
+// construção ou uma colocação em andamento); só quando não há mais nada
+// pra fechar é que abre/fecha a tela de configurações. Assim uma tecla só
+// nunca faz duas coisas de uma vez.
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
+  if (e.key !== 'Escape' || jogoEncerrado) return;
+  if (painelConfig.classList.contains('aberto')) {
+    fecharPainelConfig();
+    return;
+  }
+  const haAlgoParaFechar = painelFabricas.classList.contains('aberto') || estadoConstrucao !== null;
+  if (haAlgoParaFechar) {
     fecharPainelFabricas();
     abortarColocacao();
+    return;
   }
+  abrirPainelConfig();
 });
 
 // delegação no container (os cards são renderizados dinamicamente a
@@ -185,18 +234,27 @@ document.getElementById('lista-fabricas').addEventListener('click', (e) => {
 });
 
 // ============ ECONOMIA ============
-// ícones reaproveitados nos cards de construção (mesmo viewBox 24x24 e
-// classe .icone-fabrica dos outros ícones do HUD)
+// ícones dos cards de construção (viewBox 24x24, classe .icone-fabrica
+// compartilhada com os outros ícones do HUD) — um por construção
 const ICONES_CONSTRUCAO = {
   fabrica: '<path d="M3 21V13l4 3v-3l4 3v-3l4 3v5H3Z"/><rect x="17" y="7" width="3" height="14"/><path d="M2 21h20"/>',
   usina: '<path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2Z"/><path d="M8.5 15a3.5 3.5 0 0 0 3.5 3.5"/>',
+  madeireira: '<path d="M12 2 8 10h2.5L7 18h10l-3.5-8H16Z"/><rect x="10.5" y="18" width="3" height="3"/>',
+  refinaria: '<rect x="9" y="4" width="6" height="14"/><path d="M6 20h12M9 4V2M15 4V2"/><circle cx="12" cy="9.5" r="1.4"/>',
+  eolica: '<circle cx="12" cy="10" r="1.3"/><path d="M12 10 12 21M12 10 18 6M12 10 7 4M12 10 6 13"/>',
+  tratamento: '<path d="M4 4h16l-6.5 8.5V19l-3 2v-8.5Z"/>',
 };
 
 // celulasCol/celulasRow = pegada da construção no grid.
 // ganhoPorTick/poluicaoPorTick = quanto cada UNIDADE rende/polui a cada
 // tick de TICK_ECONOMIA_MS (multiplicado pela quantidade possuída).
-// bonusAdjacencia = fração extra de ganho que essa construção dá a CADA
-// vizinha ortogonal (só usinas de suporte têm isso — ver calcularGanhoInstancia)
+// bonusAdjacencia = fração extra de GANHO que essa construção dá a CADA
+// vizinha ortogonal (ver calcularGanhoInstancia).
+// reducaoPoluicaoAdjacencia = fração de POLUIÇÃO a menos que essa
+// construção tira de CADA vizinha ortogonal (ver calcularPoluicaoInstancia)
+// — é o "oposto" do bônus de ganho, efeito diferente, não empilha com ele.
+// reducaoGlobalPorTick = quanto essa construção tira do poluicaoTotal
+// GERAL a cada tick (não é adjacência, não depende de vizinhança).
 const FABRICAS = {
   'usina-carvao': {
     nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
@@ -204,18 +262,43 @@ const FABRICAS = {
     custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
     sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1,
   },
+  'madeireira': {
+    nome: 'Madeireira', categoria: 'Fábrica', icone: 'madeireira',
+    descricao: 'Desmatamento: mais barata, rende menos, polui menos.',
+    custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
+    sprite: 'imagens/madeireira.svg', celulasCol: 2, celulasRow: 1,
+  },
+  'refinaria-petroleo': {
+    nome: 'Refinaria de Petróleo', categoria: 'Fábrica', icone: 'refinaria',
+    descricao: 'Ganho pesado, poluição desproporcional. Alto risco.',
+    custo: 12000, ganhoPorTick: 600, poluicaoPorTick: 48,
+    sprite: 'imagens/refinaria-petroleo.svg', celulasCol: 3, celulasRow: 1,
+  },
   'usina-agua': {
     nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
     descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
     custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
     sprite: 'imagens/usina-agua.svg', celulasCol: 1, celulasRow: 1,
   },
+  'usina-eolica': {
+    nome: 'Usina Eólica', categoria: 'Usina', icone: 'eolica',
+    descricao: 'Quase não polui; reduz a poluição das vizinhas.',
+    custo: 2500, ganhoPorTick: 60, poluicaoPorTick: 1, reducaoPoluicaoAdjacencia: 0.25,
+    sprite: 'imagens/usina-eolica.svg', celulasCol: 1, celulasRow: 1,
+  },
+  'estacao-tratamento': {
+    nome: 'Estação de Tratamento', categoria: 'Usina', icone: 'tratamento',
+    descricao: 'Não rende nada; limpa poluição acumulada da região inteira.',
+    custo: 5000, ganhoPorTick: 0, poluicaoPorTick: 0, reducaoGlobalPorTick: 20,
+    sprite: 'imagens/estacao-tratamento.svg', celulasCol: 1, celulasRow: 1,
+  },
 };
 
-// teto global: uma construção não pode receber mais que +60% de ganho
-// somando o bônus de TODAS as usinas vizinhas — sem isso, cercar uma
-// fábrica de usinas de água vira ganho infinito
+// tetos globais: uma construção não pode ganhar mais que +60% de ganho
+// nem perder mais que -50% de poluição só de vizinhança — sem isso,
+// cercar uma fábrica de usinas vira ganho infinito ou poluição zerada
 const BONUS_ADJACENCIA_MAX = 0.60;
+const REDUCAO_ADJACENCIA_MAX = 0.50;
 
 function renderizarCartasFabricas() {
   const lista = document.getElementById('lista-fabricas');
@@ -344,11 +427,29 @@ function calcularGanhoInstancia(instancia) {
   return Math.round(config.ganhoPorTick * (1 + bonus) * configDificuldade().multGanho);
 }
 
-function mostrarNumeroFlutuante(instancia, valor) {
+// poluição efetiva de UMA instância no tick atual, já descontando a
+// redução de todas as vizinhas ortogonais com reducaoPoluicaoAdjacencia
+// (ex: Usina Eólica), respeitando o teto REDUCAO_ADJACENCIA_MAX — a
+// dificuldade entra por último, igual em calcularGanhoInstancia
+function calcularPoluicaoInstancia(instancia) {
+  const config = FABRICAS[instancia.tipo];
+  if (!config.poluicaoPorTick) return 0;
+  let reducao = 0;
+  for (const outra of instanciasConstruidas) {
+    if (outra === instancia) continue;
+    const configOutra = FABRICAS[outra.tipo];
+    if (!configOutra.reducaoPoluicaoAdjacencia) continue;
+    if (footprintsVizinhos(instancia, outra)) reducao += configOutra.reducaoPoluicaoAdjacencia;
+  }
+  reducao = Math.min(reducao, REDUCAO_ADJACENCIA_MAX);
+  return Math.round(config.poluicaoPorTick * (1 - reducao) * configDificuldade().multPoluicao);
+}
+
+function mostrarNumeroFlutuante(instancia, texto, classeExtra) {
   const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
   const numero = document.createElement('div');
-  numero.className = 'numero-flutuante';
-  numero.textContent = '+' + formatarDinheiro(valor);
+  numero.className = 'numero-flutuante' + (classeExtra ? ' ' + classeExtra : '');
+  numero.textContent = texto;
   numero.style.left = ponto.x + 'px';
   numero.style.top = ponto.y + 'px';
   document.body.appendChild(numero);
@@ -358,13 +459,19 @@ function mostrarNumeroFlutuante(instancia, valor) {
 function tickEconomia() {
   if (jogoEncerrado || instanciasConstruidas.length === 0) return;
   let ganhoDoTick = 0;
+  let reducaoGlobalDoTick = 0;
   instanciasConstruidas.forEach((instancia) => {
     const config = FABRICAS[instancia.tipo];
     const ganho = calcularGanhoInstancia(instancia);
     ganhoDoTick += ganho;
-    poluicaoTotal += Math.round(config.poluicaoPorTick * configDificuldade().multPoluicao);
-    mostrarNumeroFlutuante(instancia, ganho);
+    poluicaoTotal += calcularPoluicaoInstancia(instancia);
+    if (ganho > 0) mostrarNumeroFlutuante(instancia, '+' + formatarDinheiro(ganho));
+    if (config.reducaoGlobalPorTick) {
+      reducaoGlobalDoTick += config.reducaoGlobalPorTick;
+      mostrarNumeroFlutuante(instancia, '−' + config.reducaoGlobalPorTick + ' poluição', 'numero-flutuante--poluicao');
+    }
   });
+  poluicaoTotal = Math.max(0, poluicaoTotal - reducaoGlobalDoTick);
   dinheiro += ganhoDoTick;
   atualizarHudDinheiro();
   atualizarHudPoluicao();
@@ -401,8 +508,11 @@ function aplicarFiscalizacao() {
 setInterval(aplicarFiscalizacao, FISCALIZACAO_INTERVALO_MS);
 
 // ============ META DE VITÓRIA / COLAPSO DA EMPRESA ============
-const META_CAIXA = 60000;
-const LIMIAR_COLAPSO = 4000;
+// aumentados em +50% em relação ao valor original (60000/4000) — com 6
+// construções diferentes agora, o jogo precisa de mais fôlego pra dar
+// tempo de experimentar a economia toda antes de acabar
+const META_CAIXA = 90000;
+const LIMIAR_COLAPSO = 6000;
 let jogoEncerrado = null; // null | 'colapso' | 'vitoria'
 
 function segundosJogados() {

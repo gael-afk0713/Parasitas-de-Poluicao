@@ -51,6 +51,13 @@
     </div>
   </header>
 
+  <button class="botao-config" id="btn-config" aria-label="Configurações">
+    <svg class="icone-config" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="3.2"/>
+      <path d="M12 3v2.6M12 18.4V21M21 12h-2.6M5.6 12H3M18.4 5.6l-1.85 1.85M7.45 16.55l-1.85 1.85M18.4 18.4l-1.85-1.85M7.45 7.45 5.6 5.6"/>
+    </svg>
+  </button>
+
   <button class="botao-fabricas" id="btn-fabricas" aria-expanded="false" aria-controls="painel-fabricas">
     <svg class="icone-fabrica" viewBox="0 0 24 24" aria-hidden="true">
       <path d="M3 21V13l4 3v-3l4 3v-3l4 3v5H3Z"/>
@@ -68,6 +75,26 @@
       </div>
 
       <div class="lista-fabricas" id="lista-fabricas"></div>
+    </div>
+  </section>
+
+  <section class="painel" id="painel-config" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Pausado</p>
+      <h2 class="painel-titulo">Configurações</h2>
+      <p class="painel-explicacao">
+        O progresso já fica salvo sozinho a cada poucos segundos — mas dá
+        pra forçar um salvamento agora, antes de sair.
+      </p>
+      <p class="painel-status" id="status-config"></p>
+      <div class="config-acoes">
+        <button class="painel-voltar" id="btn-config-salvar">Salvar agora</button>
+        <button class="painel-voltar" id="btn-config-menu">Voltar ao Menu</button>
+        <button class="painel-voltar config-acao-sair" id="btn-config-sair">Sair da Sessão</button>
+      </div>
+      <div class="painel-acoes painel-acoes--fim">
+        <button class="painel-confirmar" id="btn-config-continuar">Continuar Jogando</button>
+      </div>
     </div>
   </section>
 
