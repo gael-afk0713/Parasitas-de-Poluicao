@@ -1132,6 +1132,16 @@ footer{
 .fabrica-instancia--construida .fabrica-sprite{
   opacity:1;
 }
+/* só construções JÁ construídas respondem a clique (gerenciar/vender/
+   melhorar) — fantasma/travada durante a colocação continuam
+   pointer-events:none, pra não disputar com o fluxo de colocação */
+.fabrica-instancia--construida{
+  pointer-events:auto;
+  cursor:pointer;
+}
+.fabrica-instancia--construida:hover .fabrica-sprite{
+  filter:brightness(1.18);
+}
 
 .fabrica-tinta{
   position:absolute;

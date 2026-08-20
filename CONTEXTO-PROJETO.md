@@ -468,6 +468,52 @@ progresso: {
   `Date.now() - inicioSessaoMs` (tempo da sessão atual), calculado em
   `segundosJogados()`.
 
+### Gerenciar construção (clicar numa já construída): vender e melhorar
+
+Clicar em qualquer construção **já construída** no grid (`--construida`, não
+durante a colocação) abre `#painel-instancia` com as estatísticas atuais
+dela (rende/tick, polui/tick, nível de melhoria) e dois botões:
+
+- **Melhorar** — paga pra subir o nível da instância (até
+  `NIVEL_UPGRADE_MAX` = 3 níveis), cada nível aplicando
+  `multiplicadorUpgrade(instancia)` = `1 + nivel × MULT_UPGRADE_GANHO`
+  (25% por nível, então nível 3 = +75%) sobre a **métrica principal** dela.
+  Pra quem rende dinheiro (`ganhoPorTick > 0`), a métrica é o ganho — ver
+  `calcularGanhoInstancia`. Pra quem não rende mas tem
+  `reducaoGlobalPorTick` (só a Estação de Tratamento hoje), a métrica é a
+  limpeza — ver o cálculo em `tickEconomia`. **A poluição/tick escala
+  pelo mesmo multiplicador** (`calcularPoluicaoInstancia`) — de propósito:
+  rende mais, também polui mais, mantendo a tensão central do jogo em vez
+  de virar um upgrade "de graça". Custo do próximo upgrade
+  (`custoProximoUpgrade`): primeiro nível custa 50% do preço-base da
+  construção, cada nível seguinte NA MESMA instância custa 30% a mais que
+  o anterior (`FATOR_CUSTO_UPGRADE` × `MULT_CUSTO_UPGRADE_REPETIDO^nivel`)
+  — mesma lógica de escalonamento do preço por unidade repetida
+  (`precoAtual`), só que por instância em vez de por tipo.
+- **Vender** — remove a construção do grid, libera as células dela
+  (`desmarcarFootprintOcupado`, pra dar pra construir ali de novo),
+  decrementa `totalFabricas`/`quantidadePorTipo[tipo]` (então o **próximo**
+  da mesma linha volta a ficar mais barato, já que a escala de preço é por
+  quantidade possuída) e devolve `FATOR_VENDA` (70%) do que foi **investido
+  de verdade** na instância — `instancia.investimentoTotal`, que é o preço
+  de compra somado a todo upgrade pago nela, não o preço-base cru. Vender
+  não devolve o valor cheio de propósito: comprar-e-vender em loop sempre
+  perde 30%, então nunca vira uma forma grátis de resetar o escalonamento
+  de preço ou farmar dinheiro.
+
+Cada instância guarda `precoCompra`, `investimentoTotal` e `nivelUpgrade` —
+todos persistidos no save (`progresso.instancias[].{precoCompra,
+investimentoTotal,nivelUpgrade}`) e restaurados em `restaurarProgresso`
+(com fallback pro preço-base em saves antigos, de antes desse recurso
+existir, que não têm esses campos). O clique só funciona em construções
+`--construida` (`.fabrica-instancia--construida{pointer-events:auto;
+cursor:pointer;}` — o resto continua `pointer-events:none` de propósito,
+pra não disputar com o fluxo de arrastar/soltar da colocação), e só abre o
+painel se não houver colocação em andamento nem o jogo já ter terminado
+(`abrirPainelInstancia` checa `estadoConstrucao`/`jogoEncerrado`). Fica
+mais uma camada na cadeia do Esc, a mais interna de todas (fecha antes até
+das Configurações — ver seção abaixo).
+
 ### Painel de Configurações (Esc / botão de engrenagem)
 
 `#painel-config` (mesmo padrão `.painel`/`.painel-conteudo` dos outros) é
@@ -483,16 +529,17 @@ em `#status-config`), **Voltar ao Menu** (salva e redireciona pra
 ```js
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || jogoEncerrado) return;
+  if (painelInstancia.classList.contains('aberto')) { fecharPainelInstancia(); return; }
   if (painelConfig.classList.contains('aberto')) { fecharPainelConfig(); return; }
   const haAlgoParaFechar = painelFabricas.classList.contains('aberto') || estadoConstrucao !== null;
   if (haAlgoParaFechar) { fecharPainelFabricas(); abortarColocacao(); return; }
   abrirPainelConfig();
 });
 ```
-Ou seja: se as Configurações já estão abertas, Esc fecha elas. Senão, se
-tiver o painel de Fábricas aberto OU uma colocação em andamento, Esc fecha
-**isso** primeiro (comportamento que já existia). Só quando não há mais
-nada pra fechar é que Esc abre as Configurações. Fica desabilitado
+Ordem de prioridade, do mais "por cima" pro mais "por baixo": painel de
+gerenciar construção (`#painel-instancia`) → Configurações → painel de
+Fábricas/colocação em andamento → (nada mais aberto) abre Configurações.
+Cada Esc só fecha UMA camada, nunca duas de uma vez. Fica desabilitado
 inteiramente se `jogoEncerrado` (não faz sentido pausar numa tela de fim de
 jogo). **Se algum painel novo for adicionado no futuro, ele precisa entrar
 nessa cadeia de prioridade antes do `abrirPainelConfig()` final**, senão Esc
@@ -555,6 +602,13 @@ seção de login acima).
 
 ## O que falta / próximos passos possíveis
 
+- **Venda e melhoria por instância** (clicar numa construção do grid) só
+  afeta a métrica principal dela (ganho, ou a redução global da Estação de
+  Tratamento) — não escala `bonusAdjacencia`/`reducaoPoluicaoAdjacencia`
+  (os efeitos que uma construção dá às vizinhas). Foi decisão deliberada
+  pra não empilhar upgrade com adjacência de forma difícil de comunicar no
+  card/painel, mas é um ponto de rebalanceamento possível se upgrade em
+  Usina de Água/Eólica parecer fraco perto de melhorar uma Fábrica.
 - Sprite da "fábrica inicial" (hoje é só um número `1` no HUD, sem
   representação visual no grid).
 - Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do

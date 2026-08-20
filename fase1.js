@@ -205,12 +205,17 @@ document.getElementById('btn-config-sair').addEventListener('click', () => {
   window.location.href = 'index.html';
 });
 
-// Esc é em camadas: primeiro fecha o que estiver por cima (painel de
-// construção ou uma colocação em andamento); só quando não há mais nada
-// pra fechar é que abre/fecha a tela de configurações. Assim uma tecla só
+// Esc é em camadas: primeiro fecha o que estiver por cima (o painel de
+// gerenciar uma construção clicada, depois o de Configurações, depois o
+// painel de construção/colocação em andamento); só quando não há mais
+// nada pra fechar é que abre a tela de configurações. Assim uma tecla só
 // nunca faz duas coisas de uma vez.
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || jogoEncerrado) return;
+  if (painelInstancia.classList.contains('aberto')) {
+    fecharPainelInstancia();
+    return;
+  }
   if (painelConfig.classList.contains('aberto')) {
     fecharPainelConfig();
     return;
@@ -299,6 +304,44 @@ const FABRICAS = {
 // cercar uma fábrica de usinas vira ganho infinito ou poluição zerada
 const BONUS_ADJACENCIA_MAX = 0.60;
 const REDUCAO_ADJACENCIA_MAX = 0.50;
+
+// ---- melhoria e venda de construções já colocadas (clique numa
+// construção construída pra abrir #painel-instancia) ----
+// cada nível de melhoria aumenta em MULT_UPGRADE_GANHO a "métrica
+// principal" da construção: o ganho/tick pra quem rende dinheiro, ou a
+// reducaoGlobalPorTick pra quem não rende (ex: Estação de Tratamento) —
+// ver multiplicadorUpgrade(). A poluição/tick escala junto (mesmo
+// multiplicador): rende mais, também polui mais, de propósito — não
+// existe upgrade de graça nesse jogo.
+const NIVEL_UPGRADE_MAX = 3;
+const MULT_UPGRADE_GANHO = 0.25;
+// primeiro upgrade custa 50% do preço-base da construção; cada upgrade
+// seguinte NA MESMA instância custa 30% a mais que o anterior (mesma
+// lógica de escalonamento de MULTIPLICADOR_CUSTO_REPETIDO, só que por
+// instância em vez de por tipo)
+const FATOR_CUSTO_UPGRADE = 0.5;
+const MULT_CUSTO_UPGRADE_REPETIDO = 1.3;
+// vender devolve 70% do total investido na instância (preço de compra +
+// upgrades pagos) — nunca o preço cheio, senão comprar-e-vender vira
+// forma grátis de "resetar" o escalonamento de preço por tipo
+const FATOR_VENDA = 0.7;
+
+function multiplicadorUpgrade(instancia) {
+  return 1 + (instancia.nivelUpgrade || 0) * MULT_UPGRADE_GANHO;
+}
+
+function custoProximoUpgrade(instancia) {
+  const config = FABRICAS[instancia.tipo];
+  const nivel = instancia.nivelUpgrade || 0;
+  if (nivel >= NIVEL_UPGRADE_MAX) return null;
+  return Math.round(config.custo * FATOR_CUSTO_UPGRADE * Math.pow(MULT_CUSTO_UPGRADE_REPETIDO, nivel));
+}
+
+function valorVenda(instancia) {
+  const config = FABRICAS[instancia.tipo];
+  const investido = instancia.investimentoTotal ?? instancia.precoCompra ?? config.custo;
+  return Math.round(investido * FATOR_VENDA);
+}
 
 function renderizarCartasFabricas() {
   const lista = document.getElementById('lista-fabricas');
@@ -424,7 +467,7 @@ function calcularGanhoInstancia(instancia) {
     if (footprintsVizinhos(instancia, outra)) bonus += configOutra.bonusAdjacencia;
   }
   bonus = Math.min(bonus, BONUS_ADJACENCIA_MAX);
-  return Math.round(config.ganhoPorTick * (1 + bonus) * configDificuldade().multGanho);
+  return Math.round(config.ganhoPorTick * (1 + bonus) * multiplicadorUpgrade(instancia) * configDificuldade().multGanho);
 }
 
 // poluição efetiva de UMA instância no tick atual, já descontando a
@@ -442,7 +485,7 @@ function calcularPoluicaoInstancia(instancia) {
     if (footprintsVizinhos(instancia, outra)) reducao += configOutra.reducaoPoluicaoAdjacencia;
   }
   reducao = Math.min(reducao, REDUCAO_ADJACENCIA_MAX);
-  return Math.round(config.poluicaoPorTick * (1 - reducao) * configDificuldade().multPoluicao);
+  return Math.round(config.poluicaoPorTick * multiplicadorUpgrade(instancia) * (1 - reducao) * configDificuldade().multPoluicao);
 }
 
 function mostrarNumeroFlutuante(instancia, texto, classeExtra) {
@@ -467,8 +510,9 @@ function tickEconomia() {
     poluicaoTotal += calcularPoluicaoInstancia(instancia);
     if (ganho > 0) mostrarNumeroFlutuante(instancia, '+' + formatarDinheiro(ganho));
     if (config.reducaoGlobalPorTick) {
-      reducaoGlobalDoTick += config.reducaoGlobalPorTick;
-      mostrarNumeroFlutuante(instancia, '−' + config.reducaoGlobalPorTick + ' poluição', 'numero-flutuante--poluicao');
+      const reducao = Math.round(config.reducaoGlobalPorTick * multiplicadorUpgrade(instancia));
+      reducaoGlobalDoTick += reducao;
+      mostrarNumeroFlutuante(instancia, '−' + reducao + ' poluição', 'numero-flutuante--poluicao');
     }
   });
   poluicaoTotal = Math.max(0, poluicaoTotal - reducaoGlobalDoTick);
@@ -481,6 +525,115 @@ function tickEconomia() {
   salvarProgresso();
 }
 setInterval(tickEconomia, TICK_ECONOMIA_MS);
+
+// ============ GERENCIAR CONSTRUÇÃO (clicar numa já construída) ============
+// clicar em qualquer construção já construída no grid abre este painel com
+// duas ações: Melhorar (paga pra aumentar a métrica principal dela, ver
+// multiplicadorUpgrade) e Vender (remove do grid, devolve FATOR_VENDA do
+// que foi investido nela e libera as células pra construir de novo ali)
+const painelInstancia = document.getElementById('painel-instancia');
+const instanciaCategoriaEl = document.getElementById('instancia-categoria');
+const instanciaNomeEl = document.getElementById('instancia-nome');
+const instanciaGanhoEl = document.getElementById('instancia-ganho');
+const instanciaPoluicaoEl = document.getElementById('instancia-poluicao');
+const instanciaNivelEl = document.getElementById('instancia-nivel');
+const statusInstancia = document.getElementById('status-instancia');
+const btnInstanciaMelhorar = document.getElementById('btn-instancia-melhorar');
+const btnInstanciaVender = document.getElementById('btn-instancia-vender');
+let instanciaSelecionada = null;
+
+// texto da "métrica principal": ganho em dinheiro pra quem rende, ou a
+// redução de poluição global pra quem não rende (ex: Estação de
+// Tratamento, ganhoPorTick 0) — sempre o que multiplicadorUpgrade afeta
+function textoMetricaPrincipal(instancia) {
+  const config = FABRICAS[instancia.tipo];
+  if (!config.ganhoPorTick && config.reducaoGlobalPorTick) {
+    const reducao = Math.round(config.reducaoGlobalPorTick * multiplicadorUpgrade(instancia));
+    return '−' + reducao.toLocaleString('pt-BR') + ' poluição/tick (geral)';
+  }
+  return '+' + formatarDinheiro(calcularGanhoInstancia(instancia)) + '/tick';
+}
+
+function atualizarPainelInstancia() {
+  if (!instanciaSelecionada) return;
+  const config = FABRICAS[instanciaSelecionada.tipo];
+  instanciaCategoriaEl.textContent = config.categoria;
+  instanciaNomeEl.textContent = config.nome;
+  instanciaGanhoEl.textContent = textoMetricaPrincipal(instanciaSelecionada);
+  instanciaPoluicaoEl.textContent = calcularPoluicaoInstancia(instanciaSelecionada).toLocaleString('pt-BR') + '/tick';
+  instanciaNivelEl.textContent = `${instanciaSelecionada.nivelUpgrade || 0} / ${NIVEL_UPGRADE_MAX}`;
+
+  const custoUpgrade = custoProximoUpgrade(instanciaSelecionada);
+  if (custoUpgrade === null) {
+    btnInstanciaMelhorar.textContent = 'Nível máximo';
+    btnInstanciaMelhorar.disabled = true;
+  } else {
+    btnInstanciaMelhorar.textContent = `Melhorar — ${formatarDinheiro(custoUpgrade)}`;
+    btnInstanciaMelhorar.disabled = custoUpgrade > dinheiro;
+  }
+  btnInstanciaVender.textContent = `Vender — +${formatarDinheiro(valorVenda(instanciaSelecionada))}`;
+}
+
+function abrirPainelInstancia(instancia) {
+  // não abre no meio de uma colocação em andamento, nem depois do fim de jogo
+  if (jogoEncerrado || estadoConstrucao) return;
+  instanciaSelecionada = instancia;
+  statusInstancia.textContent = '';
+  statusInstancia.classList.remove('visivel', 'painel-status--sucesso');
+  atualizarPainelInstancia();
+  painelInstancia.classList.add('aberto');
+  painelInstancia.setAttribute('aria-hidden', 'false');
+}
+function fecharPainelInstancia() {
+  painelInstancia.classList.remove('aberto');
+  painelInstancia.setAttribute('aria-hidden', 'true');
+  instanciaSelecionada = null;
+}
+document.getElementById('btn-instancia-fechar').addEventListener('click', fecharPainelInstancia);
+
+btnInstanciaMelhorar.addEventListener('click', () => {
+  if (!instanciaSelecionada) return;
+  const custoUpgrade = custoProximoUpgrade(instanciaSelecionada);
+  if (custoUpgrade === null || custoUpgrade > dinheiro) return;
+
+  dinheiro -= custoUpgrade;
+  instanciaSelecionada.nivelUpgrade = (instanciaSelecionada.nivelUpgrade || 0) + 1;
+  instanciaSelecionada.investimentoTotal = (instanciaSelecionada.investimentoTotal || 0) + custoUpgrade;
+
+  const tinta = instanciaSelecionada.wrapper.querySelector('.fabrica-tinta');
+  if (tinta) {
+    tinta.classList.remove('fabrica-tinta--sucesso');
+    void tinta.offsetWidth;
+    tinta.classList.add('fabrica-tinta--sucesso');
+  }
+
+  atualizarHudDinheiro();
+  atualizarCartasFabricas();
+  atualizarPainelInstancia();
+  statusInstancia.textContent = 'Melhoria aplicada.';
+  statusInstancia.classList.add('visivel', 'painel-status--sucesso');
+  salvarProgresso();
+});
+
+btnInstanciaVender.addEventListener('click', () => {
+  if (!instanciaSelecionada) return;
+  const instancia = instanciaSelecionada;
+  const valor = valorVenda(instancia);
+
+  dinheiro += valor;
+  totalFabricas = Math.max(0, totalFabricas - 1);
+  quantidadePorTipo[instancia.tipo] = Math.max(0, (quantidadePorTipo[instancia.tipo] || 1) - 1);
+  desmarcarFootprintOcupado(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
+  const indice = instanciasConstruidas.indexOf(instancia);
+  if (indice !== -1) instanciasConstruidas.splice(indice, 1);
+  instancia.wrapper.remove();
+
+  atualizarHudDinheiro();
+  atualizarHudFabricas();
+  atualizarCartasFabricas();
+  fecharPainelInstancia();
+  salvarProgresso();
+});
 
 // ============ FISCALIZAÇÃO AMBIENTAL (multas por poluição) ============
 const FISCALIZACAO_INTERVALO_MS = 25000;
@@ -637,6 +790,16 @@ function marcarFootprintOcupado(col, row, colSpan, rowSpan) {
   for (let dc = 0; dc < colSpan; dc++) {
     for (let dr = 0; dr < rowSpan; dr++) {
       celulasOcupadas.add(chaveCelula(col + dc, row + dr));
+    }
+  }
+}
+
+// inverso de marcarFootprintOcupado — libera as células de uma construção
+// vendida, pra dar pra construir ali de novo
+function desmarcarFootprintOcupado(col, row, colSpan, rowSpan) {
+  for (let dc = 0; dc < colSpan; dc++) {
+    for (let dr = 0; dr < rowSpan; dr++) {
+      celulasOcupadas.delete(chaveCelula(col + dc, row + dr));
     }
   }
 }
@@ -812,7 +975,12 @@ function confirmarConstrucao() {
   atualizarHudDinheiro();
   atualizarHudFabricas();
   marcarFootprintOcupado(col, row, colSpan, rowSpan);
-  instanciasConstruidas.push({ wrapper, col, row, colSpan, rowSpan, larguraImagem, tipo });
+  const instancia = {
+    wrapper, col, row, colSpan, rowSpan, larguraImagem, tipo,
+    precoCompra, investimentoTotal: precoCompra, nivelUpgrade: 0,
+  };
+  instanciasConstruidas.push(instancia);
+  wrapper.addEventListener('click', () => abrirPainelInstancia(instancia));
 
   setTimeout(() => tinta.remove(), 550);
   encerrarEstadoConstrucao();
@@ -879,6 +1047,7 @@ function salvarProgresso() {
       quantidadePorTipo: { ...quantidadePorTipo },
       instancias: instanciasConstruidas.map((i) => ({
         tipo: i.tipo, col: i.col, row: i.row, colSpan: i.colSpan, rowSpan: i.rowSpan,
+        precoCompra: i.precoCompra, investimentoTotal: i.investimentoTotal, nivelUpgrade: i.nivelUpgrade || 0,
       })),
       tempoJogadoSegundos: segundosJogados(),
       colapsada: jogoEncerrado === 'colapso',
@@ -913,10 +1082,16 @@ function restaurarProgresso() {
       wrapper, tipo: dados.tipo, col: dados.col, row: dados.row,
       colSpan: dados.colSpan, rowSpan: dados.rowSpan,
       larguraImagem: larguraImagemParaFootprint(dados.colSpan, dados.rowSpan),
+      // saves de antes desse recurso não têm esses campos — cai pro preço
+      // base como estimativa razoável do que foi investido
+      precoCompra: dados.precoCompra ?? config.custo,
+      investimentoTotal: dados.investimentoTotal ?? dados.precoCompra ?? config.custo,
+      nivelUpgrade: dados.nivelUpgrade || 0,
     };
     posicionarInstancia(instancia);
     marcarFootprintOcupado(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
     instanciasConstruidas.push(instancia);
+    wrapper.addEventListener('click', () => abrirPainelInstancia(instancia));
   });
 
   atualizarHudDinheiro();
