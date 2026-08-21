@@ -278,11 +278,11 @@ const FABRICAS = {
     nome: 'Madeireira', categoria: 'Fábrica', icone: 'madeireira',
     descricao: 'Desmatamento: mais barata, rende menos, polui menos.',
     custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
-    // pegada larga E funda (3x2): o desenho real é um "complexo" espalhado
-    // na horizontal (pilha de toras + galpão + tábuas lado a lado) — só
-    // largura (3x1) deixava a construção fina e pequena demais perto do
-    // que ela realmente desenha
-    sprite: 'imagens/madeireira.png', celulasCol: 3, celulasRow: 2,
+    // pegada larga (3x1): o desenho real é bem espalhado na horizontal
+    // (pilha de toras + galpão + tábuas lado a lado) — o tamanho
+    // renderizado em si já ficava bom nessa pegada, o problema real era
+    // o sprite ficar mal ancorado dentro dela (ver baseFootprintNaTela)
+    sprite: 'imagens/madeireira.png', celulasCol: 3, celulasRow: 1,
     larguraImagemPx: 1342, alturaImagemPx: 677,
   },
   'refinaria-petroleo': {
@@ -755,9 +755,32 @@ function celulaMaisProxima(mx, my) {
 }
 
 // centro na tela de uma pegada de colSpan x rowSpan células, começando
-// em (col, row) — pra pegada 1x1 isso é o mesmo que o centro da célula
+// em (col, row) — pra pegada 1x1 isso é o mesmo que o centro da célula.
+// Usado só pra UI que deve ficar "no meio" da pegada (barra de
+// Confirmar/Cancelar, número flutuante de ganho) — NÃO usar pra
+// posicionar o sprite em si, ver baseFootprintNaTela logo abaixo.
 function centroFootprintNaTela(col, row, colSpan, rowSpan) {
   return pontoNaTela(col + colSpan / 2, row + rowSpan / 2);
+}
+
+// ponto de ancoragem da BASE do sprite de uma construção: o vértice do
+// losango mais próximo do jogador (maior coluna E maior linha ao mesmo
+// tempo — é aí que o losango "aponta" pra frente), não o centro
+// geométrico da pegada. Horizontalmente ainda usa o centro (mantém o
+// sprite simétrico esquerda/direita mesmo em pegadas não-quadradas, tipo
+// 3x2); só o eixo vertical muda pro vértice.
+//
+// Bug real que isso corrige: com o sprite ancorado pelo CENTRO (como era
+// antes), a metade "da frente" do losango — do centro até o vértice mais
+// próximo — ficava sem nenhum pixel de sprite em cima, mesmo essas
+// células estando ocupadas/reservadas. Numa pegada pequena (1x1, 2x1)
+// isso quase não se notava; numa pegada maior (3x2, como a Madeireira)
+// virava uma faixa enorme de "chão vazio" na frente da construção, dando
+// a impressão de que ela não preenche direito o próprio espaço reservado.
+function baseFootprintNaTela(col, row, colSpan, rowSpan) {
+  const centro = centroFootprintNaTela(col, row, colSpan, rowSpan);
+  const verticeProximo = pontoNaTela(col + colSpan, row + rowSpan);
+  return { x: centro.x, y: verticeProximo.y };
 }
 
 // largura visual (no espaço da imagem) da pegada isométrica de
@@ -808,7 +831,7 @@ function escalaAtual() {
 }
 
 function posicionarInstancia(instancia) {
-  const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
+  const ponto = baseFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
   instancia.wrapper.style.left = ponto.x + 'px';
   instancia.wrapper.style.top = ponto.y + 'px';
   instancia.wrapper.style.width = (instancia.larguraImagem * escalaAtual()) + 'px';

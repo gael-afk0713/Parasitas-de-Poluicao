@@ -214,7 +214,32 @@ snap pra célula válida mais próxima.
 `celulasRow` células (não necessariamente 1x1 — a Usina de Carvão é 2x1, a
 Usina de Água é 1x1). `centroFootprintNaTela(col, row, colSpan, rowSpan)`
 devolve o centro na tela de toda a pegada (generaliza o antigo
-`centroCelulaNaTela`, que só existia pra 1x1).
+`centroCelulaNaTela`, que só existia pra 1x1) — usado só pra elementos de
+UI que devem ficar "no meio" da pegada (barra de Confirmar/Cancelar,
+número flutuante de ganho).
+
+**Ancoragem do SPRITE em si é outra função, `baseFootprintNaTela`, não
+`centroFootprintNaTela`** — bug real corrigido nessa sessão, não
+reintroduzir. `posicionarInstancia` (que define `left`/`top`/`width` do
+wrapper do sprite, com `transform:translate(-50%,-100%)` no CSS ancorando
+a base do sprite no ponto dado) usava `centroFootprintNaTela` originalmente,
+ancorando a base do sprite no CENTRO GEOMÉTRICO do losango da pegada. Isso
+deixava a metade "da frente" do losango — do centro até o vértice mais
+próximo do jogador — sem nenhum pixel de sprite em cima, mesmo essas
+células estando ocupadas/reservadas. Numa pegada pequena (1x1, 2x1) o
+efeito é sutil; numa pegada maior (3x1, como a Madeireira) vira uma faixa
+grande de "chão vazio" na frente da construção — foi relatado pelo autor
+como "as dimensões do grid que tá ocupando tá uma merda" antes de eu medir
+e confirmar a causa exata via `getBoundingClientRect()` comparado aos 4
+cantos do losango. `baseFootprintNaTela(col, row, colSpan, rowSpan)`
+corrige isso: mantém o **X** do centro (sprite fica simétrico
+esquerda/direita mesmo em pegadas não-quadradas) mas troca o **Y** pro
+vértice do losango mais próximo do jogador
+(`pontoNaTela(col+colSpan, row+rowSpan)`) — a base do sprite passa a
+cobrir a pegada inteira, e a estrutura ainda sobe visualmente acima do
+losango (efeito de altura de construção, normal e esperado numa cena
+isométrica).
+
 `larguraImagemParaFootprint(colSpan, rowSpan)` calcula a largura-ALVO do
 sprite a partir do contorno do losango isométrico da pegada
 (`(colSpan+rowSpan)*(TILE_W/2)`), com uma margem de 15% pra dentro — o
@@ -391,7 +416,7 @@ que rendem.
 | Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
 | Usina de Carvão | Fábrica | 2x1 | R$ 4.500 | R$ 225 | 15 | — |
-| Madeireira | Fábrica | 3x2 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
+| Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
 | Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
 | Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
 | Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%) |
@@ -399,7 +424,7 @@ que rendem.
 
 As pegadas de Madeireira/Refinaria/Estação foram ajustadas depois que a
 arte final (PNG) chegou, substituindo os chutes originais feitos em cima
-dos placeholders SVG: a regra usada foi "pegada elongada (ex: 3x2) pra
+dos placeholders SVG: a regra usada foi "pegada elongada (ex: 3x1) pra
 desenho bem espalhado na horizontal, pegada compacta (ex: 2x2) pra desenho
 quase quadrado (sobe mais do que se espalha)". A largura-ALVO derivada da
 pegada (`celulasCol + celulasRow`, ver `larguraImagemParaFootprint`)
