@@ -818,38 +818,44 @@ acima), não mais no `localStorage`.
   recuperação de senha por e-mail, 3 slots reais por conta sincronizados
   entre dispositivos, progresso da Fase 1 salvo e restaurado, botão de
   apagar por slot com confirmação em duas etapas). Isso substitui o
-  sistema local antigo (removido). O que ainda falta nessa frente:
-  - `firebase-config.js` só funciona depois de alguém (o autor) criar o
-    projeto Firebase de verdade e colar as chaves reais — enquanto tiver
-    os placeholders, login/saves não funcionam. Ver "Como configurar o
-    Firebase" logo abaixo.
-  - **Testado ponta-a-ponta contra um Firebase FALSO, não o real** — o
-    sandbox de testes automatizados usado nessa sessão bloqueia acesso de
-    saída pro CDN do Firebase (`gstatic.com`) mesmo pro navegador
-    controlado por Playwright (confirmado: `curl` alcança gstatic.com por
-    uma rota de rede diferente, mas o Chromium do sandbox não). Pra ainda
-    assim validar a lógica de verdade, criei localmente 3 módulos-stub
-    (`stub-firebase-auth.js`/`firestore.js`/`app.js`, deletados depois,
-    nunca commitados) que imitam a API do SDK real (mesmas assinaturas de
-    função, mesmos códigos de erro) só que guardando os dados em
-    `localStorage` em vez de bater na rede — troquei os `import` de
-    `script.js`/`fase1.js` pra apontar pra eles temporariamente, rodei o
-    fluxo completo (criar conta, e-mail duplicado, senha errada, esqueci
-    senha, criar save, construir uma fábrica, autosave real gravando no
-    "Firestore" fake, voltar pro menu e ver o slot refletir o progresso,
-    apagar save com confirmação em duas etapas, sair da sessão pelo rodapé
-    E pelo painel de Configurações, recarregar um save existente e ver a
-    construção reaparecer no grid) e conferi cada passo — tudo passou.
-    Antes de sair validando, também confirmei via `curl` que TODAS as
-    funções importadas (`createUserWithEmailAndPassword`,
-    `onAuthStateChanged`, `updateDoc`, `deleteField` etc.) realmente
-    existem no arquivo real do SDK na versão pinada (12.18.0). Isso dá bem
-    mais confiança do que só checar sintaxe, mas **ainda não é o Firebase
-    de verdade** — coisas que só um teste contra credenciais reais pega
-    (Regras do Firestore rejeitando algo por engano, comportamento real de
-    erro do Auth, latência de rede de verdade) só vão aparecer depois que
-    o projeto Firebase existir e as chaves forem coladas em
-    `firebase-config.js`.
+  sistema local antigo (removido). `firebase-config.js` já está preenchido
+  com as chaves reais do projeto `parasitas-de-poluicao` (Authentication
+  com E-mail/senha ativado, Firestore criado com as regras de
+  `firestore.rules` publicadas).
+  - **Validação em duas camadas** (o sandbox de testes automatizados desta
+    sessão bloqueia o navegador controlado por Playwright de alcançar o
+    CDN do Firebase, `gstatic.com` — `curl` alcança por uma rota de rede
+    diferente, mas o Chromium do sandbox não):
+    1. **Lógica do app**: criei localmente 3 módulos-stub (deletados
+       depois, nunca commitados) que imitam a API real do SDK guardando
+       dados em `localStorage` em vez de bater na rede, troquei os
+       `import` de `script.js`/`fase1.js` pra apontar pra eles
+       temporariamente, e rodei o fluxo completo num navegador de verdade:
+       criar conta, e-mail duplicado, senha errada, esqueci senha, criar
+       save, construir uma fábrica, autosave real, voltar pro menu e ver o
+       slot refletir o progresso, apagar save, sair da sessão (rodapé E
+       painel de Configurações), recarregar um save existente e ver a
+       construção reaparecer no grid — tudo passou.
+    2. **Projeto Firebase real**: sem conseguir abrir o navegador contra
+       ele, chamei as APIs REST do Firebase direto via `curl` (que tem
+       acesso de rede de verdade) usando as chaves reais: criei uma conta
+       de teste via `identitytoolkit.googleapis.com` (confirma que
+       Authentication + E-mail/senha estão ativados), escrevi no
+       PRÓPRIO documento Firestore autenticado (sucesso) e tentei escrever
+       no documento de outra conta (barrado com `PERMISSION_DENIED` —
+       confirma que as Regras publicadas estão funcionando de verdade, não
+       só "coladas mas inativas"), e apaguei a conta/documento de teste
+       depois, sem deixar lixo no projeto.
+  - Antes disso, também confirmei via `curl` que todas as funções
+    importadas (`createUserWithEmailAndPassword`, `onAuthStateChanged`,
+    `updateDoc`, `deleteField` etc.) existem de verdade no arquivo real do
+    SDK na versão pinada (12.18.0).
+  - **O que ainda não foi testado**: o fluxo completo dentro do JOGO em si
+    (não via API crua) contra o projeto real, porque isso exige um
+    navegador de verdade (não o Playwright sandboxed) — o autor testando
+    no próprio iPad/navegador é o próximo passo. A lógica em si (camada 1)
+    e a infraestrutura Firebase em si (camada 2) já foram validadas
+    separadamente; só falta ver as duas juntas rodando de verdade.
   - **Pegadinha de teste descoberta nessa sessão, não é bug do jogo**: no
     Playwright desse sandbox, `page.waitForURL(...)` e os listeners de
     `console`/`pageerror` **não funcionam** depois de uma navegação
@@ -884,8 +890,14 @@ acima), não mais no `localStorage`.
 
 ## Como configurar o Firebase
 
-O jogo não funciona (login trava, saves não carregam) até essa parte estar
-feita — `firebase-config.js` vem só com placeholders. Tudo no plano
+**Já feito nessa sessão** — projeto `parasitas-de-poluicao` criado,
+Authentication (E-mail/senha) ativado, Firestore criado com as regras de
+`firestore.rules` publicadas, `firebase-config.js` preenchido com as
+chaves reais. Validado direto via API (`curl`): criar conta funciona,
+escrever no próprio documento funciona, escrever no documento de outra
+conta é barrado pelas regras. Passo a passo abaixo fica de referência —
+útil se precisar recriar o projeto do zero algum dia, ou se outra pessoa
+for rodar o jogo com a própria conta Firebase separada. Tudo no plano
 **gratuito (Spark)**, não pede cartão de crédito.
 
 1. Acesse **https://console.firebase.google.com**, entre com uma conta
