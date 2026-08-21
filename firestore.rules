@@ -1,0 +1,18 @@
+// Regras de segurança do Firestore pro Parasitas de Poluição.
+//
+// Esse arquivo NÃO é aplicado automaticamente — não tem Firebase CLI nem
+// deploy configurado neste projeto (é um site estático, sem build step).
+// Cole o conteúdo abaixo manualmente no Console do Firebase: seu projeto
+// → Firestore Database → aba "Regras" → colar → Publicar.
+//
+// A regra: cada usuário autenticado só pode ler/escrever o PRÓPRIO
+// documento (usuarios/{uid}, onde uid é o ID dele no Firebase
+// Authentication) — nunca o de outra pessoa, mesmo estando logado.
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /usuarios/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}

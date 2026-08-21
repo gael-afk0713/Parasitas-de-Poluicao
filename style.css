@@ -533,6 +533,11 @@ footer{
   gap:0.6rem;
   margin-bottom:1.8rem;
 }
+.slot-wrapper{
+  flex:1;
+  display:flex;
+  gap:0.4rem;
+}
 .slot{
   flex:1;
   display:flex;
@@ -563,6 +568,35 @@ footer{
   background:var(--amber);
   border-color:var(--amber);
   box-shadow:0 0 0 1px rgba(217,154,53,0.25), 0 0 16px rgba(217,154,53,0.35);
+}
+
+/* ---- apagar save: botão pequeno ao lado do slot, exige clicar 2x
+   (primeiro clique arma/fica vermelho, segundo confirma) ---- */
+.slot-apagar{
+  flex-shrink:0;
+  width:2.2rem;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:transparent;
+  border:1px solid rgba(239,232,214,0.15);
+  color:var(--paper-dim);
+  cursor:pointer;
+  transition:color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.icone-apagar{
+  width:16px;height:16px;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:1.6;
+  stroke-linejoin:round;
+  stroke-linecap:round;
+}
+.slot-apagar:hover, .slot-apagar:focus-visible{color:var(--paper);border-color:rgba(239,232,214,0.35);outline:none;}
+.slot-apagar--confirmando, .slot-apagar--confirmando:hover{
+  color:var(--paper);
+  background:var(--rust);
+  border-color:var(--rust);
 }
 
 .campo{
@@ -664,6 +698,21 @@ footer{
   padding-top:1rem;
   border-top:1px solid rgba(239,232,214,0.1);
 }
+
+.link-discreto{
+  display:block;
+  margin:0.9rem auto 0;
+  background:none;
+  border:none;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.72rem;
+  letter-spacing:0.04em;
+  color:var(--paper-dim);
+  text-decoration:underline;
+  text-underline-offset:2px;
+  cursor:pointer;
+}
+.link-discreto:hover, .link-discreto:focus-visible{color:var(--amber);outline:none;}
 
 /* ---- indicador de conta logada no rodapé ---- */
 .footer-conta{

@@ -1,3 +1,8 @@
+// ============ FIREBASE (autenticação + saves na nuvem) ============
+import { auth, db } from './firebase-init.js';
+import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js';
+import { doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/12.18.0/firebase-firestore.js';
+
 // ============ GRID ISOMÉTRICO DA FASE 1 ============
 // coordenadas abaixo são todas no espaço original da imagem de fundo
 // (mapa-fase1-clareira.jpg, 1024x572px), depois convertidas pra tela
@@ -188,20 +193,24 @@ btnConfig.addEventListener('click', abrirPainelConfig);
 
 document.getElementById('btn-config-continuar').addEventListener('click', fecharPainelConfig);
 
-document.getElementById('btn-config-salvar').addEventListener('click', () => {
-  salvarProgresso();
+document.getElementById('btn-config-salvar').addEventListener('click', async () => {
+  statusConfig.textContent = 'Salvando...';
+  statusConfig.classList.add('visivel');
+  statusConfig.classList.remove('painel-status--sucesso');
+  ultimoProgressoSalvo = null; // força a escrita mesmo se nada mudou desde o autosave
+  await salvarProgresso();
   statusConfig.textContent = 'Progresso salvo.';
-  statusConfig.classList.add('visivel', 'painel-status--sucesso');
+  statusConfig.classList.add('painel-status--sucesso');
 });
 
-document.getElementById('btn-config-menu').addEventListener('click', () => {
-  salvarProgresso();
+document.getElementById('btn-config-menu').addEventListener('click', async () => {
+  await salvarProgresso();
   window.location.href = 'index.html';
 });
 
-document.getElementById('btn-config-sair').addEventListener('click', () => {
-  salvarProgresso();
-  localStorage.removeItem('parasitas-sessao');
+document.getElementById('btn-config-sair').addEventListener('click', async () => {
+  await salvarProgresso();
+  await signOut(auth);
   window.location.href = 'index.html';
 });
 
@@ -1194,59 +1203,84 @@ window.addEventListener('resize', () => {
   redesenharCena(); // reafirma os destaques por cima do grid limpo que atualizarTudo() acabou de redesenhar
 });
 
-// ============ AUTOSAVE / RESTAURAÇÃO DE PROGRESSO ============
-// progresso vive dentro do mesmo save persistido pelo menu
-// (parasitas-saves-{usuario}[slot].progresso) — não é uma chave separada
-function chaveSavesContaAtual() {
-  return saveAtivoInfo?.usuario ? `parasitas-saves-${saveAtivoInfo.usuario}` : null;
-}
-function lerTodosSavesContaAtual() {
-  const chave = chaveSavesContaAtual();
-  if (!chave) return {};
-  try {
-    return JSON.parse(localStorage.getItem(chave)) || {};
-  } catch {
-    return {};
-  }
+// ============ AUTOSAVE / RESTAURAÇÃO DE PROGRESSO (Firestore) ============
+// progresso vive dentro do mesmo documento Firestore da conta
+// (usuarios/{uid}.saves.{slot}.progresso) — não é uma coleção separada.
+// Só funciona com sessão Firebase ativa E saveAtivoInfo.uid batendo com o
+// usuário logado agora (confirmado via onAuthStateChanged); sem isso, o
+// jogo continua jogável normalmente, só sem persistir nada — mesmo
+// comportamento de antes pra quem abre fase1.html sem vir do menu.
+let usuarioAutenticado = null; // preenchido quando onAuthStateChanged confirma a sessão
+let progressoJaRestaurado = false; // evita restaurar (e duplicar instâncias) mais de uma vez
+
+function refContaAtiva() {
+  if (!usuarioAutenticado || !saveAtivoInfo?.uid || !saveAtivoInfo?.slot) return null;
+  if (usuarioAutenticado.uid !== saveAtivoInfo.uid) return null; // sessão de outra conta
+  return doc(db, 'usuarios', saveAtivoInfo.uid);
 }
 
-function salvarProgresso() {
-  const chave = chaveSavesContaAtual();
-  if (!chave || !saveAtivoInfo?.slot) return; // abriu fase1.html sem vir do menu — nada pra gravar
-  const todos = lerTodosSavesContaAtual();
-  const existente = todos[saveAtivoInfo.slot] || {};
-  todos[saveAtivoInfo.slot] = {
-    ...existente,
-    slot: saveAtivoInfo.slot,
-    nomeSave: saveAtivoInfo.nomeSave,
-    jogador: saveAtivoInfo.jogador,
-    empresa: saveAtivoInfo.empresa,
-    dificuldade: saveAtivoInfo.dificuldade,
-    atualizadoEm: Date.now(),
-    progresso: {
-      dinheiro,
-      poluicaoTotal,
-      totalFabricas,
-      quantidadePorTipo: { ...quantidadePorTipo },
-      instancias: instanciasConstruidas.map((i) => ({
-        tipo: i.tipo, col: i.col, row: i.row, colSpan: i.colSpan, rowSpan: i.rowSpan,
-        precoCompra: i.precoCompra, investimentoTotal: i.investimentoTotal, nivelUpgrade: i.nivelUpgrade || 0,
-      })),
-      tempoJogadoSegundos: segundosJogados(),
-      colapsada: jogoEncerrado === 'colapso',
-      vitoriaAlcancada: jogoEncerrado === 'vitoria',
-    },
+function progressoAtual() {
+  return {
+    dinheiro,
+    poluicaoTotal,
+    totalFabricas,
+    quantidadePorTipo: { ...quantidadePorTipo },
+    instancias: instanciasConstruidas.map((i) => ({
+      tipo: i.tipo, col: i.col, row: i.row, colSpan: i.colSpan, rowSpan: i.rowSpan,
+      precoCompra: i.precoCompra, investimentoTotal: i.investimentoTotal, nivelUpgrade: i.nivelUpgrade || 0,
+    })),
+    tempoJogadoSegundos: segundosJogados(),
+    colapsada: jogoEncerrado === 'colapso',
+    vitoriaAlcancada: jogoEncerrado === 'vitoria',
   };
-  localStorage.setItem(chave, JSON.stringify(todos));
 }
+
+// evita gravar no Firestore quando nada relevante mudou desde o último
+// save — tickEconomia chama salvarProgresso a cada 3s, mas diferente do
+// localStorage (grátis e ilimitado), o Firestore tem cota diária de
+// escrita mesmo no plano gratuito, então só vale a pena escrever se algo
+// realmente mudou
+let ultimoProgressoSalvo = null;
+
+async function salvarProgresso() {
+  const ref = refContaAtiva();
+  if (!ref) return;
+  const progresso = progressoAtual();
+  const serializado = JSON.stringify(progresso);
+  if (serializado === ultimoProgressoSalvo) return;
+  ultimoProgressoSalvo = serializado;
+  try {
+    await updateDoc(ref, {
+      [`saves.${saveAtivoInfo.slot}.progresso`]: progresso,
+      [`saves.${saveAtivoInfo.slot}.atualizadoEm`]: Date.now(),
+    });
+  } catch (erro) {
+    console.error('Falha ao salvar progresso na nuvem:', erro);
+  }
+}
+// melhor esforço: ao fechar a aba, o navegador pode matar a página antes
+// da promise da escrita resolver — não é garantido como era com
+// localStorage (síncrono), mas o autosave a cada tick já cobre a maior
+// parte dos casos de perda de progresso
 window.addEventListener('beforeunload', salvarProgresso);
 
 // reconstrói o estado salvo (dinheiro, poluição, construções no grid) em
-// vez de começar do zero — chamada uma vez, no fim do carregamento
-function restaurarProgresso() {
-  const chave = chaveSavesContaAtual();
-  if (!chave || !saveAtivoInfo?.slot) return;
-  const progresso = lerTodosSavesContaAtual()[saveAtivoInfo.slot]?.progresso;
+// vez de começar do zero — chamada de dentro de onAuthStateChanged, só
+// uma vez (ver progressoJaRestaurado), assim que a sessão Firebase bate
+// com a conta dona do save ativo
+async function restaurarProgresso() {
+  const ref = refContaAtiva();
+  if (!ref || progressoJaRestaurado) return;
+  progressoJaRestaurado = true;
+
+  let progresso;
+  try {
+    const snap = await getDoc(ref);
+    progresso = snap.data()?.saves?.[saveAtivoInfo.slot]?.progresso;
+  } catch (erro) {
+    console.error('Falha ao carregar progresso da nuvem:', erro);
+    return;
+  }
   if (!progresso) return;
 
   dinheiro = progresso.dinheiro ?? dinheiro;
@@ -1293,5 +1327,18 @@ function restaurarProgresso() {
     jogoEncerrado = 'vitoria';
     mostrarTelaVitoria();
   }
+
+  // evita reescrever no Firestore, no próximo tick, os mesmos dados que
+  // acabaram de ser lidos de lá
+  ultimoProgressoSalvo = JSON.stringify(progressoAtual());
 }
-restaurarProgresso();
+
+// onAuthStateChanged é a fonte da verdade de "tá logado ou não", igual em
+// script.js — dispara na carga da página assim que o SDK confirma a
+// sessão (ou confirma que não há nenhuma) e de novo em qualquer
+// login/logout que aconteça enquanto a aba estiver aberta (ex: usar o
+// "Sair da Sessão" do painel de Configurações)
+onAuthStateChanged(auth, (user) => {
+  usuarioAutenticado = user;
+  restaurarProgresso();
+});

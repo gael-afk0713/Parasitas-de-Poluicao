@@ -52,36 +52,33 @@
     <span class="footer-conta" id="footer-conta" hidden></span>
   </footer>
 
-  <section class="painel painel--login" id="painel-login" aria-hidden="true">
+  <section class="painel painel--login aberto" id="painel-login" aria-hidden="false">
     <div class="painel-conteudo">
       <p class="painel-rotulo">Acesso</p>
       <h2 class="painel-titulo">Entrar</h2>
       <p class="painel-explicacao">
-        Crie um usuário e senha pra guardar seu progresso neste navegador.
-        Se o usuário já existir, é só entrar com a senha certa — se não
-        existir, uma conta nova é criada na hora.
+        Conta de verdade (Firebase Authentication) — seu progresso fica
+        salvo na nuvem e acompanha você em qualquer navegador ou
+        dispositivo, não só neste computador.
       </p>
 
       <div class="campo">
-        <label for="campo-login-usuario">Usuário</label>
-        <input type="text" id="campo-login-usuario" maxlength="20" autocomplete="username" placeholder="seu usuário">
+        <label for="campo-login-email">E-mail</label>
+        <input type="email" id="campo-login-email" maxlength="120" autocomplete="email" placeholder="seu@email.com">
       </div>
       <div class="campo">
         <label for="campo-login-senha">Senha</label>
-        <input type="password" id="campo-login-senha" maxlength="40" autocomplete="current-password" placeholder="sua senha">
+        <input type="password" id="campo-login-senha" maxlength="100" autocomplete="current-password" placeholder="sua senha (mín. 6 caracteres)">
       </div>
 
       <p class="painel-status" id="status-login"></p>
 
       <div class="painel-acoes painel-acoes--fim">
+        <button class="painel-voltar" id="btn-criar-conta">Criar Conta</button>
         <button class="painel-confirmar" id="btn-entrar">Entrar</button>
       </div>
 
-      <p class="painel-nota">
-        Fica guardado só neste navegador (sem servidor) — não é uma conta
-        de verdade sincronizada entre aparelhos, só separa o progresso de
-        quem usa este computador.
-      </p>
+      <button class="link-discreto" id="btn-esqueci-senha" type="button">Esqueci minha senha</button>
     </div>
   </section>
 
@@ -119,18 +116,33 @@
       <h2 class="painel-titulo">Criar Save</h2>
 
       <div class="slots">
-        <button class="slot slot-ativo" data-slot="1">
-          <span class="slot-titulo">Save 1</span>
-          <span class="slot-sub"></span>
-        </button>
-        <button class="slot" data-slot="2">
-          <span class="slot-titulo">Save 2</span>
-          <span class="slot-sub"></span>
-        </button>
-        <button class="slot" data-slot="3">
-          <span class="slot-titulo">Save 3</span>
-          <span class="slot-sub"></span>
-        </button>
+        <div class="slot-wrapper">
+          <button class="slot slot-ativo" data-slot="1">
+            <span class="slot-titulo">Save 1</span>
+            <span class="slot-sub"></span>
+          </button>
+          <button class="slot-apagar" data-slot="1" aria-label="Apagar Save 1">
+            <svg class="icone-apagar" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+        <div class="slot-wrapper">
+          <button class="slot" data-slot="2">
+            <span class="slot-titulo">Save 2</span>
+            <span class="slot-sub"></span>
+          </button>
+          <button class="slot-apagar" data-slot="2" aria-label="Apagar Save 2">
+            <svg class="icone-apagar" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
+        <div class="slot-wrapper">
+          <button class="slot" data-slot="3">
+            <span class="slot-titulo">Save 3</span>
+            <span class="slot-sub"></span>
+          </button>
+          <button class="slot-apagar" data-slot="3" aria-label="Apagar Save 3">
+            <svg class="icone-apagar" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/></svg>
+          </button>
+        </div>
       </div>
 
       <div class="campo">
@@ -167,6 +179,6 @@
     </div>
   </section>
 
-<script src="script.js"></script>
+<script type="module" src="script.js"></script>
 </body>
 </html>

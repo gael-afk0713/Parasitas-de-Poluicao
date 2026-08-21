@@ -20,9 +20,14 @@ construída** — por enquanto o jogo cobre só a fase de expansão da empresa.
 ```
 index.html              tela de menu + painéis (Como Jogar, Créditos, Novo Jogo)
 style.css               TODO o CSS do jogo (menu + Fase 1, um arquivo só)
-script.js               JS da tela de menu e dos painéis de index.html
+script.js               JS da tela de menu e dos painéis de index.html (type="module")
 fase1.html              cena da Fase 1 (grid isométrico + HUD + construção)
-fase1.js                JS da Fase 1 (grid, câmera/escala, construção de fábricas)
+fase1.js                JS da Fase 1 (grid, câmera/escala, construção de fábricas) (type="module")
+firebase-config.js      chaves do projeto Firebase — vem com PLACEHOLDERS, precisa trocar
+                          pelos valores reais (ver "Como configurar o Firebase" no fim deste arquivo)
+firebase-init.js        initializeApp/getAuth/getFirestore uma vez, exporta auth/db
+firestore.rules         regras de segurança do Firestore — colar manualmente no Console
+                          (sem Firebase CLI/deploy configurado neste projeto)
 imagens/
   fabrica-fundo.png       fundo da tela de menu (gerado com IA)
   mapa-fase1-clareira.jpg fundo original da Fase 1 (floresta + clareira + lagoa), 1024x572
@@ -53,8 +58,11 @@ sprite/máscara (`criarSprite` em `fase1.js`) continua aceitando `.svg` sem
 mudança de código nenhuma, caso alguma construção futura precise de novo de
 um placeholder desenhado à mão antes da arte final ficar pronta.
 
-Não existe build step, bundler ou dependências — é tudo `<script>`/`<link>`
-direto. `index.html` e `fase1.html` carregam o **mesmo** `style.css`.
+Não existe build step, bundler nem `npm`/`node_modules` — é tudo
+`<script>`/`<link>` direto, e o SDK do Firebase é importado via CDN
+(gstatic) dentro dos próprios `script.js`/`fase1.js`, que por isso
+precisam ser `<script type="module">`. `index.html` e `fase1.html`
+carregam o **mesmo** `style.css`.
 
 ## Paleta e tipografia (usar em tudo daqui pra frente)
 
@@ -96,70 +104,108 @@ em vez de sombras pesadas, glow sutil em âmbar pra estados ativos/hover.
   animações decorativas — **sempre atualizar esse bloco ao adicionar uma
   animação nova**, é convenção já estabelecida no projeto.
 
-#### Contas locais (login/cadastro obrigatório)
+#### Contas de verdade (Firebase Authentication) + saves na nuvem (Firestore)
 
-`#painel-login` é um `.painel` **sempre aberto ao carregar a página se não
-houver sessão válida** (`abrirGateLogin()` chamado direto no fim do script,
-não depende de clique em nada) — cobre a tela inteira e bloqueia interação
-com o menu atrás até logar. **Diferente dos outros painéis, o Escape global
-pula esse aqui de propósito** (`document.querySelectorAll('.painel.aberto:not(#painel-login)')`)
-— não dá pra sair sem entrar.
+**Mudança grande nessa sessão: trocou o sistema local (usuário/senha só no
+`localStorage`, sem verificação real) por Firebase de verdade** — plano
+gratuito (Spark). Duas peças:
 
-**Isso NÃO é autenticação de verdade.** Não existe servidor (é só
-HTML/JS/CSS estático, GitHub Pages). Usuário+senha ficam 100% no
-`localStorage` do navegador:
+- **Firebase Authentication** (e-mail/senha) — conta de verdade, senha
+  verificada pelo próprio Firebase (nunca passa pelo nosso código), dá pra
+  entrar na mesma conta de qualquer navegador/dispositivo, e existe
+  recuperação de senha de verdade (`sendPasswordResetEmail`) — resolve uma
+  limitação que era documentada como "sem solução" nas fases anteriores.
+- **Cloud Firestore** — os saves (que antes viviam em
+  `localStorage['parasitas-saves-{usuario}']`) agora vivem num documento
+  por conta: `usuarios/{uid}` (`uid` = ID único que o Firebase Auth dá pra
+  cada conta), campo `saves` = mapa `{ "1": {...}|null, "2":..., "3":... }`.
 
-```js
-localStorage['parasitas-contas']  // { [usuarioMinusculo]: { usuario, senhaHash, criadoEm } }
-localStorage['parasitas-sessao']  // usuarioMinusculo logado, ou ausente
+**Arquivos novos, específicos do Firebase:**
+```
+firebase-config.js   as chaves do projeto Firebase (apiKey, authDomain, projectId
+                      etc.) — client-side, NÃO é segredo (a segurança de
+                      verdade vem das Regras do Firestore + do Auth, não de
+                      esconder essas chaves). Vem com PLACEHOLDERS — sem
+                      trocar pelos valores reais do projeto, login/saves não
+                      funcionam. Ver "Como configurar o Firebase" no fim
+                      deste arquivo.
+firebase-init.js     initializeApp/getAuth/getFirestore uma vez só, exporta
+                      `auth`/`db` prontos pra usar. Importa o SDK modular via
+                      CDN (gstatic), pinado na versão 12.18.0 de propósito.
+firestore.rules      regras de segurança — cada usuário só lê/escreve o
+                      PRÓPRIO documento (usuarios/{uid}). Não é aplicado
+                      automaticamente (sem Firebase CLI/deploy configurado
+                      aqui) — copia manualmente pro Console, aba Regras.
 ```
 
-- `hashSenha(usuario, senha)` usa `crypto.subtle.digest('SHA-256', ...)`
-  (Web Crypto — exige contexto seguro: `https://` ou `http://localhost`,
-  os dois ambientes usados neste projeto) com um salt fixo + o usuário, só
-  pra não guardar a senha em texto puro. **Não é criptografia robusta**,
-  não tem como recuperar senha esquecida, e qualquer pessoa com acesso ao
-  mesmo navegador pode inspecionar/apagar isso pelo DevTools. Serve só pra
-  separar o progresso de pessoas diferentes no mesmo computador — a tela de
-  login já deixa esse aviso explícito pro jogador.
-- Mesmo formulário faz login E cadastro: usuário existe → confere a senha;
-  não existe → cria a conta na hora com essa senha.
-- `sessaoAtual()` devolve a chave (usuário em minúsculas) logada, ou `null`
-  se não houver sessão ou se a sessão apontar pra uma conta apagada.
-- Indicador no rodapé (`#footer-conta`, escondido via `hidden` até logar)
-  mostra o usuário + botão **Sair** (`encerrarSessao()` + reabre o gate).
+`index.html` e `fase1.html` agora carregam `script.js`/`fase1.js` como
+`<script type="module">` (precisa ser module pra usar `import`/`export`) —
+**se algum dia voltar pra `<script>` comum, os imports do Firebase quebram
+silenciosamente**, não esquecer disso.
 
-#### Painel Novo Jogo — saves persistidos de verdade, por conta
+`#painel-login` continua um `.painel` que bloqueia o menu até logar, mas
+agora **nasce com a classe `aberto` já no HTML** (não só via JS) — como
+`onAuthStateChanged` (a função que confirma se há sessão) é assíncrona,
+tinha risco de o menu aparecer clicável por uma fração de segundo antes da
+confirmação chegar; nascer já fechado (coberto pelo gate) elimina esse
+flash. **Diferente dos outros painéis, o Escape global pula esse aqui de
+propósito** (`document.querySelectorAll('.painel.aberto:not(#painel-login)')`).
 
-Os 3 slots **não vivem mais só em memória** — persistem em
-`localStorage['parasitas-saves-{usuario}']` (namespaced pela conta logada,
-via `chaveSavesConta()`), formato:
+- **Dois botões separados, "Entrar" e "Criar Conta"** (não é mais um
+  formulário único que decide sozinho) — o Firebase Auth não expõe de
+  forma confiável "esse e-mail já existe?" antes de tentar (proteção contra
+  enumeração de e-mail, ligada por padrão em projetos novos), então
+  adivinhar a intenção pelo código de erro seria frágil. O usuário escolhe
+  explicitamente.
+- **"Esqueci minha senha"** (`#btn-esqueci-senha`) chama
+  `sendPasswordResetEmail(auth, email)` com o e-mail que estiver no campo.
+- `ERROS_AUTH` traduz os códigos de erro mais comuns do Firebase Auth
+  (`auth/invalid-credential`, `auth/email-already-in-use` etc.) pra
+  mensagens em português — lista completa de códigos em
+  https://firebase.google.com/docs/auth/admin/errors.
+- `onAuthStateChanged(auth, callback)` é a fonte da verdade de "tá logado
+  ou não" — dispara na carga da página (assim que o SDK confirma a sessão
+  restaurada, se houver) e de novo a cada login/logout. Substitui o antigo
+  `sessaoAtual()` síncrono.
+- Indicador no rodapé (`#footer-conta`) mostra o **e-mail** da conta (não
+  mais um "usuário" separado) + botão **Sair** (`signOut(auth)`).
 
-```js
-{ 1: { slot, nomeSave, jogador, empresa, dificuldade, criadoEm, atualizadoEm,
-       progresso: null | {...} } | null,
-  2: ..., 3: ... }
-```
+#### Painel Novo Jogo — saves no Firestore
 
-- `renderSlotAtual()` pré-preenche os campos com o que já estiver salvo
-  naquele slot (ou campos vazios); os botões de slot mostram um subtítulo
-  (`.slot-sub`) com o nome da empresa, "vazio", ou "{empresa} · R$ X" se já
-  tiver progresso jogado.
-- **Cada campo grava no localStorage a cada tecla digitada**
-  (`atualizarCampoSlot`) — um rascunho sobrevive a um F5 mesmo sem clicar
-  Começar.
-- **Começar decide entre continuar ou recomeçar**: se nome/jogador/empresa/
-  dificuldade batem exatamente com o que já estava salvo naquele slot
-  (`snapshotSlotAtual`, capturado ao selecionar o slot) E existe
-  `progresso`, o progresso é preservado; qualquer campo diferente conta
-  como recomeçar do zero (zera `progresso`). Escreve
-  `localStorage['parasitas-save-ativo']` com `{usuario, slot, nomeSave,
-  jogador, empresa, dificuldade}` (agora inclui `usuario` — é a ponte que
-  `fase1.js` usa pra saber onde ler/gravar o progresso) e redireciona.
-- **Botão "Continuar"** (menu principal, hoje funcional): pega o save de
-  `atualizadoEm` mais recente entre os 3 slots da conta logada e vai direto
-  pra `fase1.html`; se a conta não tiver nenhum save ainda, abre o painel
-  Novo Jogo com um aviso em vez de não fazer nada.
+Os 3 slots persistem em `usuarios/{uid}.saves.{1,2,3}` no Firestore, mesmo
+formato de antes (`{ slot, nomeSave, jogador, empresa, dificuldade,
+criadoEm, atualizadoEm, progresso: null|{...} }`), só que na nuvem em vez
+de `localStorage`. `salvarSlotConta(slot, dados)`/`apagarSlotConta(slot)`
+usam `updateDoc` com caminho de campo (`` `saves.${slot}` ``) — grava/apaga
+**só aquele slot**, nunca reescreve o documento inteiro nem afeta os
+outros dois.
+
+- `renderSlotAtual()` continua pré-preenchendo os campos, igual antes; os
+  botões de slot mostram `.slot-sub` com "carregando..." enquanto o
+  `getDoc` inicial não voltou, depois "vazio", "{empresa} · R$ X" ou
+  "rascunho".
+- **Diferente da versão local antiga: os campos NÃO gravam a cada tecla
+  digitada.** O Firestore tem cota diária de escrita mesmo no plano
+  gratuito (bem generosa, mas não infinita como o `localStorage" era) —
+  gravar a cada tecla gastaria ela rápido demais à toa. Os campos só
+  atualizam um objeto em memória (`atualizarCampoSlotEmMemoria`); a
+  gravação de verdade acontece no `blur` de cada campo (quando o jogador
+  sai dele) e sempre ao clicar Começar (garantia final).
+- **Começar decide entre continuar ou recomeçar** — lógica idêntica à
+  versão anterior (`snapshotSlotAtual` comparado aos campos atuais).
+  Escreve `localStorage['parasitas-save-ativo']` com `{uid, slot, nomeSave,
+  jogador, empresa, dificuldade}` (**`uid` no lugar do antigo `usuario`** —
+  é a ponte que `fase1.js` usa pra montar a referência do documento
+  Firestore) e redireciona. Essa chave em si CONTINUA no `localStorage` de
+  propósito — é só "qual save está ativo agora", efêmero, não é dado que
+  precise sobreviver a trocar de navegador.
+- **Botão "Continuar"** — mesma lógica de pegar o save de `atualizadoEm`
+  mais recente, agora lendo do Firestore (`carregarSavesConta()`, async).
+- **Apagar save** (`.slot-apagar`, um botão por slot, ícone de lixeira):
+  primeiro clique arma a confirmação (fica vermelho/`--rust` por 4s,
+  `slot-apagar--confirmando`), segundo clique dentro da janela apaga de
+  verdade (`apagarSlotConta`, `deleteField()` no Firestore). Sem `confirm()`
+  nativo do navegador, pra combinar com o resto da UI custom do jogo.
 
 ### `fase1.html` / `fase1.js` — Fase 1 (grid + construção)
 
@@ -561,35 +607,53 @@ de verdade** — as duas telas dizem explicitamente que o "Guardião da
 Natureza" ainda não existe, é só o gancho narrativo onde a Fase 1 termina
 por enquanto.
 
-### Autosave e restauração de progresso
+### Autosave e restauração de progresso (Firestore)
 
-O progresso da Fase 1 vive **dentro do mesmo save** persistido pelo menu
-(`localStorage['parasitas-saves-{usuario}'][slot].progresso`), não numa
-chave separada:
+O progresso da Fase 1 vive **dentro do mesmo documento** da conta no
+Firestore (`usuarios/{uid}.saves.{slot}.progresso`), não numa coleção
+separada — mesmo formato de dados de antes, só que gravado/lido via
+`updateDoc`/`getDoc` em vez de `localStorage`:
 
 ```js
 progresso: {
   dinheiro, poluicaoTotal, totalFabricas, quantidadePorTipo,
-  instancias: [{ tipo, col, row, colSpan, rowSpan }],  // sem o wrapper DOM, só os dados
+  instancias: [{ tipo, col, row, colSpan, rowSpan, precoCompra, investimentoTotal, nivelUpgrade }],
   tempoJogadoSegundos, colapsada, vitoriaAlcancada,
 }
 ```
 
-- `salvarProgresso()` é chamada: a cada `tickEconomia` (3s), depois de
-  `confirmarConstrucao`, e num listener de `beforeunload` (rede de
-  segurança pra pegar o estado mais recente mesmo se o jogador fechar a
-  aba entre ticks). Se `saveAtivoInfo` não tiver `usuario`/`slot` (ex:
-  abriu `fase1.html` direto, sem vir do menu), é um no-op silencioso.
-- `restaurarProgresso()` roda **uma vez, no fim do carregamento** (depois
-  de tudo mais estar definido — precisa de `FABRICAS`, `criarSprite`,
-  `posicionarInstancia` etc.). Recria cada instância salva chamando
-  `criarSprite` normalmente, mas pulando o fantasma/travamento: aplica
-  direto as classes `--travada --construida` (o mesmo estado final de uma
-  construção confirmada) e remove a `.fabrica-tinta` na hora (ela só existe
-  during o flash de confirmação, que não faz sentido pra algo restaurado).
-  Se `colapsada`/`vitoriaAlcancada` estiver marcado, mostra a tela de fim
-  imediatamente — um save que colapsou continua colapsado ao reabrir, não
-  dá pra "revivê-lo" jogando de novo.
+- `refContaAtiva()` só devolve uma referência de documento válida se **três
+  coisas baterem ao mesmo tempo**: existe `saveAtivoInfo.uid`/`.slot`
+  (veio do menu), existe `usuarioAutenticado` (o Firebase confirmou a
+  sessão via `onAuthStateChanged`) e os dois `uid` são iguais (a sessão
+  ativa é da MESMA conta dona do save — evita, por exemplo, gravar no
+  documento de outra conta se alguém trocar de sessão numa aba já aberta
+  em `fase1.html`). Sem isso tudo batendo, salvar/restaurar é um no-op
+  silencioso — mesmo comportamento gracioso de antes pra quem abre
+  `fase1.html` direto, sem vir do menu.
+- **`salvarProgresso()` agora é assíncrona** (`updateDoc` devolve uma
+  Promise) e só escreve o que mudou daquele slot
+  (`` `saves.${slot}.progresso` ``/`` `saves.${slot}.atualizadoEm` ``, não
+  o documento inteiro). Chamada: a cada `tickEconomia` (3s), depois de
+  `confirmarConstrucao`/venda/melhoria, e num listener de `beforeunload`
+  (melhor esforço — diferente do `localStorage` síncrono de antes, o
+  navegador pode matar a aba antes dessa escrita assíncrona terminar; o
+  autosave a cada tick é quem garante a maior parte da cobertura agora).
+  **`ultimoProgressoSalvo`** guarda um `JSON.stringify` do último progresso
+  gravado — se o próximo tick calcular exatamente o mesmo valor, a escrita
+  é pulada. Isso existe porque, diferente do `localStorage` (grátis e
+  ilimitado), o Firestore tem cota diária de escrita mesmo no plano
+  gratuito — sem essa checagem, cada tick escreveria de novo mesmo sem
+  nada ter mudado (ex: só a Estação de Tratamento sem nenhuma outra
+  construção, ou o jogo parado na tela de configurações).
+- `restaurarProgresso()` roda **uma vez** (guardado por
+  `progressoJaRestaurado`, pra não duplicar instâncias se
+  `onAuthStateChanged` disparar mais de uma vez), chamada de dentro do
+  callback do `onAuthStateChanged` — não mais uma chamada direta no fim do
+  arquivo, porque agora depende de uma confirmação assíncrona da sessão.
+  O resto da lógica de reconstrução (recriar sprites, aplicar
+  `--travada --construida`, mostrar tela de fim se `colapsada`/
+  `vitoriaAlcancada`) é idêntica à versão anterior.
 - `tempoJogadoSegundos` acumula corretamente entre sessões:
   `tempoJogadoAcumulado` (vem do progresso restaurado) +
   `Date.now() - inicioSessaoMs` (tempo da sessão atual), calculado em
@@ -693,24 +757,28 @@ detalhe clássico (e não óbvio) do modelo de flexbox.
 
 ## Fluxo de dados entre telas
 
-Duas pontes entre `index.html` e `fase1.html`, ambas em `localStorage`:
+**A sessão em si (login) é gerenciada pelo próprio Firebase Authentication**
+— o SDK guarda o token de sessão sozinho (IndexedDB do navegador) e
+`onAuthStateChanged` é como cada página descobre se há alguém logado; não
+tem mais `localStorage['parasitas-sessao']`/`['parasitas-contas']` (isso
+era do sistema local antigo, removido).
 
-1. **`parasitas-save-ativo`** — qual save está em uso agora:
-   ```json
-   { "usuario": "fulano", "slot": 1, "nomeSave": "...", "jogador": "...", "empresa": "...", "dificuldade": "Iniciante" }
-   ```
-   Escrito por `script.js` (Começar ou Continuar); lido por `fase1.js`
-   (`lerSaveAtivo()`, guardado em `saveAtivoInfo`) ao carregar a Fase 1.
-   Se não existir (ex: abrir `fase1.html` direto), a página cai em valores
-   padrão sem quebrar — só não autosalva nem restaura nada, já que não sabe
-   pra qual conta/slot gravar.
-2. **`parasitas-saves-{usuario}`** — os 3 slots daquela conta, incluindo o
-   `progresso` de cada um (ver seção acima). Escrito tanto por `script.js`
-   (campos do formulário) quanto por `fase1.js` (autosave do progresso).
+Continua existindo **uma ponte em `localStorage` entre `index.html` e
+`fase1.html`** — só essa, e só porque é informação efêmera de sessão de
+navegação (não precisa sobreviver a trocar de navegador, então não faz
+sentido pagar uma leitura Firestore só pra isso):
 
-E uma terceira chave que não é save, é sessão: **`parasitas-sessao`** (qual
-conta está logada) + **`parasitas-contas`** (todas as contas locais, ver
-seção de login acima).
+**`parasitas-save-ativo`** — qual save está em uso agora:
+```json
+{ "uid": "AbC123...", "slot": 1, "nomeSave": "...", "jogador": "...", "empresa": "...", "dificuldade": "Iniciante" }
+```
+Escrito por `script.js` (Começar ou Continuar) com o `uid` do Firebase Auth
+(não mais um "usuário" local); lido por `fase1.js` (`lerSaveAtivo()`,
+guardado em `saveAtivoInfo`) ao carregar a Fase 1. Se não existir (ex:
+abrir `fase1.html` direto), a página cai em valores padrão sem quebrar —
+só não autosalva nem restaura nada. **Os dados de verdade (os 3 slots, com
+`progresso` de cada um) vivem no Firestore** (`usuarios/{uid}`, ver seções
+acima), não mais no `localStorage`.
 
 ## Preferências de fluxo de trabalho do autor
 
@@ -745,15 +813,61 @@ seção de login acima).
   Natureza" / restauração) — hoje colapso e vitória são as DUAS telas de
   fim da Fase 1, cada uma com uma nota explícita de que a próxima etapa
   ainda não existe.
-- **Contas locais, saves persistidos e autosave já funcionam** (login
-  obrigatório, 3 slots reais por conta, progresso da Fase 1 salvo e
-  restaurado). O que ainda falta nessa frente:
-  - Sem recuperação de senha (não tem como, não existe backend/e-mail).
-  - Sem exportar/importar save (útil pra levar progresso pra outro
-    navegador, já que a "conta" não sincroniza de verdade).
-  - Só 3 slots por conta, sem opção de apagar um slot individualmente pelo
-    painel Novo Jogo (dá pra sobrescrever mudando os campos, mas não tem
-    botão "apagar save").
+- **Contas de verdade (Firebase Auth) + saves na nuvem (Firestore) + apagar
+  save já funcionam** (login obrigatório com e-mail/senha real,
+  recuperação de senha por e-mail, 3 slots reais por conta sincronizados
+  entre dispositivos, progresso da Fase 1 salvo e restaurado, botão de
+  apagar por slot com confirmação em duas etapas). Isso substitui o
+  sistema local antigo (removido). O que ainda falta nessa frente:
+  - `firebase-config.js` só funciona depois de alguém (o autor) criar o
+    projeto Firebase de verdade e colar as chaves reais — enquanto tiver
+    os placeholders, login/saves não funcionam. Ver "Como configurar o
+    Firebase" logo abaixo.
+  - **Testado ponta-a-ponta contra um Firebase FALSO, não o real** — o
+    sandbox de testes automatizados usado nessa sessão bloqueia acesso de
+    saída pro CDN do Firebase (`gstatic.com`) mesmo pro navegador
+    controlado por Playwright (confirmado: `curl` alcança gstatic.com por
+    uma rota de rede diferente, mas o Chromium do sandbox não). Pra ainda
+    assim validar a lógica de verdade, criei localmente 3 módulos-stub
+    (`stub-firebase-auth.js`/`firestore.js`/`app.js`, deletados depois,
+    nunca commitados) que imitam a API do SDK real (mesmas assinaturas de
+    função, mesmos códigos de erro) só que guardando os dados em
+    `localStorage` em vez de bater na rede — troquei os `import` de
+    `script.js`/`fase1.js` pra apontar pra eles temporariamente, rodei o
+    fluxo completo (criar conta, e-mail duplicado, senha errada, esqueci
+    senha, criar save, construir uma fábrica, autosave real gravando no
+    "Firestore" fake, voltar pro menu e ver o slot refletir o progresso,
+    apagar save com confirmação em duas etapas, sair da sessão pelo rodapé
+    E pelo painel de Configurações, recarregar um save existente e ver a
+    construção reaparecer no grid) e conferi cada passo — tudo passou.
+    Antes de sair validando, também confirmei via `curl` que TODAS as
+    funções importadas (`createUserWithEmailAndPassword`,
+    `onAuthStateChanged`, `updateDoc`, `deleteField` etc.) realmente
+    existem no arquivo real do SDK na versão pinada (12.18.0). Isso dá bem
+    mais confiança do que só checar sintaxe, mas **ainda não é o Firebase
+    de verdade** — coisas que só um teste contra credenciais reais pega
+    (Regras do Firestore rejeitando algo por engano, comportamento real de
+    erro do Auth, latência de rede de verdade) só vão aparecer depois que
+    o projeto Firebase existir e as chaves forem coladas em
+    `firebase-config.js`.
+  - **Pegadinha de teste descoberta nessa sessão, não é bug do jogo**: no
+    Playwright desse sandbox, `page.waitForURL(...)` e os listeners de
+    `console`/`pageerror` **não funcionam** depois de uma navegação
+    disparada via `window.location.href` de dentro de um `<script
+    type="module">` (o botão Começar, "Voltar ao Menu", "Sair da Sessão"
+    fazem isso) — a URL muda, mas o Playwright para de "ver" a página nova
+    (parece que travou, sem erro nenhum). Confirmado que **não é bug real**
+    comparando com `page.goto()` direto pra mesma URL com os mesmos dados
+    em `localStorage`: funciona perfeitamente, título atualiza, tudo certo.
+    Workaround usado nos testes: depois de uma navegação dessas, dar
+    `await page.reload()` — reestabelece o rastreamento do Playwright sem
+    perder nada (o jogo já carregou o progresso real do Firestore, um
+    reload só re-executa o mesmo carregamento). Um navegador de verdade
+    (fora do Playwright) nunca teve esse problema.
+  - Sem exportar/importar save manualmente (hoje não faz falta, já que os
+    saves sincronizam sozinhos entre dispositivos pela nuvem).
+  - Sem deleção de CONTA (só de save/slot individual) — apagar a conta
+    inteira do Firebase Auth não foi pedido nem implementado.
 - ~~4 construções novas usavam sprites SVG placeholder~~ — **resolvido**: o
   autor gerou a arte final via IA a partir das descrições de prompt e
   mandou os PNGs, já trocados em `FABRICAS` e commitados; os SVGs foram
@@ -767,3 +881,44 @@ seção de login acima).
 - Painel de Configurações (Esc / engrenagem) cobre salvar/menu/sair — não
   tem ainda opções de áudio, idioma, ou dificuldade-em-tempo-real (a
   dificuldade é fixada na criação do save, não muda depois).
+
+## Como configurar o Firebase
+
+O jogo não funciona (login trava, saves não carregam) até essa parte estar
+feita — `firebase-config.js` vem só com placeholders. Tudo no plano
+**gratuito (Spark)**, não pede cartão de crédito.
+
+1. Acesse **https://console.firebase.google.com**, entre com uma conta
+   Google, clique em **"Adicionar projeto"**. Dê um nome (ex:
+   `parasitas-de-poluicao`), pode desativar o Google Analytics (não é
+   usado aqui) e criar o projeto.
+2. No menu lateral, **Build → Authentication → Get started**. Na aba
+   "Sign-in method", escolha **"E-mail/senha"** e ative a primeira opção
+   ("Email/Password"). Salvar.
+3. No menu lateral, **Build → Firestore Database → Create database**.
+   Escolha um local (qualquer região próxima serve) e comece em
+   **modo de produção** (não "modo de teste" — as regras de segurança do
+   passo 5 cuidam do acesso). Criar.
+4. No menu lateral, clique na engrenagem ⚙ ao lado de "Project Overview" →
+   **Project settings**. Na aba "General", role até "Your apps", clique no
+   ícone **`</>`** (Web) pra registrar um app novo. Dê um apelido
+   qualquer (ex: `web`), **não** precisa marcar Firebase Hosting. Depois de
+   criar, o Firebase mostra um bloco `const firebaseConfig = { ... }` —
+   **é exatamente esse objeto que preciso** (apiKey, authDomain,
+   projectId, storageBucket, messagingSenderId, appId).
+5. Ainda no Console: **Firestore Database → aba Regras** → apague o que
+   estiver lá e cole o conteúdo do arquivo `firestore.rules` deste
+   repositório → **Publicar**. Sem isso, o Firestore fica com as regras
+   padrão restritivas de "modo de produção" e ninguém consegue ler/escrever
+   nada, nem o dono da conta.
+6. Me manda o objeto `firebaseConfig` do passo 4 (pode colar aqui no chat
+   — como já foi explicado em `firebase-config.js`, essas chaves não são
+   segredo, a segurança real está nas Regras do passo 5) que eu preencho
+   `firebase-config.js` e testo o fluxo completo (criar conta, logar,
+   salvar, restaurar, apagar save) num navegador de verdade antes de
+   confirmar que está tudo funcionando.
+
+Depois de configurado, o app do Firebase criado no passo 4 já é o único
+que esse projeto precisa — não é necessário repetir os passos 1–4 de novo
+pra nada (Authentication e Firestore são serviços do PROJETO, não do app
+web individual).
