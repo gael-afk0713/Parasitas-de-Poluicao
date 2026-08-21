@@ -9,10 +9,11 @@
 // veja o passo a passo em CONTEXTO-PROJETO.md, seção "Como configurar o
 // Firebase".
 export const firebaseConfig = {
-  apiKey: 'COLE_AQUI_SUA_API_KEY',
-  authDomain: 'SEU-PROJETO.firebaseapp.com',
-  projectId: 'SEU-PROJETO',
-  storageBucket: 'SEU-PROJETO.firebasestorage.app',
-  messagingSenderId: '000000000000',
-  appId: '1:000000000000:web:0000000000000000000000',
+  apiKey: 'AIzaSyDELbxTgzSG3cBZgIeUeWTj5ylx0XjCibs',
+  authDomain: 'parasitas-de-poluicao.firebaseapp.com',
+  projectId: 'parasitas-de-poluicao',
+  storageBucket: 'parasitas-de-poluicao.firebasestorage.app',
+  messagingSenderId: '853761565278',
+  appId: '1:853761565278:web:bd641a2809bf71fd84cacf',
+  measurementId: 'G-CDKBC9ZD0J',
 };
