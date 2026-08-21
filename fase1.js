@@ -260,52 +260,62 @@ const ICONES_CONSTRUCAO = {
 // — é o "oposto" do bônus de ganho, efeito diferente, não empilha com ele.
 // reducaoGlobalPorTick = quanto essa construção tira do poluicaoTotal
 // GERAL a cada tick (não é adjacência, não depende de vizinhança).
+// larguraImagemPx/alturaImagemPx = dimensão NATIVA (em pixels) do arquivo
+// de sprite — usada só pra calcular a proporção real da imagem em
+// tamanhoRenderizado(), pra desenhos muito estreitos-e-altos (torres) ou
+// muito largos-e-baixos (galpões) não ficarem com altura/largura absurda
+// só porque a pegada deles no grid é pequena ou grande (ver comentário
+// completo em tamanhoRenderizado, logo abaixo de FABRICAS)
 const FABRICAS = {
   'usina-carvao': {
     nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
     descricao: 'Energia barata, alto custo ambiental.',
     custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
     sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1,
+    larguraImagemPx: 644, alturaImagemPx: 740,
   },
   'madeireira': {
     nome: 'Madeireira', categoria: 'Fábrica', icone: 'madeireira',
     descricao: 'Desmatamento: mais barata, rende menos, polui menos.',
     custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
-    // pegada mais larga (3x1): o desenho real é bem espalhado na horizontal
-    // (pilha de toras + galpão + tábuas lado a lado), a pegada antiga (2x1)
-    // ficava apertada perto do desenho de verdade
-    sprite: 'imagens/madeireira.png', celulasCol: 3, celulasRow: 1,
+    // pegada larga E funda (3x2): o desenho real é um "complexo" espalhado
+    // na horizontal (pilha de toras + galpão + tábuas lado a lado) — só
+    // largura (3x1) deixava a construção fina e pequena demais perto do
+    // que ela realmente desenha
+    sprite: 'imagens/madeireira.png', celulasCol: 3, celulasRow: 2,
+    larguraImagemPx: 1342, alturaImagemPx: 677,
   },
   'refinaria-petroleo': {
     nome: 'Refinaria de Petróleo', categoria: 'Fábrica', icone: 'refinaria',
     descricao: 'Ganho pesado, poluição desproporcional. Alto risco.',
     custo: 12000, ganhoPorTick: 600, poluicaoPorTick: 48,
-    // pegada compacta (2x2 em vez de 3x1): o desenho real é praticamente
-    // quadrado (torres sobem mais do que se espalham no chão) — 3x1 tinha
-    // sido um chute de antes da arte final existir, pra uma composição bem
-    // mais alongada do que a que chegou
+    // pegada compacta (2x2): o desenho real é praticamente quadrado
+    // (torres sobem mais do que se espalham no chão)
     sprite: 'imagens/refinaria-petroleo.png', celulasCol: 2, celulasRow: 2,
+    larguraImagemPx: 900, alturaImagemPx: 789,
   },
   'usina-agua': {
     nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
     descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
     custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
     sprite: 'imagens/usina-agua.png', celulasCol: 1, celulasRow: 1,
+    larguraImagemPx: 414, alturaImagemPx: 1299,
   },
   'usina-eolica': {
     nome: 'Usina Eólica', categoria: 'Usina', icone: 'eolica',
     descricao: 'Quase não polui; reduz a poluição das vizinhas.',
     custo: 2500, ganhoPorTick: 60, poluicaoPorTick: 1, reducaoPoluicaoAdjacencia: 0.25,
     sprite: 'imagens/usina-eolica.png', celulasCol: 1, celulasRow: 1,
+    larguraImagemPx: 474, alturaImagemPx: 1327,
   },
   'estacao-tratamento': {
     nome: 'Estação de Tratamento', categoria: 'Usina', icone: 'tratamento',
     descricao: 'Não rende nada; limpa poluição acumulada da região inteira.',
     custo: 5000, ganhoPorTick: 0, poluicaoPorTick: 0, reducaoGlobalPorTick: 20,
     // pegada 2x1: são dois tanques lado a lado, mais larga que uma
-    // construção de célula única (a pegada antiga, 1x1, era pequena demais
-    // pro par de tanques do desenho real)
+    // construção de célula única
     sprite: 'imagens/estacao-tratamento.png', celulasCol: 2, celulasRow: 1,
+    larguraImagemPx: 996, alturaImagemPx: 731,
   },
 };
 
@@ -759,6 +769,40 @@ function larguraImagemParaFootprint(colSpan, rowSpan) {
   return (colSpan + rowSpan) * (TILE_W / 2) * 0.85;
 }
 
+// altura MÁXIMA (no espaço da imagem) que qualquer sprite pode ocupar,
+// não importa a pegada — sem esse teto, um desenho muito estreito e alto
+// (torre, chaminé isolada) acaba com uma altura ABSURDA só porque a
+// largura dele (vinda só da pegada, larguraImagemParaFootprint) é pequena
+// e a proporção da imagem é extrema: uma imagem 3x mais alta que larga
+// numa pegada 1x1 (largura ~68) resultaria em ~213 de altura — quase o
+// dobro da Usina de Carvão (~117), completamente fora de escala com o
+// resto do cenário. 150 foi escolhido comparando as 6 construções lado a
+// lado: dá folga pra torres (água/eólica) ficarem visivelmente mais altas
+// que uma fábrica comum, sem dominar a cena.
+const ALTURA_MAX_SPRITE = TILE_H * 3.75; // 150
+
+// tamanho final (em espaço de imagem) que o sprite de uma construção deve
+// ocupar: começa do alvo de largura dado pela pegada
+// (larguraImagemParaFootprint) e mantém a PROPORÇÃO REAL do arquivo
+// (config.larguraImagemPx/alturaImagemPx) — só reduz a largura abaixo do
+// alvo da pegada se isso for necessário pra não estourar ALTURA_MAX_SPRITE
+// (efeito "contain" dentro de uma caixa largura-da-pegada × altura-máxima,
+// nunca estica a imagem, só encolhe quando a proporção pede). Recebe
+// colSpan/rowSpan à parte (não lê de config.celulasCol/celulasRow) porque
+// uma instância restaurada de um save antigo pode ter sido construída sob
+// uma pegada diferente da que o FABRICAS de hoje define pro mesmo tipo.
+function tamanhoRenderizado(config, colSpan, rowSpan) {
+  const larguraAlvo = larguraImagemParaFootprint(colSpan, rowSpan);
+  const razaoAltura = config.alturaImagemPx / config.larguraImagemPx;
+  let largura = larguraAlvo;
+  let altura = larguraAlvo * razaoAltura;
+  if (altura > ALTURA_MAX_SPRITE) {
+    altura = ALTURA_MAX_SPRITE;
+    largura = altura / razaoAltura;
+  }
+  return { largura, altura };
+}
+
 function escalaAtual() {
   return Math.min(window.innerWidth / IMG_W, window.innerHeight / IMG_H);
 }
@@ -865,7 +909,7 @@ function iniciarColocacao(tipo) {
     // preço travado no início da colocação (com a escala por quantidade
     // já possuída), pra cobrar o mesmo valor mostrado no card
     precoCompra: precoAtual(tipo),
-    larguraImagem: larguraImagemParaFootprint(colSpan, rowSpan),
+    larguraImagem: tamanhoRenderizado(config, colSpan, rowSpan).largura,
     travado: false, col: null, row: null, barra: null,
   };
 
@@ -909,6 +953,12 @@ function preencherFootprint(col, row, colSpan, rowSpan, corPreenchimento, corCon
   }
 }
 
+// âmbar (--amber) = pegada livre, onde o fantasma pode ser confirmado;
+// ferrugem (--rust) = pegada ocupada, não dá pra confirmar ali
+const COR_FOOTPRINT_LIVRE = 'rgba(217,154,53,0.30)';
+const COR_FOOTPRINT_OCUPADO = 'rgba(138,74,47,0.40)';
+const COR_CONTORNO_FOOTPRINT = 'rgba(217,154,53,0.75)';
+
 // verde (mesma família do --moss-bright) pro efeito de ganho, azul (mesma
 // família do --agua) pro efeito de redução de poluição — "existente" é
 // mais fraco (rede já montada, só informativo), "fantasma" é mais forte
@@ -918,6 +968,20 @@ const COR_DESTAQUE_GANHO_FANTASMA = 'rgba(143,191,114,0.42)';
 const COR_DESTAQUE_POLUICAO_EXISTENTE = 'rgba(95,151,166,0.16)';
 const COR_DESTAQUE_POLUICAO_FANTASMA = 'rgba(95,151,166,0.42)';
 const COR_CONTORNO_DESTAQUE = 'rgba(239,232,214,0.55)';
+
+// enquanto uma colocação está em andamento, marca no grid as células que a
+// PRÓPRIA pegada do fantasma vai ocupar — âmbar se livre (pode confirmar
+// ali), ferrugem se alguma célula já está ocupada (mesma cor de "cancelar"
+// usada no resto do jogo). Sem isso não tinha nenhuma indicação visual de
+// "essas são as células que vão virar essa construção", só o sprite meio
+// transparente por cima, que não deixa claro os limites exatos da pegada.
+function desenharFootprintFantasma() {
+  if (!estadoConstrucao || estadoConstrucao.col === null) return;
+  const { col, row, colSpan, rowSpan } = estadoConstrucao;
+  const ocupada = footprintOcupado(col, row, colSpan, rowSpan);
+  const cor = ocupada ? COR_FOOTPRINT_OCUPADO : COR_FOOTPRINT_LIVRE;
+  preencherFootprint(col, row, colSpan, rowSpan, cor, COR_CONTORNO_FOOTPRINT);
+}
 
 // enquanto uma colocação está em andamento, destaca: (1) os quadrados de
 // construções JÁ existentes que hoje dão/recebem efeito de adjacência
@@ -956,6 +1020,7 @@ function desenharDestaquesAdjacencia() {
 // instanciasConstruidas/estadoConstrucao ainda não existem nesse ponto)
 function redesenharCena() {
   desenharGrid();
+  desenharFootprintFantasma();
   desenharDestaquesAdjacencia();
 }
 
@@ -1175,7 +1240,7 @@ function restaurarProgresso() {
     const instancia = {
       wrapper, tipo: dados.tipo, col: dados.col, row: dados.row,
       colSpan: dados.colSpan, rowSpan: dados.rowSpan,
-      larguraImagem: larguraImagemParaFootprint(dados.colSpan, dados.rowSpan),
+      larguraImagem: tamanhoRenderizado(config, dados.colSpan, dados.rowSpan).largura,
       // saves de antes desse recurso não têm esses campos — cai pro preço
       // base como estimativa razoável do que foi investido
       precoCompra: dados.precoCompra ?? config.custo,

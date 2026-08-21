@@ -215,11 +215,14 @@ snap pra célula válida mais próxima.
 Usina de Água é 1x1). `centroFootprintNaTela(col, row, colSpan, rowSpan)`
 devolve o centro na tela de toda a pegada (generaliza o antigo
 `centroCelulaNaTela`, que só existia pra 1x1).
-`larguraImagemParaFootprint(colSpan, rowSpan)` calcula a largura visual do
+`larguraImagemParaFootprint(colSpan, rowSpan)` calcula a largura-ALVO do
 sprite a partir do contorno do losango isométrico da pegada
 (`(colSpan+rowSpan)*(TILE_W/2)`), com uma margem de 15% pra dentro — o
 sprite é um retângulo, a pegada é um losango, sem essa folga os cantos do
-retângulo escapam visualmente da pegada. `footprintOcupado`/
+retângulo escapam visualmente da pegada. Essa largura-alvo sozinha **não**
+é o tamanho final usado — ver `tamanhoRenderizado()` logo abaixo dela no
+código, que ajusta esse alvo pela proporção real de cada imagem.
+`footprintOcupado`/
 `marcarFootprintOcupado` conferem/marcam **todas** as células da pegada em
 `celulasOcupadas` (um `Set` de chaves `"col,row"`), não só uma.
 `clampFootprint` desliza a pegada pra dentro do grid se o cursor estiver
@@ -388,7 +391,7 @@ que rendem.
 | Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
 | Usina de Carvão | Fábrica | 2x1 | R$ 4.500 | R$ 225 | 15 | — |
-| Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
+| Madeireira | Fábrica | 3x2 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
 | Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
 | Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
 | Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%) |
@@ -396,13 +399,44 @@ que rendem.
 
 As pegadas de Madeireira/Refinaria/Estação foram ajustadas depois que a
 arte final (PNG) chegou, substituindo os chutes originais feitos em cima
-dos placeholders SVG: a regra usada foi "pegada elongada (ex: 3x1) pra
+dos placeholders SVG: a regra usada foi "pegada elongada (ex: 3x2) pra
 desenho bem espalhado na horizontal, pegada compacta (ex: 2x2) pra desenho
-quase quadrado (sobe mais do que se espalha)". A largura RENDERIZADA do
-sprite só depende de `celulasCol + celulasRow` (ver
-`larguraImagemParaFootprint`), não de qual dos dois é maior — trocar a
-composição de uma pegada (2x2 vs 3x1 vs 1x3, todas somam 4) muda **qual
-formato de célula é reservado no grid**, não o tamanho do sprite na tela.
+quase quadrado (sobe mais do que se espalha)". A largura-ALVO derivada da
+pegada (`celulasCol + celulasRow`, ver `larguraImagemParaFootprint`)
+define **qual formato de célula é reservado no grid**, não de qual dos
+dois é maior (2x2 vs 3x1 vs 1x3, todas somam 4, reservam formas
+diferentes de célula mas pedem a mesma largura-alvo).
+
+**Bug real corrigido nessa passada (não reintroduzir): a largura-alvo da
+pegada sozinha NÃO é o tamanho final do sprite.** Antes dessa correção, o
+código usava `larguraImagemParaFootprint(...)` direto como
+`instancia.larguraImagem`, e a altura ficava inteiramente por conta do
+`height:auto` do CSS — ou seja, a altura final era sempre
+`larguraAlvo × (alturaNaturalDoPNG / larguraNaturalDoPNG)`, sem NENHUM
+teto. Isso é inofensivo pra imagens com proporção parecida com a da Usina
+de Carvão (h/w ≈ 0.87–1.15), mas quebra completamente pra proporções
+extremas: a Usina de Água (414×1299px, h/w ≈ 3.14) numa pegada 1x1 virava
+uma torre gigantesca (~213 de altura, quase o dobro da Usina de Carvão),
+enquanto a Madeireira (1342×677px, h/w ≈ 0.50) numa pegada larga ficava
+achatada e pequena demais pro tanto de grid que reservava.
+
+A correção é `tamanhoRenderizado(config, colSpan, rowSpan)` (em
+`fase1.js`, logo abaixo de `larguraImagemParaFootprint`): calcula a altura
+que a largura-alvo implicaria (mantendo a proporção REAL do arquivo, via
+`config.larguraImagemPx`/`alturaImagemPx` — dimensões nativas de cada PNG,
+guardadas direto em `FABRICAS`) e, se essa altura estourar
+`ALTURA_MAX_SPRITE` (`TILE_H * 3.75` = 150, calibrado olhando as 6
+construções lado a lado), reduz a LARGURA proporcionalmente até a altura
+caber no teto — efeito "contain" dentro de uma caixa
+largura-da-pegada×altura-máxima, nunca estica a imagem, só encolhe quando
+a proporção pede. Isso é por que a Usina de Água/Eólica hoje renderizam
+mais ESTREITAS que a largura-alvo da pegada 1x1 sugeriria (a torre não
+precisa preencher a célula inteira, só precisa ter uma altura razoável) —
+é o comportamento correto, não um bug. `tamanhoRenderizado` recebe
+`colSpan`/`rowSpan` À PARTE (não lê de `config.celulasCol/celulasRow`)
+porque uma instância restaurada de um save antigo pode ter sido construída
+sob uma pegada diferente da que `FABRICAS` define hoje pro mesmo tipo —
+ver `restaurarProgresso`.
 
 Caixa inicial do jogador: R$ 5.000. Filosofia: a primeira construção deve
 consumir a maior parte do caixa inicial (decisão pesada) mas se pagar em
@@ -412,13 +446,23 @@ suporte de ganho, suporte de limpeza local, suporte de limpeza global) em
 vez de só "mais uma fábrica com número diferente" — o objetivo era reduzir
 a monotonia relatada pelo jogador ("só comprar fábrica e deixar farmar").
 
-### Destaque de adjacência no grid (durante a colocação)
+### Destaque da própria pegada + adjacência no grid (durante a colocação)
 
-Enquanto uma colocação está em andamento, o grid destaca com uma cor de
-fundo (preenchimento do losango isométrico da célula, `preencherCelula`/
-`preencherFootprint` em `fase1.js`) os quadrados afetados por adjacência —
-verde (família do `--moss-bright`) pra efeito de ganho, azul (família do
-`--agua`) pra efeito de redução de poluição:
+Enquanto uma colocação está em andamento, o grid destaca com preenchimento
+colorido do losango isométrico das células (`preencherCelula`/
+`preencherFootprint` em `fase1.js`), em duas camadas:
+
+**1. A pegada do próprio fantasma** (`desenharFootprintFantasma()`) —
+âmbar (`--amber`) se as células estão livres (dá pra confirmar ali),
+ferrugem (`--rust`) se alguma célula já está ocupada (mesma cor usada em
+"cancelar" no resto do jogo) — mostra exatamente quais células vão virar
+aquela construção, sem precisar adivinhar pelos limites do sprite
+(sprites têm folga/transparência ao redor do desenho, então o contorno
+visual do PNG não corresponde exatamente ao contorno da pegada).
+
+**2. Adjacência** (`desenharDestaquesAdjacencia()`) — verde (família do
+`--moss-bright`) pra efeito de ganho, azul (família do `--agua`) pra
+efeito de redução de poluição:
 
 - **Sempre** que há uma colocação ativa: os quadrados de construções JÁ
   existentes que hoje dão/recebem efeito de adjacência umas das outras
@@ -430,18 +474,20 @@ verde (família do `--moss-bright`) pra efeito de ganho, azul (família do
   forte (`COR_DESTAQUE_*_FANTASMA`) com contorno — o jogador vê o efeito
   antes de confirmar, não precisa adivinhar ou confirmar-e-conferir.
 
-Implementado em `desenharDestaquesAdjacencia()`, chamada por
-`redesenharCena()` (grid base + destaques) sempre que a célula sob o
-fantasma muda (`reposicionarFantasma`, com uma checagem de "mudou de
-célula" pra não redesenhar o canvas inteiro a cada pixel de movimento do
-mouse) e ao encerrar qualquer colocação (`encerrarEstadoConstrucao`, que
-redesenha sem destaques já que `estadoConstrucao` volta a `null`). **A
-função de desenho da grade original, `desenharGrid()`, continua chamada
-sozinha (sem destaques) na pintura inicial da página e no listener de
-resize do topo do arquivo** — nesse ponto do carregamento
+As duas camadas são chamadas juntas por `redesenharCena()` (grid base +
+pegada do fantasma + adjacência, nessa ordem — a pegada fica "por baixo",
+a adjacência por cima) sempre que a célula sob o fantasma muda
+(`reposicionarFantasma`, com uma checagem de "mudou de célula" pra não
+redesenhar o canvas inteiro a cada pixel de movimento do mouse) e ao
+encerrar qualquer colocação (`encerrarEstadoConstrucao`, que redesenha sem
+destaques já que `estadoConstrucao` volta a `null`). **A função de desenho
+da grade original, `desenharGrid()`, continua chamada sozinha (sem
+destaques) na pintura inicial da página e no listener de resize do topo
+do arquivo** — nesse ponto do carregamento
 `FABRICAS`/`instanciasConstruidas`/`estadoConstrucao` ainda não existem
-(TDZ), então `desenharDestaquesAdjacencia()` só pode ser chamada depois
-que tudo isso é declarado mais abaixo no arquivo; `redesenharCena()` fica
+(TDZ), então nem `desenharFootprintFantasma()` nem
+`desenharDestaquesAdjacencia()` podem ser chamadas ali; `redesenharCena()`
+fica
 definida perto de `reposicionarFantasma`, não lá no topo.
 
 ### Dificuldade, fiscalização, meta de vitória e colapso
