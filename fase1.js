@@ -289,8 +289,7 @@ const FABRICAS = {
     custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
     // pegada larga (3x1): o desenho real é bem espalhado na horizontal
     // (pilha de toras + galpão + tábuas lado a lado) — o tamanho
-    // renderizado em si já ficava bom nessa pegada, o problema real era
-    // o sprite ficar mal ancorado dentro dela (ver baseFootprintNaTela)
+    // renderizado em si já ficava bom nessa pegada
     sprite: 'imagens/madeireira.png', celulasCol: 3, celulasRow: 1,
     larguraImagemPx: 1342, alturaImagemPx: 677,
   },
@@ -765,31 +764,21 @@ function celulaMaisProxima(mx, my) {
 
 // centro na tela de uma pegada de colSpan x rowSpan células, começando
 // em (col, row) — pra pegada 1x1 isso é o mesmo que o centro da célula.
-// Usado só pra UI que deve ficar "no meio" da pegada (barra de
-// Confirmar/Cancelar, número flutuante de ganho) — NÃO usar pra
-// posicionar o sprite em si, ver baseFootprintNaTela logo abaixo.
+// Também é o ponto de ancoragem do SPRITE (ver posicionarInstancia): a
+// base do sprite (borda inferior, por causa do transform:translate(-50%,
+// -100%) em .fabrica-instancia) fica encostada bem no centro do losango.
+//
+// Histórico: cheguei a trocar isso pelo vértice do losango mais próximo
+// do jogador (achando que resolvia um "chão vazio" na frente de pegadas
+// grandes) — mas o vértice tem LARGURA ZERO, e um sprite retangular
+// ancorado ali vaza pros losangos vizinhos nas pontas esquerda/direita.
+// O centro é o ponto de largura MÁXIMA do losango, então minimiza esse
+// vazamento lateral — o "chão vazio" na frente volta a existir em
+// pegadas bem alongadas (ex: Madeireira 3x1), mas é um problema visual
+// bem menor que invadir a construção vizinha. Não trocar pro vértice de
+// novo sem resolver as duas coisas ao mesmo tempo.
 function centroFootprintNaTela(col, row, colSpan, rowSpan) {
   return pontoNaTela(col + colSpan / 2, row + rowSpan / 2);
-}
-
-// ponto de ancoragem da BASE do sprite de uma construção: o vértice do
-// losango mais próximo do jogador (maior coluna E maior linha ao mesmo
-// tempo — é aí que o losango "aponta" pra frente), não o centro
-// geométrico da pegada. Horizontalmente ainda usa o centro (mantém o
-// sprite simétrico esquerda/direita mesmo em pegadas não-quadradas, tipo
-// 3x2); só o eixo vertical muda pro vértice.
-//
-// Bug real que isso corrige: com o sprite ancorado pelo CENTRO (como era
-// antes), a metade "da frente" do losango — do centro até o vértice mais
-// próximo — ficava sem nenhum pixel de sprite em cima, mesmo essas
-// células estando ocupadas/reservadas. Numa pegada pequena (1x1, 2x1)
-// isso quase não se notava; numa pegada maior (3x2, como a Madeireira)
-// virava uma faixa enorme de "chão vazio" na frente da construção, dando
-// a impressão de que ela não preenche direito o próprio espaço reservado.
-function baseFootprintNaTela(col, row, colSpan, rowSpan) {
-  const centro = centroFootprintNaTela(col, row, colSpan, rowSpan);
-  const verticeProximo = pontoNaTela(col + colSpan, row + rowSpan);
-  return { x: centro.x, y: verticeProximo.y };
 }
 
 // largura visual (no espaço da imagem) da pegada isométrica de
@@ -840,10 +829,21 @@ function escalaAtual() {
 }
 
 function posicionarInstancia(instancia) {
-  const ponto = baseFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
+  const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
   instancia.wrapper.style.left = ponto.x + 'px';
   instancia.wrapper.style.top = ponto.y + 'px';
   instancia.wrapper.style.width = (instancia.larguraImagem * escalaAtual()) + 'px';
+  // z-index dinâmico por profundidade no grid: o vértice do losango mais
+  // próximo do jogador (col+colSpan, row+rowSpan) — quanto maior essa
+  // soma, mais "pra frente" a construção está, e mais por cima ela deve
+  // desenhar. Sem isso, o navegador desempata pela ordem de criação no
+  // DOM (quem foi construído por último fica sempre em cima), errado
+  // sempre que uma construção mais funda é colocada depois de uma mais
+  // rasa. Faixa alcançada num grid 12x12: ~2 a ~28 — bem abaixo dos
+  // z-index da UI da Fase 1 (40+, ver style.css), que precisa ficar
+  // sempre visível por cima de qualquer construção.
+  const profundidade = (instancia.col + instancia.colSpan) + (instancia.row + instancia.rowSpan);
+  instancia.wrapper.style.zIndex = 2 + profundidade;
 }
 
 function reposicionarAcoesFlutuantes() {

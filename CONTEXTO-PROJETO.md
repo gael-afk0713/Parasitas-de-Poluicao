@@ -264,27 +264,52 @@ devolve o centro na tela de toda a pegada (generaliza o antigo
 UI que devem ficar "no meio" da pegada (barra de Confirmar/Cancelar,
 número flutuante de ganho).
 
-**Ancoragem do SPRITE em si é outra função, `baseFootprintNaTela`, não
-`centroFootprintNaTela`** — bug real corrigido nessa sessão, não
-reintroduzir. `posicionarInstancia` (que define `left`/`top`/`width` do
-wrapper do sprite, com `transform:translate(-50%,-100%)` no CSS ancorando
-a base do sprite no ponto dado) usava `centroFootprintNaTela` originalmente,
-ancorando a base do sprite no CENTRO GEOMÉTRICO do losango da pegada. Isso
-deixava a metade "da frente" do losango — do centro até o vértice mais
-próximo do jogador — sem nenhum pixel de sprite em cima, mesmo essas
-células estando ocupadas/reservadas. Numa pegada pequena (1x1, 2x1) o
-efeito é sutil; numa pegada maior (3x1, como a Madeireira) vira uma faixa
-grande de "chão vazio" na frente da construção — foi relatado pelo autor
-como "as dimensões do grid que tá ocupando tá uma merda" antes de eu medir
-e confirmar a causa exata via `getBoundingClientRect()` comparado aos 4
-cantos do losango. `baseFootprintNaTela(col, row, colSpan, rowSpan)`
-corrige isso: mantém o **X** do centro (sprite fica simétrico
-esquerda/direita mesmo em pegadas não-quadradas) mas troca o **Y** pro
-vértice do losango mais próximo do jogador
-(`pontoNaTela(col+colSpan, row+rowSpan)`) — a base do sprite passa a
-cobrir a pegada inteira, e a estrutura ainda sobe visualmente acima do
-losango (efeito de altura de construção, normal e esperado numa cena
-isométrica).
+**Ancoragem do SPRITE em si usa a MESMA função `centroFootprintNaTela`**
+(não uma função separada) — histórico de idas e voltas nessa decisão,
+documentado aqui pra não reintroduzir nenhum dos dois bugs já resolvidos.
+`posicionarInstancia` define `left`/`top`/`width` do wrapper do sprite,
+com `transform:translate(-50%,-100%)` no CSS ancorando a BASE do sprite
+(borda inferior da imagem) no ponto dado por `centroFootprintNaTela` —
+ou seja, no centro geométrico do losango da pegada.
+
+- **Bug A (ancoragem no centro, versão original):** ancorar no centro
+  geométrico deixa a metade "da frente" do losango — do centro até o
+  vértice mais próximo do jogador — sem nenhum pixel de sprite em cima,
+  mesmo essas células estando ocupadas/reservadas. Numa pegada pequena
+  (1x1, 2x1) o efeito é sutil; numa pegada maior (3x1, como a Madeireira)
+  vira uma faixa de "chão vazio" na frente da construção.
+- **Tentativa de correção que criou um bug pior (ancoragem no vértice):**
+  pra cobrir a pegada inteira, uma versão anterior trocou o ponto de
+  ancoragem pro vértice do losango mais próximo do jogador
+  (`pontoNaTela(col+colSpan, row+rowSpan)`, então chamada
+  `baseFootprintNaTela`, hoje removida). Isso resolveu o "chão vazio" mas
+  causou um bug pior: um losango tem LARGURA ZERO exatamente nos vértices
+  e largura MÁXIMA no centro — ancorar um sprite retangular num ponto de
+  largura zero faz ele inevitavelmente vazar pros losangos vizinhos nas
+  pontas esquerda/direita, "invadindo" construções ao lado.
+- **Estado atual (revertido pro centro, aceito conscientemente):** de
+  volta ao centro geométrico via `centroFootprintNaTela`, que é o ponto de
+  largura MÁXIMA do losango — minimiza o vazamento lateral, ao custo de
+  reintroduzir o "chão vazio" na frente em pegadas bem alongadas (ex:
+  Madeireira 3x1). Trade-off aceito explicitamente pelo autor: invadir a
+  construção vizinha é pior que ter uma faixa vazia na frente. **Não
+  trocar pro vértice de novo sem resolver os dois problemas ao mesmo
+  tempo** (precisaria de um ponto de ancoragem que dependesse da LARGURA
+  real do sprite em cada X, não só um ponto fixo — fora do escopo por
+  enquanto).
+
+**Z-index dinâmico por profundidade no grid:** cada `.fabrica-instancia`
+tem `z-index:2` fixo só como fallback no CSS — `posicionarInstancia`
+sempre sobrescreve com `wrapper.style.zIndex = 2 + profundidade`, onde
+`profundidade = (col+colSpan) + (row+rowSpan)` (a mesma soma usada no
+vértice do losango mais próximo do jogador, como proxy de "quão pra
+frente" a construção está no grid — quanto maior, mais em cima ela
+desenha). Sem isso, o navegador desempata pela ordem de criação no DOM
+(quem foi construído por último sempre fica em cima), o que fica visualmente
+errado sempre que uma construção mais "funda" no grid é colocada depois de
+uma mais "rasa". Faixa alcançada num grid 12x12: ~2 a ~28 — por isso a UI
+da Fase 1 (HUD, painéis, botões) foi renumerada pra 40+ em `style.css`,
+garantindo que sempre fique visível por cima de qualquer construção.
 
 `larguraImagemParaFootprint(colSpan, rowSpan)` calcula a largura-ALVO do
 sprite a partir do contorno do losango isométrico da pegada

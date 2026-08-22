@@ -26,7 +26,7 @@ body{position:relative;}
 .power-on{
   position:fixed;
   inset:0;
-  z-index:50;
+  z-index:60; /* sempre por cima de tudo durante o flash de abertura, inclusive do .painel (50) */
   pointer-events:none;
   background:var(--paper);
   animation:ligar 0.8s steps(1,end) forwards;
@@ -352,7 +352,11 @@ footer{
 .painel{
   position:fixed;
   inset:0;
-  z-index:10;
+  /* 50: precisa ficar acima de TODA a UI da Fase 1 (HUD, botões, gaveta de
+     construção) e de qualquer construção no grid (z-index dinâmico até
+     ~32, ver .fabrica-instancia) — só fica abaixo do flash de abertura
+     (.power-on, 60), que só existe em index.html */
+  z-index:50;
   display:flex;
   align-items:center;
   justify-content:center;
@@ -795,7 +799,10 @@ footer{
   top:0;
   left:0;
   right:0;
-  z-index:5;
+  /* 40+: acima de qualquer construção no grid (z-index dinâmico até ~32,
+     ver .fabrica-instancia) — a UI da Fase 1 tem que ficar sempre visível
+     por cima do cenário, não importa quão "funda" uma construção esteja */
+  z-index:40;
   display:flex;
   align-items:center;
   gap:2.4rem;
@@ -894,7 +901,7 @@ footer{
   position:fixed;
   top:6.4rem;
   left:50%;
-  z-index:6;
+  z-index:41; /* acima de qualquer construção, ver nota em .hud-fase1 */
   max-width:min(90vw, 520px);
   text-align:center;
   font-family:'JetBrains Mono',monospace;
@@ -934,7 +941,7 @@ footer{
   left:50%;
   bottom:1.8rem;
   transform:translateX(-50%);
-  z-index:6;
+  z-index:42; /* acima de qualquer construção, ver nota em .hud-fase1 */
   display:flex;
   align-items:center;
   gap:0.65rem;
@@ -974,7 +981,7 @@ footer{
   position:fixed;
   top:1.4rem;
   right:1.6rem;
-  z-index:8;
+  z-index:44; /* acima de qualquer construção, ver nota em .hud-fase1 */
   width:2.6rem;
   height:2.6rem;
   display:flex;
@@ -1019,7 +1026,7 @@ footer{
 .painel-fabricas{
   position:fixed;
   inset:0;
-  z-index:7;
+  z-index:43; /* acima de qualquer construção, ver nota em .hud-fase1 */
   display:flex;
   align-items:flex-end;
   justify-content:center;
@@ -1164,8 +1171,13 @@ footer{
   position:fixed;
   top:0;
   left:0;
-  z-index:2;
+  z-index:2; /* fallback só; fase1.js sobrescreve com style.zIndex por profundidade no grid (col+row) */
   pointer-events:none;
+  /* a base (borda inferior) do sprite fica ancorada no ponto dado por
+     posicionarInstancia — que volta a ser o CENTRO geométrico do losango
+     da pegada (centroFootprintNaTela), não mais o vértice da frente. No
+     vértice a pegada tem largura zero, então um sprite retangular vazava
+     pros losangos vizinhos; no centro a pegada está na largura máxima. */
   transform:translate(-50%, -100%);
 }
 .fabrica-instancia .fabrica-sprite{
@@ -1216,7 +1228,7 @@ footer{
   position:fixed;
   top:0;
   left:0;
-  z-index:3;
+  z-index:45; /* acima de qualquer construção (mesmo uma funda), ver nota em .hud-fase1 */
   display:flex;
   flex-wrap:wrap;
   justify-content:center;
@@ -1241,7 +1253,7 @@ footer{
   position:fixed;
   top:0;
   left:0;
-  z-index:4;
+  z-index:46; /* acima de qualquer construção (mesmo uma funda), ver nota em .hud-fase1 */
   font-family:'JetBrains Mono',monospace;
   font-weight:700;
   font-size:0.8rem;
