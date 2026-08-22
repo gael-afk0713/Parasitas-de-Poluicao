@@ -793,17 +793,29 @@ function centroFootprintNaTela(col, row, colSpan, rowSpan) {
 //    contorno quando a pegada não é quadrada), ou seja, nem "vértice"
 //    ele é de verdade.
 //
-// Esse ponto aqui (col+colSpan/2, row+rowSpan) é o meio do lado do
-// losango mais próximo do jogador — fica sempre DENTRO do contorno real
-// da pegada (isso vale pra qualquer colSpan/rowSpan, não só quadrada),
-// então não vaza pro lado. Reduz o buraco da frente pela metade em
-// relação ao centro puro, mas não zera — zerar exigiria ancorar no
-// vértice, que é exatamente o que causa o vazamento lateral acima. Essa
-// troca (buraco pequeno vs. vazamento zero) foi aceita conscientemente;
-// não trocar por uma ancoragem mais funda sem resolver o vazamento
-// lateral ao mesmo tempo.
+// O losango da pegada tem DUAS arestas "próximas do jogador" (a que vai
+// do vértice esquerdo até o da frente, e a que vai do vértice direito até
+// o da frente) — cada uma é o meio de UM dos dois lados, nunca as duas ao
+// mesmo tempo. Qual das duas usar importa: cada aresta só cobre bem a
+// largura do sprite quando o lado dela é o mais LONGO da pegada — a outra
+// aresta, mais curta, fica perto demais do vértice (largura quase zero) e
+// deixa o sprite (que sempre mede a mesma largura, baseada em
+// colSpan+rowSpan, dos dois lados) vazando praticamente inteiro pra fora
+// da pegada de um dos lados. Isso não aparecia nas pegadas testadas até
+// aqui (2x1, 3x1, 1x1 — sempre colSpan>=rowSpan) mas quebrou na hora que
+// a Usina de Carvão virou 1x2 (rowSpan>colSpan): a aresta esquerda-frente
+// (usada sem condição) ficou curta demais, sprite saindo quase inteiro
+// pro lado errado. Por isso a escolha da aresta depende de qual span é
+// maior — sempre a aresta do lado mais comprido da pegada.
 function baseFootprintNaTela(col, row, colSpan, rowSpan) {
-  return pontoNaTela(col + colSpan / 2, row + rowSpan);
+  if (rowSpan <= colSpan) {
+    // aresta esquerda->frente (mais comprida quando a pegada é mais
+    // larga que funda, ex: 2x1, 3x1): X no meio da pegada, Y na frente
+    return pontoNaTela(col + colSpan / 2, row + rowSpan);
+  }
+  // aresta direita->frente (mais comprida quando a pegada é mais funda
+  // que larga, ex: 1x2): X na frente, Y no meio da pegada
+  return pontoNaTela(col + colSpan, row + rowSpan / 2);
 }
 
 // largura visual (no espaço da imagem) da pegada isométrica de

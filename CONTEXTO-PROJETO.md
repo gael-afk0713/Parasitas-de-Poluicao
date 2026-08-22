@@ -266,14 +266,13 @@ número flutuante de ganho).
 
 **Ancoragem do SPRITE usa uma função PRÓPRIA, `baseFootprintNaTela`**
 (diferente de `centroFootprintNaTela`, que é só pra UI) — histórico de
-três tentativas nessa decisão, documentado aqui pra não repetir nenhuma
-das duas erradas. `posicionarInstancia` define `left`/`top`/`width` do
-wrapper do sprite, com `transform:translate(-50%,-100%)` no CSS ancorando
-a BASE do sprite (borda inferior da imagem) no ponto dado por
-`baseFootprintNaTela(col, row, colSpan, rowSpan)` =
-`pontoNaTela(col + colSpan/2, row + rowSpan)` — o meio do lado do losango
-da pegada mais próximo do jogador (X do centro, mas Y empurrado até a
-linha da frente, não até o vértice).
+quatro tentativas nessa decisão, documentado aqui pra não repetir nenhuma
+das erradas. `posicionarInstancia` define `left`/`top`/`width` do wrapper
+do sprite, com `transform:translate(-50%,-100%)` no CSS ancorando a BASE
+do sprite (borda inferior da imagem) no ponto dado por
+`baseFootprintNaTela(col, row, colSpan, rowSpan)` — o meio do lado do
+losango da pegada mais próximo do jogador, mais LONGO dos dois (ver
+Tentativa 3 abaixo pra entender por que "mais longo" importa).
 
 - **Tentativa 1 (ancoragem no centro geométrico, `centroFootprintNaTela`):**
   deixa a metade "da frente" do losango — do centro até o vértice mais
@@ -294,23 +293,37 @@ linha da frente, não até o vértice).
   vértice) não pertence ao mesmo ponto do contorno real do losango — cai
   literalmente FORA da forma, ao sul dela. Isso empurra o sprite inteiro
   além da própria pegada, "invadindo" a linha de células seguinte.
-- **Estado atual (`baseFootprintNaTela` corrigida — meio do lado da
-  frente):** `pontoNaTela(col + colSpan/2, row + rowSpan)` — combina X e Y
-  do MESMO ponto da grade (ao contrário da tentativa 2, que misturava X de
-  um ponto com Y de outro), então fica sempre DENTRO do contorno real da
-  pegada, pra qualquer colSpan/rowSpan (provado algebricamente: é o ponto
-  médio do lado do losango mais próximo do jogador, não um ponto
-  arbitrário). Reduz o gap da tentativa 1 pela metade (17,5px→8,7px na
-  Usina de Água; 35px→26,2px na Madeireira), sem reabrir o vazamento
-  lateral da tentativa 2 — testado com 2 Madeireiras vizinhas lado a lado,
-  o overlap horizontal das bounding boxes ficou EXATAMENTE igual ao que já
-  existia com o centro puro (14px, pré-existente, não uma regressão).
-  **Não zera o gap** — zerar exigiria ancorar no vértice puro, que é
-  exatamente a tentativa 2 que vaza. Essa troca (gap pela metade vs.
-  vazamento lateral zero) foi medida e aceita conscientemente pelo autor.
-  Resolver os dois problemas por completo exigiria o sprite variar de
-  largura conforme a profundidade (tampo mais estreito perto da ponta),
-  não só mover um ponto de ancoragem fixo — fora do escopo por enquanto.
+- **Tentativa 3 (`pontoNaTela(col+colSpan/2, row+rowSpan)` sem condição):**
+  combina X e Y do MESMO ponto da grade (ao contrário da tentativa 2, que
+  misturava X de um ponto com Y de outro) — o ponto médio do lado do
+  losango mais próximo do jogador. Reduz o gap da tentativa 1 pela metade
+  (17,5px→8,7px na Usina de Água; 35px→26,2px na Madeireira), sem reabrir
+  o vazamento lateral da tentativa 2 — testado com 2 Madeireiras vizinhas
+  lado a lado, overlap idêntico ao que já existia com centro puro (14px,
+  pré-existente). **Bug**: o losango tem DOIS lados "da frente" (esquerda-
+  frente e direita-frente); essa fórmula sempre usa o esquerda-frente, que
+  só é o lado LONGO quando `colSpan >= rowSpan` (2x1, 3x1, 1x1 — todas as
+  pegadas testadas até então). Quando a Usina de Carvão virou 1x2
+  (`rowSpan > colSpan`, pra corrigir a orientação), esse lado passou a ser
+  o CURTO — perto demais do vértice (largura quase zero) — e o sprite
+  (que sempre mede a mesma largura, baseada só em `colSpan+rowSpan`, não
+  na orientação) vazou quase inteiro pra fora da pegada de um lado.
+  Medido: sprite de meia-largura 51 ancorado num ponto onde a pegada só
+  tinha 40 de largura local — span do sprite `[-111,-9]` contra a pegada
+  real (o vértice esquerdo sozinho já está em -80).
+- **Estado atual (`baseFootprintNaTela` com escolha condicional de
+  lado):** usa `rowSpan <= colSpan` pra decidir qual lado é o mais longo
+  — `pontoNaTela(col+colSpan/2, row+rowSpan)` quando a pegada é mais larga
+  que funda (ou quadrada), `pontoNaTela(col+colSpan, row+rowSpan/2)`
+  (o lado direita-frente) quando é mais funda que larga. Verificado que a
+  fórmula alternativa aplicada à Usina de Carvão 1x2 dá exatamente o mesmo
+  formato de span (`[-51,51]`, centralizado) que já estava aceito no caso
+  2x1 antigo — por simetria, não é um ajuste ad-hoc. **Ainda não zera o
+  gap** em nenhuma das duas pegadas — zerar exigiria ancorar no vértice
+  puro, que é exatamente a tentativa 2 que vaza. Resolver os dois
+  problemas por completo exigiria o sprite variar de largura conforme a
+  profundidade (tampo mais estreito perto da ponta), não só mover um
+  ponto de ancoragem fixo — fora do escopo por enquanto.
 
 **Z-index dinâmico por profundidade no grid:** cada `.fabrica-instancia`
 tem `z-index:2` fixo só como fallback no CSS — `posicionarInstancia`
