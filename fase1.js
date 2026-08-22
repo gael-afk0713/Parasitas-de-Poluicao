@@ -280,7 +280,10 @@ const FABRICAS = {
     nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
     descricao: 'Energia barata, alto custo ambiental.',
     custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
-    sprite: 'imagens/usina-carvao.png', celulasCol: 2, celulasRow: 1,
+    // pegada 1x2: os dois prédios (com as chaminés) ficam um atrás do
+    // outro no eixo de profundidade, não lado a lado — 2x1 tinha a
+    // orientação errada
+    sprite: 'imagens/usina-carvao.png', celulasCol: 1, celulasRow: 2,
     larguraImagemPx: 644, alturaImagemPx: 740,
   },
   'madeireira': {

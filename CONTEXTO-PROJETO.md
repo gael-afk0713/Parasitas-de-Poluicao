@@ -257,7 +257,7 @@ clampa pro grid (`0` a `GRID_N-1`), então mesmo o cursor fora do grid faz
 snap pra célula válida mais próxima.
 
 **Pegada multi-célula (footprint):** cada construção ocupa `celulasCol` x
-`celulasRow` células (não necessariamente 1x1 — a Usina de Carvão é 2x1, a
+`celulasRow` células (não necessariamente 1x1 — a Usina de Carvão é 1x2, a
 Usina de Água é 1x1). `centroFootprintNaTela(col, row, colSpan, rowSpan)`
 devolve o centro na tela de toda a pegada (generaliza o antigo
 `centroCelulaNaTela`, que só existia pra 1x1) — usado só pra elementos de
@@ -434,8 +434,11 @@ tamanho "auto" instável que parecia mudar de tamanho conforme a posição na
 tela. A correção está em `iniciarColocacao()`.
 
 **Rotação:** já existiu (tecla R + botão "Girar", trocava 2x1 por 1x2) e foi
-**removida a pedido do usuário** — a pegada da Usina de Carvão é fixa em 2x1
-hoje. A infraestrutura de pegada multi-célula continua toda lá; reintroduzir
+**removida a pedido do usuário** — a pegada da Usina de Carvão é fixa hoje.
+Ficou fixa em 2x1 por um tempo, mas isso era a orientação ERRADA pro
+desenho real do sprite (os dois prédios com chaminé ficam um atrás do
+outro no eixo de profundidade, não lado a lado) — corrigido pra 1x2. A
+infraestrutura de pegada multi-célula continua toda lá; reintroduzir
 rotação seria só voltar a trocar `colSpan`/`rowSpan` num botão/tecla, igual
 antes.
 
@@ -500,7 +503,7 @@ que rendem.
 
 | Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
-| Usina de Carvão | Fábrica | 2x1 | R$ 4.500 | R$ 225 | 15 | — |
+| Usina de Carvão | Fábrica | 1x2 | R$ 4.500 | R$ 225 | 15 | — |
 | Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
 | Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
 | Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
