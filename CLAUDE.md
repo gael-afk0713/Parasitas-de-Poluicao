@@ -33,3 +33,11 @@ dia, não uma licença geral pra ações irreversíveis sem aviso.
 - Perguntar antes de decisões de design ambíguas, em vez de assumir.
 - Atualizar o bloco `@media (prefers-reduced-motion: reduce)` sempre que
   uma animação nova for adicionada.
+- `style.css`, `script.js` e `fase1.js` são carregados com `?v=N` no
+  `<script>`/`<link>` de `index.html` e `fase1.html`, pra evitar que o
+  navegador sirva uma versão em cache depois de um deploy (sem isso, uma
+  correção publicada pode parecer "não aplicada" só por causa de cache).
+  **Sempre que editar um desses três arquivos, incrementar o `?v=N`
+  correspondente nos HTMLs que o carregam** (mesmo número pros dois, se
+  os dois `<script>`/`<link>` daquele arquivo existirem em ambos os
+  HTMLs).
