@@ -807,15 +807,35 @@ function centroFootprintNaTela(col, row, colSpan, rowSpan) {
 // (usada sem condição) ficou curta demais, sprite saindo quase inteiro
 // pro lado errado. Por isso a escolha da aresta depende de qual span é
 // maior — sempre a aresta do lado mais comprido da pegada.
+//
+// No lado ESCOLHIDO (o comprido), o ponto não pode ser o meio EXATO do
+// span (comprido/2) — bug real, achado depois de "resolvido": quando o
+// span comprido é PAR (2, 4...), a metade exata cai bem em cima da
+// fronteira entre duas células, e como o sprite só existe ACIMA do ponto
+// de ancoragem (nada dele fica "abaixo"), a célula da frente fica com
+// ZERO pixels de sprite (100%/0%, não um degradê) — foi exatamente o caso
+// da Usina de Carvão 1x2 (rowSpan=2, metade=1, cai na fronteira entre as
+// 2 células). Pra spans ÍMPARES (3, como a Madeireira) isso não acontecia
+// por acaso: metade de 3 é 1.5, no MEIO de uma célula, não na fronteira,
+// dando uma cobertura gradual (célula de trás cheia, célula da frente
+// parcial) em vez de tudo-ou-nada. Fórmula corrigida: em vez do meio do
+// span inteiro, usa o meio de UMA célula específica
+// (`Math.floor(span/2) + 0.5`) — nunca cai exatamente numa fronteira,
+// então nunca deixa uma célula 100% vazia. Continua sempre em cima da
+// mesma aresta (só muda ONDE ao longo dela), então continua dentro do
+// contorno real da pegada, sem reabrir o vazamento lateral.
 function baseFootprintNaTela(col, row, colSpan, rowSpan) {
   if (rowSpan <= colSpan) {
     // aresta esquerda->frente (mais comprida quando a pegada é mais
-    // larga que funda, ex: 2x1, 3x1): X no meio da pegada, Y na frente
-    return pontoNaTela(col + colSpan / 2, row + rowSpan);
+    // larga que funda, ex: 2x1, 3x1): X no meio de uma célula específica
+    // do lado comprido, Y na frente
+    const fracoColSpan = Math.floor(colSpan / 2) + 0.5;
+    return pontoNaTela(col + fracoColSpan, row + rowSpan);
   }
   // aresta direita->frente (mais comprida quando a pegada é mais funda
-  // que larga, ex: 1x2): X na frente, Y no meio da pegada
-  return pontoNaTela(col + colSpan, row + rowSpan / 2);
+  // que larga, ex: 1x2): X na frente, Y no meio de uma célula específica
+  const fracaoRowSpan = Math.floor(rowSpan / 2) + 0.5;
+  return pontoNaTela(col + colSpan, row + fracaoRowSpan);
 }
 
 // largura visual (no espaço da imagem) da pegada isométrica de

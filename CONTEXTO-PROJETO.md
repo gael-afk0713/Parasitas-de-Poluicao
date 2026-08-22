@@ -311,19 +311,45 @@ Tentativa 3 abaixo pra entender por que "mais longo" importa).
   Medido: sprite de meia-largura 51 ancorado num ponto onde a pegada só
   tinha 40 de largura local — span do sprite `[-111,-9]` contra a pegada
   real (o vértice esquerdo sozinho já está em -80).
-- **Estado atual (`baseFootprintNaTela` com escolha condicional de
-  lado):** usa `rowSpan <= colSpan` pra decidir qual lado é o mais longo
-  — `pontoNaTela(col+colSpan/2, row+rowSpan)` quando a pegada é mais larga
-  que funda (ou quadrada), `pontoNaTela(col+colSpan, row+rowSpan/2)`
+- **Tentativa 4 (escolha condicional de lado, sem cuidar de qual célula
+  específica):** usa `rowSpan <= colSpan` pra decidir qual lado é o mais
+  longo — `pontoNaTela(col+colSpan/2, row+rowSpan)` quando a pegada é mais
+  larga que funda (ou quadrada), `pontoNaTela(col+colSpan, row+rowSpan/2)`
   (o lado direita-frente) quando é mais funda que larga. Verificado que a
   fórmula alternativa aplicada à Usina de Carvão 1x2 dá exatamente o mesmo
   formato de span (`[-51,51]`, centralizado) que já estava aceito no caso
-  2x1 antigo — por simetria, não é um ajuste ad-hoc. **Ainda não zera o
-  gap** em nenhuma das duas pegadas — zerar exigiria ancorar no vértice
-  puro, que é exatamente a tentativa 2 que vaza. Resolver os dois
-  problemas por completo exigiria o sprite variar de largura conforme a
-  profundidade (tampo mais estreito perto da ponta), não só mover um
-  ponto de ancoragem fixo — fora do escopo por enquanto.
+  2x1 antigo — por simetria, não era um ajuste ad-hoc. **Bug** (achado
+  testando com o jogo de verdade, não só matemática): usar EXATAMENTE a
+  metade do lado comprido (`colSpan/2` ou `rowSpan/2`) é um problema
+  quando esse span é PAR — a metade exata cai bem em cima da fronteira
+  entre duas células, e como o sprite só existe ACIMA do ponto de
+  ancoragem (nada dele fica "abaixo"), a célula da frente fica
+  **completamente vazia de sprite** (0%, não um degradê). Pra spans
+  ÍMPARES (3, como a Madeireira) isso não acontecia por acaso: metade de 3
+  é 1,5, no MEIO de uma célula, não na fronteira — dando cobertura gradual
+  em vez de tudo-ou-nada. A Usina de Carvão 1x2 tem span comprido par
+  (rowSpan=2, metade=1) — bateu direto na fronteira, célula da frente 100%
+  vazia (visível e reportado pelo autor testando ao vivo: "a célula azul
+  mal tem pixels da construção"). O 2x1 antigo tinha o mesmo problema
+  (colSpan=2 também par) — só não foi tão notado porque a célula vazia
+  ficava do lado (menos "flutuante" visualmente que ficar embaixo de uma
+  chaminé alta).
+- **Estado atual (meio de uma CÉLULA específica, não do span inteiro):**
+  troca `colSpan/2`/`rowSpan/2` por `Math.floor(span/2) + 0.5` — sempre o
+  meio de uma célula, nunca uma fronteira exata, então nunca deixa uma
+  célula 100% vazia, pra span par ou ímpar. Pra spans ímpares (3) dá
+  exatamente o mesmo valor de antes (sem regressão na Madeireira,
+  verificado: posição idêntica antes/depois). Continua em cima da mesma
+  aresta (só muda ONDE ao longo dela), então continua dentro do contorno
+  real da pegada — sem reabrir o vazamento lateral. Verificado nos 3 casos
+  afetados hoje (Usina de Carvão 1x2, Estação de Tratamento 2x1): os
+  centros das duas células da pegada caem dentro da bounding box do
+  sprite renderizado, testado com o jogo de verdade rodando (não só a
+  fórmula isolada). **Ainda não zera o gap por completo** — zerar
+  exigiria ancorar no vértice puro, que é a tentativa 2 que vaza.
+  Resolver os dois problemas por completo exigiria o sprite variar de
+  largura conforme a profundidade (tampo mais estreito perto da ponta),
+  não só mover um ponto de ancoragem fixo — fora do escopo por enquanto.
 
 **Z-index dinâmico por profundidade no grid:** cada `.fabrica-instancia`
 tem `z-index:2` fixo só como fallback no CSS — `posicionarInstancia`
