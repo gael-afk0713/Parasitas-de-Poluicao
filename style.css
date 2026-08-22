@@ -1174,10 +1174,11 @@ footer{
   z-index:2; /* fallback só; fase1.js sobrescreve com style.zIndex por profundidade no grid (col+row) */
   pointer-events:none;
   /* a base (borda inferior) do sprite fica ancorada no ponto dado por
-     posicionarInstancia — que volta a ser o CENTRO geométrico do losango
-     da pegada (centroFootprintNaTela), não mais o vértice da frente. No
-     vértice a pegada tem largura zero, então um sprite retangular vazava
-     pros losangos vizinhos; no centro a pegada está na largura máxima. */
+     posicionarInstancia, via baseFootprintNaTela (ver fase1.js) — o meio
+     do lado do losango da pegada mais próximo do jogador, não o centro
+     geométrico nem o vértice da frente. Histórico completo (por que nem
+     um nem outro funcionam sozinhos) documentado no comentário de
+     baseFootprintNaTela em fase1.js. */
   transform:translate(-50%, -100%);
 }
 .fabrica-instancia .fabrica-sprite{

@@ -264,39 +264,53 @@ devolve o centro na tela de toda a pegada (generaliza o antigo
 UI que devem ficar "no meio" da pegada (barra de Confirmar/Cancelar,
 número flutuante de ganho).
 
-**Ancoragem do SPRITE em si usa a MESMA função `centroFootprintNaTela`**
-(não uma função separada) — histórico de idas e voltas nessa decisão,
-documentado aqui pra não reintroduzir nenhum dos dois bugs já resolvidos.
-`posicionarInstancia` define `left`/`top`/`width` do wrapper do sprite,
-com `transform:translate(-50%,-100%)` no CSS ancorando a BASE do sprite
-(borda inferior da imagem) no ponto dado por `centroFootprintNaTela` —
-ou seja, no centro geométrico do losango da pegada.
+**Ancoragem do SPRITE usa uma função PRÓPRIA, `baseFootprintNaTela`**
+(diferente de `centroFootprintNaTela`, que é só pra UI) — histórico de
+três tentativas nessa decisão, documentado aqui pra não repetir nenhuma
+das duas erradas. `posicionarInstancia` define `left`/`top`/`width` do
+wrapper do sprite, com `transform:translate(-50%,-100%)` no CSS ancorando
+a BASE do sprite (borda inferior da imagem) no ponto dado por
+`baseFootprintNaTela(col, row, colSpan, rowSpan)` =
+`pontoNaTela(col + colSpan/2, row + rowSpan)` — o meio do lado do losango
+da pegada mais próximo do jogador (X do centro, mas Y empurrado até a
+linha da frente, não até o vértice).
 
-- **Bug A (ancoragem no centro, versão original):** ancorar no centro
-  geométrico deixa a metade "da frente" do losango — do centro até o
-  vértice mais próximo do jogador — sem nenhum pixel de sprite em cima,
-  mesmo essas células estando ocupadas/reservadas. Numa pegada pequena
-  (1x1, 2x1) o efeito é sutil; numa pegada maior (3x1, como a Madeireira)
-  vira uma faixa de "chão vazio" na frente da construção.
-- **Tentativa de correção que criou um bug pior (ancoragem no vértice):**
-  pra cobrir a pegada inteira, uma versão anterior trocou o ponto de
-  ancoragem pro vértice do losango mais próximo do jogador
-  (`pontoNaTela(col+colSpan, row+rowSpan)`, então chamada
-  `baseFootprintNaTela`, hoje removida). Isso resolveu o "chão vazio" mas
-  causou um bug pior: um losango tem LARGURA ZERO exatamente nos vértices
-  e largura MÁXIMA no centro — ancorar um sprite retangular num ponto de
-  largura zero faz ele inevitavelmente vazar pros losangos vizinhos nas
-  pontas esquerda/direita, "invadindo" construções ao lado.
-- **Estado atual (revertido pro centro, aceito conscientemente):** de
-  volta ao centro geométrico via `centroFootprintNaTela`, que é o ponto de
-  largura MÁXIMA do losango — minimiza o vazamento lateral, ao custo de
-  reintroduzir o "chão vazio" na frente em pegadas bem alongadas (ex:
-  Madeireira 3x1). Trade-off aceito explicitamente pelo autor: invadir a
-  construção vizinha é pior que ter uma faixa vazia na frente. **Não
-  trocar pro vértice de novo sem resolver os dois problemas ao mesmo
-  tempo** (precisaria de um ponto de ancoragem que dependesse da LARGURA
-  real do sprite em cada X, não só um ponto fixo — fora do escopo por
-  enquanto).
+- **Tentativa 1 (ancoragem no centro geométrico, `centroFootprintNaTela`):**
+  deixa a metade "da frente" do losango — do centro até o vértice mais
+  próximo do jogador — sem nenhum pixel de sprite em cima, mesmo essas
+  células estando ocupadas/reservadas. Numa pegada pequena (1x1, 2x1) o
+  efeito é sutil; numa pegada maior (3x1, como a Madeireira) vira uma
+  faixa grande de "chão vazio" na frente da construção. Medido: gap de
+  17,5px (1x1) a 35px (3x1) entre a base do sprite e a ponta do losango,
+  numa tela de teste 1400x500.
+- **Tentativa 2 (ancoragem no vértice, X do centro + Y do vértice):** pra
+  cobrir a pegada inteira, uma versão anterior trocou o Y pro vértice do
+  losango mais próximo do jogador (`pontoNaTela(col+colSpan,
+  row+rowSpan).y`), mantendo o X do centro — função então chamada
+  `baseFootprintNaTela`, mas com essa fórmula errada (hoje sobrescrita).
+  Isso resolveu o "chão vazio" mas causou um bug pior, PROVADO
+  geometricamente: pra pegadas não-quadradas (colSpan != rowSpan, ou
+  seja, quase todas as construções do jogo), o ponto (X do centro, Y do
+  vértice) não pertence ao mesmo ponto do contorno real do losango — cai
+  literalmente FORA da forma, ao sul dela. Isso empurra o sprite inteiro
+  além da própria pegada, "invadindo" a linha de células seguinte.
+- **Estado atual (`baseFootprintNaTela` corrigida — meio do lado da
+  frente):** `pontoNaTela(col + colSpan/2, row + rowSpan)` — combina X e Y
+  do MESMO ponto da grade (ao contrário da tentativa 2, que misturava X de
+  um ponto com Y de outro), então fica sempre DENTRO do contorno real da
+  pegada, pra qualquer colSpan/rowSpan (provado algebricamente: é o ponto
+  médio do lado do losango mais próximo do jogador, não um ponto
+  arbitrário). Reduz o gap da tentativa 1 pela metade (17,5px→8,7px na
+  Usina de Água; 35px→26,2px na Madeireira), sem reabrir o vazamento
+  lateral da tentativa 2 — testado com 2 Madeireiras vizinhas lado a lado,
+  o overlap horizontal das bounding boxes ficou EXATAMENTE igual ao que já
+  existia com o centro puro (14px, pré-existente, não uma regressão).
+  **Não zera o gap** — zerar exigiria ancorar no vértice puro, que é
+  exatamente a tentativa 2 que vaza. Essa troca (gap pela metade vs.
+  vazamento lateral zero) foi medida e aceita conscientemente pelo autor.
+  Resolver os dois problemas por completo exigiria o sprite variar de
+  largura conforme a profundidade (tampo mais estreito perto da ponta),
+  não só mover um ponto de ancoragem fixo — fora do escopo por enquanto.
 
 **Z-index dinâmico por profundidade no grid:** cada `.fabrica-instancia`
 tem `z-index:2` fixo só como fallback no CSS — `posicionarInstancia`

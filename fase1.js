@@ -764,21 +764,43 @@ function celulaMaisProxima(mx, my) {
 
 // centro na tela de uma pegada de colSpan x rowSpan células, começando
 // em (col, row) — pra pegada 1x1 isso é o mesmo que o centro da célula.
-// Também é o ponto de ancoragem do SPRITE (ver posicionarInstancia): a
-// base do sprite (borda inferior, por causa do transform:translate(-50%,
-// -100%) em .fabrica-instancia) fica encostada bem no centro do losango.
-//
-// Histórico: cheguei a trocar isso pelo vértice do losango mais próximo
-// do jogador (achando que resolvia um "chão vazio" na frente de pegadas
-// grandes) — mas o vértice tem LARGURA ZERO, e um sprite retangular
-// ancorado ali vaza pros losangos vizinhos nas pontas esquerda/direita.
-// O centro é o ponto de largura MÁXIMA do losango, então minimiza esse
-// vazamento lateral — o "chão vazio" na frente volta a existir em
-// pegadas bem alongadas (ex: Madeireira 3x1), mas é um problema visual
-// bem menor que invadir a construção vizinha. Não trocar pro vértice de
-// novo sem resolver as duas coisas ao mesmo tempo.
+// Usado só por elementos de UI que devem ficar "no meio" da pegada (barra
+// de Confirmar/Cancelar, número flutuante de ganho) — NÃO é usado pro
+// anchor do sprite, ver baseFootprintNaTela logo abaixo.
 function centroFootprintNaTela(col, row, colSpan, rowSpan) {
   return pontoNaTela(col + colSpan / 2, row + rowSpan / 2);
+}
+
+// ponto de ancoragem do SPRITE (usado só por posicionarInstancia): a base
+// do sprite (borda inferior, por causa do transform:translate(-50%,-100%)
+// em .fabrica-instancia) fica encostada aqui. NÃO é o mesmo ponto de
+// centroFootprintNaTela — histórico de duas tentativas erradas antes
+// dessa, não repetir nenhuma das duas:
+//
+// 1) Ancorar no centro geométrico do losango (== centroFootprintNaTela):
+//    deixa a metade "da frente" da pegada sem nenhum pixel de sprite em
+//    cima — quanto maior a pegada (colSpan+rowSpan), maior o buraco.
+// 2) Ancorar no vértice do losango mais próximo do jogador (col+colSpan,
+//    row+rowSpan), com X vindo do centro e Y vindo do vértice: o vértice
+//    tem LARGURA ZERO, então um sprite retangular ancorado ali (mesmo só
+//    no Y) vaza pros losangos vizinhos nas pontas esquerda/direita. Pior
+//    ainda: pra pegadas não-quadradas (colSpan != rowSpan) esse ponto
+//    híbrido cai FORA do contorno real da pegada (provado geometricamente
+//    — o X do centro e o Y do vértice não pertencem ao mesmo ponto do
+//    contorno quando a pegada não é quadrada), ou seja, nem "vértice"
+//    ele é de verdade.
+//
+// Esse ponto aqui (col+colSpan/2, row+rowSpan) é o meio do lado do
+// losango mais próximo do jogador — fica sempre DENTRO do contorno real
+// da pegada (isso vale pra qualquer colSpan/rowSpan, não só quadrada),
+// então não vaza pro lado. Reduz o buraco da frente pela metade em
+// relação ao centro puro, mas não zera — zerar exigiria ancorar no
+// vértice, que é exatamente o que causa o vazamento lateral acima. Essa
+// troca (buraco pequeno vs. vazamento zero) foi aceita conscientemente;
+// não trocar por uma ancoragem mais funda sem resolver o vazamento
+// lateral ao mesmo tempo.
+function baseFootprintNaTela(col, row, colSpan, rowSpan) {
+  return pontoNaTela(col + colSpan / 2, row + rowSpan);
 }
 
 // largura visual (no espaço da imagem) da pegada isométrica de
@@ -829,7 +851,7 @@ function escalaAtual() {
 }
 
 function posicionarInstancia(instancia) {
-  const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
+  const ponto = baseFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
   instancia.wrapper.style.left = ponto.x + 'px';
   instancia.wrapper.style.top = ponto.y + 'px';
   instancia.wrapper.style.width = (instancia.larguraImagem * escalaAtual()) + 'px';
