@@ -281,18 +281,19 @@ const ICONES_CONSTRUCAO = {
 // só porque a pegada deles no grid é pequena ou grande (ver comentário
 // completo em tamanhoRenderizado, logo abaixo de FABRICAS)
 //
-// Valores rebalanceados pra meta de R$1.500.000 / 15.000 de poluição
-// (antes: R$90.000 / colapso em 6.000) — verificado por simulação que um
-// jogador que constrói um parque inicial e depois só deixa acumular bate
-// as duas metas quase juntas; um jogador que reinveste tudo sem parar
-// ultrapassa a poluição MUITO antes de juntar o dinheiro (e arrisca bater
-// no LIMIAR_COLAPSO, ver mais abaixo) — de propósito, reforça que ganância
-// sem freio é punida.
+// Preço/ganho/poluição das construções voltaram aos valores ORIGINAIS
+// (não escalados) — só META_DINHEIRO/META_POLUICAO/LIMIAR_COLAPSO (ver
+// mais abaixo) e a mecânica nova de penalidadeGanhoAdjacencia mudaram.
+// Uma tentativa anterior escalou preço/ganho/poluição das 6 construções
+// em ~16,7x/2,5x junto com as metas novas — rejeitada pelo autor, que só
+// queria as METAS maiores, não o preço/ganho de cada construção. Aceito
+// conscientemente: com o ganho original (bem menor), bater a meta de
+// R$1.500.000 agora exige uma sessão bem mais longa que antes.
 const FABRICAS = {
   'usina-carvao': {
     nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
     descricao: 'Energia barata, alto custo ambiental.',
-    custo: 75000, ganhoPorTick: 3750, poluicaoPorTick: 38,
+    custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
     // pegada 1x2: os dois prédios (com as chaminés) ficam um atrás do
     // outro no eixo de profundidade, não lado a lado — 2x1 tinha a
     // orientação errada
@@ -302,7 +303,7 @@ const FABRICAS = {
   'madeireira': {
     nome: 'Madeireira', categoria: 'Fábrica', icone: 'madeireira',
     descricao: 'Desmatamento: mais barata, rende menos, polui menos.',
-    custo: 58000, ganhoPorTick: 2700, poluicaoPorTick: 20,
+    custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
     // pegada larga (3x1): o desenho real é bem espalhado na horizontal
     // (pilha de toras + galpão + tábuas lado a lado) — o tamanho
     // renderizado em si já ficava bom nessa pegada
@@ -312,7 +313,7 @@ const FABRICAS = {
   'refinaria-petroleo': {
     nome: 'Refinaria de Petróleo', categoria: 'Fábrica', icone: 'refinaria',
     descricao: 'A mais lucrativa — e a mais suja. Ganho pesado, poluição desproporcional.',
-    custo: 200000, ganhoPorTick: 10000, poluicaoPorTick: 120,
+    custo: 12000, ganhoPorTick: 600, poluicaoPorTick: 48,
     // pegada compacta (2x2): o desenho real é praticamente quadrado
     // (torres sobem mais do que se espalham no chão)
     sprite: 'imagens/refinaria-petroleo.png', celulasCol: 2, celulasRow: 2,
@@ -321,14 +322,14 @@ const FABRICAS = {
   'usina-agua': {
     nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
     descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
-    custo: 50000, ganhoPorTick: 1700, poluicaoPorTick: 5, bonusAdjacencia: 0.20,
+    custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
     sprite: 'imagens/usina-agua.png', celulasCol: 1, celulasRow: 1,
     larguraImagemPx: 414, alturaImagemPx: 1299,
   },
   'usina-eolica': {
     nome: 'Usina Eólica', categoria: 'Usina', icone: 'eolica',
     descricao: 'Quase não polui e reduz a poluição das vizinhas — mas também reduz um pouco o ganho delas.',
-    custo: 42000, ganhoPorTick: 1000, poluicaoPorTick: 2,
+    custo: 2500, ganhoPorTick: 60, poluicaoPorTick: 1,
     reducaoPoluicaoAdjacencia: 0.25, penalidadeGanhoAdjacencia: -0.10,
     sprite: 'imagens/usina-eolica.png', celulasCol: 1, celulasRow: 1,
     larguraImagemPx: 474, alturaImagemPx: 1327,
@@ -336,8 +337,8 @@ const FABRICAS = {
   'estacao-tratamento': {
     nome: 'Estação de Tratamento', categoria: 'Usina', icone: 'tratamento',
     descricao: 'Não rende nada e é cara — mas limpa poluição da região inteira. Reduz o ganho das vizinhas: ser sustentável tem seu preço.',
-    custo: 150000, ganhoPorTick: 0, poluicaoPorTick: 0,
-    reducaoGlobalPorTick: 25, penalidadeGanhoAdjacencia: -0.20,
+    custo: 5000, ganhoPorTick: 0, poluicaoPorTick: 0,
+    reducaoGlobalPorTick: 20, penalidadeGanhoAdjacencia: -0.20,
     // pegada 2x1: são dois tanques lado a lado, mais larga que uma
     // construção de célula única
     sprite: 'imagens/estacao-tratamento.png', celulasCol: 2, celulasRow: 1,
@@ -426,9 +427,7 @@ function precoAtual(tipo) {
   return Math.round(config.custo * Math.pow(MULTIPLICADOR_CUSTO_REPETIDO, quantidade));
 }
 
-// precisa escalar junto com os custos rebalanceados (~16,7x) — senão o
-// jogador não consegue nem comprar a primeira construção
-let dinheiro = 83000;
+let dinheiro = 5000;
 let poluicaoTotal = 0;
 let totalFabricas = 0;
 let tempoJogadoAcumulado = 0; // segundos, restaurado do progresso salvo (se houver)
@@ -773,11 +772,11 @@ setInterval(aplicarFiscalizacao, FISCALIZACAO_INTERVALO_MS);
 // crescer MUITO, o que exige poluir MUITO: vitória passa a exigir as duas
 // metas (dinheiro E poluição), não só dinheiro. LIMIAR_COLAPSO fica bem
 // acima de META_POLUICAO (não colado nela) — dá margem pra quem joga com
-// algum cuidado bater as duas metas sem flertar com colapso sem querer,
-// mas ainda pune quem constrói sem nenhum freio (testado por simulação:
-// reinvestir tudo sem parar cruza LIMIAR_COLAPSO bem antes de juntar
-// META_DINHEIRO — de propósito, reforça que ganância sem limite colapsa
-// a empresa antes dela enriquecer).
+// algum cuidado bater as duas metas sem flertar com colapso sem querer.
+// Só as METAS subiram (90.000→1.500.000 dinheiro, colapso 6.000→20.000,
+// poluição 15.000 é nova) — preço/ganho/poluição de cada construção
+// continuam nos valores originais (ver comentário em FABRICAS), então
+// bater META_DINHEIRO numa sessão só demora bem mais que antes.
 const META_DINHEIRO = 1500000;
 const META_POLUICAO = 15000;
 const LIMIAR_COLAPSO = 20000;

@@ -538,18 +538,20 @@ rende dinheiro nenhum (`ganhoPorTick: 0`) — é puramente uma ferramenta de
 mitigação, o preço dela compete por espaço no orçamento contra construções
 que rendem.
 
-**Valores atuais** (rebalanceados pra meta de R$1.500.000/15.000 de
-poluição — ver seção "Rebalanceamento econômico + neblina de poluição"
-mais abaixo pro histórico completo dessa mudança):
+**Valores atuais** (preço/ganho/poluição continuam nos valores ORIGINAIS
+— uma tentativa anterior escalou tudo ~16,7x/2,5x junto com as metas
+novas, rejeitada pelo autor: só as METAS deviam ter mudado, não o preço/
+ganho de cada construção; ver seção "Rebalanceamento econômico + neblina
+de poluição" mais abaixo pro histórico completo):
 
 | Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
-| Usina de Carvão | Fábrica | 1x2 | R$ 75.000 | R$ 3.750 | 38 | — |
-| Madeireira | Fábrica | 3x1 | R$ 58.000 | R$ 2.700 | 20 | mais barata, rende menos, polui menos que o carvão |
-| Refinaria de Petróleo | Fábrica | 2x2 | R$ 200.000 | R$ 10.000 | 120 | a mais lucrativa E a mais suja — ganho/poluição é o pior da lista |
-| Usina de Água | Usina | 1x1 | R$ 50.000 | R$ 1.700 | 5 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
-| Usina Eólica | Usina | 1x1 | R$ 42.000 | R$ 1.000 | 2 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%), `penalidadeGanhoAdjacencia` -10%/vizinha (piso -40%) |
-| Estação de Tratamento | Usina | 2x1 | R$ 150.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -25 (fixo, jogo inteiro, todo tick), `penalidadeGanhoAdjacencia` -20%/vizinha (piso -40%) |
+| Usina de Carvão | Fábrica | 1x2 | R$ 4.500 | R$ 225 | 15 | — |
+| Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
+| Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | a mais lucrativa E a mais suja — ganho/poluição é o pior da lista |
+| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
+| Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%), `penalidadeGanhoAdjacencia` -10%/vizinha (piso -40%) |
+| Estação de Tratamento | Usina | 2x1 | R$ 5.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -20 (fixo, jogo inteiro, todo tick), `penalidadeGanhoAdjacencia` -20%/vizinha (piso -40%) |
 
 As pegadas de Madeireira/Refinaria/Estação foram ajustadas depois que a
 arte final (PNG) chegou, substituindo os chutes originais feitos em cima
@@ -875,27 +877,22 @@ empresa a esse ponto), não é só um reajuste de números.
 `META_POLUICAO` = 15.000 (nova), `LIMIAR_COLAPSO` = 20.000 (era 6.000).
 `verificarFimDeJogo()` agora exige as DUAS metas pra vitória
 (`dinheiro >= META_DINHEIRO && poluicaoTotal >= META_POLUICAO`), não só
-dinheiro — não dá pra vencer sem ter poluído bastante. `dinheiro` inicial
-subiu de 5.000 pra 83.000 (tem que escalar junto com os custos, senão o
-jogador não consegue comprar nem a primeira construção).
+dinheiro — não dá pra vencer sem ter poluído bastante.
 
-**Validado por simulação numérica** (script Python fora do repo, não por
-matemática de cabeça) antes de aplicar: um jogador "disciplinado" (constrói
-um parque inicial nos primeiros minutos, depois só deixa acumular sem
-comprar mais nada) bate as duas metas quase juntas (poluição fica entre
-84%-134% da meta no momento em que o dinheiro cruza 1,5M). Um jogador
-"guloso" (reinveste tudo, sempre construindo mais) ultrapassa a meta de
-poluição em ~20x antes de juntar o dinheiro — porque poluição acumula sem
-filtro (soma pura, tick a tick, sem desconto por reinvestimento) enquanto
-"dinheiro líquido" é renda MENOS o que foi reinvestido em novas
-construções, então cresce bem mais devagar. `LIMIAR_COLAPSO` = 20.000 foi
-calibrado pra isso: alto o suficiente pra não pegar o jogador cuidadoso de
-surpresa, baixo o suficiente pra realmente punir quem constrói sem
-nenhum freio (o guloso da simulação cruzaria o colapso bem antes de
-enriquecer). Essa dinâmica (ganância sem limite colapsa a empresa antes
-dela enriquecer) foi um achado feliz da simulação, não um acidente — mas
-é bom saber que ela existe caso o balanceamento precise de ajuste fino
-depois de playtesting humano de verdade.
+**Bug real corrigido nessa passada, não repetir: só as METAS deviam
+subir, não o preço/ganho/poluição de cada construção nem o dinheiro
+inicial.** Uma primeira tentativa escalou TUDO junto (~16,7x
+ganho/custo, ~2,5x poluição, dinheiro inicial 5.000→83.000), validado por
+simulação numérica (script Python fora do repo) antes de aplicar e
+mostrado ao autor pra revisão — mas o autor só tinha pedido que as DUAS
+METAS subissem, não a tabela de preço/ganho de cada construção. Revertido
+por completo: `custo`/`ganhoPorTick`/`poluicaoPorTick` de todas as 6
+construções e `dinheiro` inicial voltaram aos valores originais (ver
+tabela "Valores atuais" acima) — só `META_DINHEIRO`/`META_POLUICAO`/
+`LIMIAR_COLAPSO` continuam nos valores novos. Consequência aceita
+conscientemente pelo autor: com o ganho original (bem menor), bater
+R$1.500.000 numa sessão demora bem mais que os ~10-15min de antes — não é
+um problema a resolver, é a escolha de design confirmada.
 
 **`penalidadeGanhoAdjacencia`** (mecânica nova, mesmo padrão de
 `bonusAdjacencia`/`reducaoPoluicaoAdjacencia` — ver `calcularGanhoInstancia`
@@ -905,9 +902,13 @@ deixa cair mais que 40% só por vizinhança). Aplicado na Usina Eólica
 (-10%) e na Estação de Tratamento (-20%) — as duas construções que já
 reduziam poluição de outras agora também atrapalham o ganho de quem
 produz do lado, de propósito: "ser do bem" tem custo real, não é só
-benefício de graça. Testado com o jogo de verdade (Playwright, fluxo real
-de colocação): Usina de Carvão isolada rende R$3.750/tick; com uma Usina
-Eólica vizinha, cai pra R$3.375/tick (exatamente ×0,90, bate com a conta).
+benefício de graça. **Essa mecânica NÃO foi revertida** junto com os
+números (não era o que o autor estava reclamando) — continua ativa com
+os valores de preço/ganho originais. Testado com o jogo de verdade
+(Playwright, fluxo real de colocação, antes da reversão dos números):
+Usina de Carvão isolada rendia R$3.750/tick; com uma Usina Eólica
+vizinha, caía pra R$3.375/tick (exatamente ×0,90) — mesma relação
+proporcional continua valendo com os números originais (R$225 → R$203).
 
 **Neblina de poluição** (feedback visual ambiental, por ESTÁGIOS — não
 partícula-por-unidade, com meta em 15.000 isso quebraria performance):
