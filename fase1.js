@@ -272,6 +272,11 @@ const ICONES_CONSTRUCAO = {
 // reducaoPoluicaoAdjacencia = fração de POLUIÇÃO a menos que essa
 // construção tira de CADA vizinha ortogonal (ver calcularPoluicaoInstancia)
 // — é o "oposto" do bônus de ganho, efeito diferente, não empilha com ele.
+// aumentoPoluicaoAdjacencia = fração de POLUIÇÃO a MAIS que essa
+// construção soma em CADA vizinha ortogonal (número positivo, "oposto"
+// do reducaoPoluicaoAdjacencia) — a Usina de Água turbina ganho E
+// poluição de quem está do lado, de propósito: o bônus de ganho não é
+// de graça, cerca ela de fábricas e a poluição sobe junto com o lucro.
 // reducaoGlobalPorTick = quanto essa construção tira do poluicaoTotal
 // GERAL a cada tick (não é adjacência, não depende de vizinhança).
 // larguraImagemPx/alturaImagemPx = dimensão NATIVA (em pixels) do arquivo
@@ -281,14 +286,17 @@ const ICONES_CONSTRUCAO = {
 // só porque a pegada deles no grid é pequena ou grande (ver comentário
 // completo em tamanhoRenderizado, logo abaixo de FABRICAS)
 //
-// Preço/ganho/poluição das construções voltaram aos valores ORIGINAIS
-// (não escalados) — só META_DINHEIRO/META_POLUICAO/LIMIAR_COLAPSO (ver
-// mais abaixo) e a mecânica nova de penalidadeGanhoAdjacencia mudaram.
-// Uma tentativa anterior escalou preço/ganho/poluição das 6 construções
-// em ~16,7x/2,5x junto com as metas novas — rejeitada pelo autor, que só
-// queria as METAS maiores, não o preço/ganho de cada construção. Aceito
-// conscientemente: com o ganho original (bem menor), bater a meta de
-// R$1.500.000 agora exige uma sessão bem mais longa que antes.
+// Preço/ganho/poluição BASE das construções continuam nos valores
+// ORIGINAIS (não escalados) — só META_DINHEIRO/META_POLUICAO/
+// LIMIAR_COLAPSO (ver mais abaixo) mudaram de escala; uma tentativa
+// anterior de escalar preço/ganho/poluição das 6 construções junto foi
+// rejeitada pelo autor (ver CONTEXTO-PROJETO.md pro histórico). O que
+// MUDOU dessa vez foram as mecânicas de adjacência: reforçar a mensagem
+// "crescer exige poluir, e ferramentas 'limpas' têm custo real" —
+// Eólica agora penaliza mais o ganho de quem está do lado (evita encher
+// o mapa de Eólica), Água agora aumenta a poluição de quem está do lado
+// (o bônus de ganho dela não é de graça), Estação de Tratamento ficou
+// mais cara e limpa menos por tick.
 const FABRICAS = {
   'usina-carvao': {
     nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
@@ -321,24 +329,25 @@ const FABRICAS = {
   },
   'usina-agua': {
     nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
-    descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
-    custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
+    descricao: 'Turbina o ganho das vizinhas — mas também turbina a poluição delas.',
+    custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2,
+    bonusAdjacencia: 0.20, aumentoPoluicaoAdjacencia: 0.20,
     sprite: 'imagens/usina-agua.png', celulasCol: 1, celulasRow: 1,
     larguraImagemPx: 414, alturaImagemPx: 1299,
   },
   'usina-eolica': {
     nome: 'Usina Eólica', categoria: 'Usina', icone: 'eolica',
-    descricao: 'Quase não polui e reduz a poluição das vizinhas — mas também reduz um pouco o ganho delas.',
+    descricao: 'Quase não polui e reduz a poluição das vizinhas — mas reduz bastante o ganho delas também: cercar tudo de Eólica sai caro.',
     custo: 2500, ganhoPorTick: 60, poluicaoPorTick: 1,
-    reducaoPoluicaoAdjacencia: 0.25, penalidadeGanhoAdjacencia: -0.10,
+    reducaoPoluicaoAdjacencia: 0.25, penalidadeGanhoAdjacencia: -0.20,
     sprite: 'imagens/usina-eolica.png', celulasCol: 1, celulasRow: 1,
     larguraImagemPx: 474, alturaImagemPx: 1327,
   },
   'estacao-tratamento': {
     nome: 'Estação de Tratamento', categoria: 'Usina', icone: 'tratamento',
-    descricao: 'Não rende nada e é cara — mas limpa poluição da região inteira. Reduz o ganho das vizinhas: ser sustentável tem seu preço.',
-    custo: 5000, ganhoPorTick: 0, poluicaoPorTick: 0,
-    reducaoGlobalPorTick: 20, penalidadeGanhoAdjacencia: -0.20,
+    descricao: 'Não rende nada e é bem cara — e o quanto limpa é modesto perto do preço. Reduz o ganho das vizinhas: ser sustentável tem seu preço.',
+    custo: 9000, ganhoPorTick: 0, poluicaoPorTick: 0,
+    reducaoGlobalPorTick: 12, penalidadeGanhoAdjacencia: -0.20,
     // pegada 2x1: são dois tanques lado a lado, mais larga que uma
     // construção de célula única
     sprite: 'imagens/estacao-tratamento.png', celulasCol: 2, celulasRow: 1,
@@ -351,9 +360,13 @@ const FABRICAS = {
 // cercar uma fábrica de usinas vira ganho infinito ou poluição zerada.
 // PENALIDADE_ADJACENCIA_MAX é negativo (é um piso, não um teto): o ganho
 // não pode cair mais que 40% só por causa de vizinhas "limpas" ao redor.
+// AUMENTO_POLUICAO_ADJACENCIA_MAX é o espelho de REDUCAO_ADJACENCIA_MAX:
+// a poluição de uma construção não pode SUBIR mais que 50% só por causa
+// de vizinhas que aumentam poluição (ex: Usina de Água).
 const BONUS_ADJACENCIA_MAX = 0.60;
 const REDUCAO_ADJACENCIA_MAX = 0.50;
 const PENALIDADE_ADJACENCIA_MAX = -0.40;
+const AUMENTO_POLUICAO_ADJACENCIA_MAX = 0.50;
 
 // ---- melhoria e venda de construções já colocadas (clique numa
 // construção construída pra abrir #painel-instancia) ----
@@ -585,14 +598,18 @@ function calcularPoluicaoInstancia(instancia) {
   const config = FABRICAS[instancia.tipo];
   if (!config.poluicaoPorTick) return 0;
   let reducao = 0;
+  let aumento = 0;
   for (const outra of instanciasConstruidas) {
     if (outra === instancia) continue;
     const configOutra = FABRICAS[outra.tipo];
-    if (!configOutra.reducaoPoluicaoAdjacencia) continue;
-    if (footprintsVizinhos(instancia, outra)) reducao += configOutra.reducaoPoluicaoAdjacencia;
+    if (!configOutra.reducaoPoluicaoAdjacencia && !configOutra.aumentoPoluicaoAdjacencia) continue;
+    if (!footprintsVizinhos(instancia, outra)) continue;
+    if (configOutra.reducaoPoluicaoAdjacencia) reducao += configOutra.reducaoPoluicaoAdjacencia;
+    if (configOutra.aumentoPoluicaoAdjacencia) aumento += configOutra.aumentoPoluicaoAdjacencia;
   }
   reducao = Math.min(reducao, REDUCAO_ADJACENCIA_MAX);
-  return Math.round(config.poluicaoPorTick * multiplicadorUpgrade(instancia) * (1 - reducao) * configDificuldade().multPoluicao);
+  aumento = Math.min(aumento, AUMENTO_POLUICAO_ADJACENCIA_MAX);
+  return Math.round(config.poluicaoPorTick * multiplicadorUpgrade(instancia) * (1 - reducao + aumento) * configDificuldade().multPoluicao);
 }
 
 function mostrarNumeroFlutuante(instancia, texto, classeExtra) {

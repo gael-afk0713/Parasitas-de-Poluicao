@@ -549,9 +549,9 @@ de poluição" mais abaixo pro histórico completo):
 | Usina de Carvão | Fábrica | 1x2 | R$ 4.500 | R$ 225 | 15 | — |
 | Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
 | Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | a mais lucrativa E a mais suja — ganho/poluição é o pior da lista |
-| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
-| Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%), `penalidadeGanhoAdjacencia` -10%/vizinha (piso -40%) |
-| Estação de Tratamento | Usina | 2x1 | R$ 5.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -20 (fixo, jogo inteiro, todo tick), `penalidadeGanhoAdjacencia` -20%/vizinha (piso -40%) |
+| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%), `aumentoPoluicaoAdjacencia` +20%/vizinha (teto 50%) |
+| Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%), `penalidadeGanhoAdjacencia` -20%/vizinha (piso -40%) |
+| Estação de Tratamento | Usina | 2x1 | R$ 9.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -12 (fixo, jogo inteiro, todo tick), `penalidadeGanhoAdjacencia` -20%/vizinha (piso -40%) |
 
 As pegadas de Madeireira/Refinaria/Estação foram ajustadas depois que a
 arte final (PNG) chegou, substituindo os chutes originais feitos em cima
@@ -899,16 +899,35 @@ um problema a resolver, é a escolha de design confirmada.
 em `fase1.js`): fração NEGATIVA de ganho que uma construção tira de CADA
 vizinha ortogonal, com piso em `PENALIDADE_ADJACENCIA_MAX` = -0.40 (não
 deixa cair mais que 40% só por vizinhança). Aplicado na Usina Eólica
-(-10%) e na Estação de Tratamento (-20%) — as duas construções que já
-reduziam poluição de outras agora também atrapalham o ganho de quem
-produz do lado, de propósito: "ser do bem" tem custo real, não é só
+(-20%, era -10%) e na Estação de Tratamento (-20%) — as duas construções
+que já reduziam poluição de outras agora também atrapalham o ganho de
+quem produz do lado, de propósito: "ser do bem" tem custo real, não é só
 benefício de graça. **Essa mecânica NÃO foi revertida** junto com os
 números (não era o que o autor estava reclamando) — continua ativa com
 os valores de preço/ganho originais. Testado com o jogo de verdade
-(Playwright, fluxo real de colocação, antes da reversão dos números):
-Usina de Carvão isolada rendia R$3.750/tick; com uma Usina Eólica
-vizinha, caía pra R$3.375/tick (exatamente ×0,90) — mesma relação
-proporcional continua valendo com os números originais (R$225 → R$203).
+(Playwright, fluxo real de colocação): Usina de Carvão isolada rende
+R$225/tick; com uma Usina Eólica vizinha, cai pra R$180/tick (×0,80, bate
+com a conta do -20% atual).
+
+**Segunda rodada de ajuste nas usinas "auxiliares"** (pedido do autor,
+depois da reversão dos números): a meta de dinheiro subiu de propósito
+pra empurrar o jogador a maximizar ganho e se importar menos com
+poluição — junto disso, as ferramentas de mitigação precisavam ficar
+menos "óbvias de usar em excesso":
+- **Usina Eólica**: `penalidadeGanhoAdjacencia` de -10% pra -20% —
+  cercar uma fábrica de Eólicas agora dói bem mais no ganho (e, como o
+  efeito vale pra QUALQUER vizinha incluindo outras Eólicas, também
+  desincentiva empilhar muitas delas juntas).
+- **Usina de Água**: ganhou `aumentoPoluicaoAdjacencia` = 0.20 (mecânica
+  nova, espelho de `reducaoPoluicaoAdjacencia` — ver
+  `calcularPoluicaoInstancia`, teto em `AUMENTO_POLUICAO_ADJACENCIA_MAX`
+  = 0.50). Antes só dava bônus de ganho (`bonusAdjacencia` +20%) sem
+  nenhuma desvantagem; agora turbina ganho E poluição das vizinhas na
+  mesma proporção — o bônus deixa de ser "de graça".
+- **Estação de Tratamento**: `custo` de R$5.000 pra R$9.000 (quase o
+  dobro) e `reducaoGlobalPorTick` de 20 pra 12 (40% menos eficaz) — mais
+  cara e limpa menos por tick, sem mexer no `penalidadeGanhoAdjacencia`
+  (continua -20%, não foi repedido).
 
 **Neblina de poluição** (feedback visual ambiental, por ESTÁGIOS — não
 partícula-por-unidade, com meta em 15.000 isso quebraria performance):
