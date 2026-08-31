@@ -264,6 +264,11 @@ const ICONES_CONSTRUCAO = {
 // tick de TICK_ECONOMIA_MS (multiplicado pela quantidade possuída).
 // bonusAdjacencia = fração extra de GANHO que essa construção dá a CADA
 // vizinha ortogonal (ver calcularGanhoInstancia).
+// penalidadeGanhoAdjacencia = fração de GANHO a MENOS que essa construção
+// tira de CADA vizinha ortogonal (número negativo, mesma mecânica do
+// bônus só que ao contrário) — as construções "limpas" (que reduzem
+// poluição de outras) atrapalham a operação de quem produz do lado,
+// de propósito: ser sustentável tem custo real, não é só ganho de graça.
 // reducaoPoluicaoAdjacencia = fração de POLUIÇÃO a menos que essa
 // construção tira de CADA vizinha ortogonal (ver calcularPoluicaoInstancia)
 // — é o "oposto" do bônus de ganho, efeito diferente, não empilha com ele.
@@ -275,11 +280,19 @@ const ICONES_CONSTRUCAO = {
 // muito largos-e-baixos (galpões) não ficarem com altura/largura absurda
 // só porque a pegada deles no grid é pequena ou grande (ver comentário
 // completo em tamanhoRenderizado, logo abaixo de FABRICAS)
+//
+// Valores rebalanceados pra meta de R$1.500.000 / 15.000 de poluição
+// (antes: R$90.000 / colapso em 6.000) — verificado por simulação que um
+// jogador que constrói um parque inicial e depois só deixa acumular bate
+// as duas metas quase juntas; um jogador que reinveste tudo sem parar
+// ultrapassa a poluição MUITO antes de juntar o dinheiro (e arrisca bater
+// no LIMIAR_COLAPSO, ver mais abaixo) — de propósito, reforça que ganância
+// sem freio é punida.
 const FABRICAS = {
   'usina-carvao': {
     nome: 'Usina de Carvão', categoria: 'Fábrica', icone: 'fabrica',
     descricao: 'Energia barata, alto custo ambiental.',
-    custo: 4500, ganhoPorTick: 225, poluicaoPorTick: 15,
+    custo: 75000, ganhoPorTick: 3750, poluicaoPorTick: 38,
     // pegada 1x2: os dois prédios (com as chaminés) ficam um atrás do
     // outro no eixo de profundidade, não lado a lado — 2x1 tinha a
     // orientação errada
@@ -289,7 +302,7 @@ const FABRICAS = {
   'madeireira': {
     nome: 'Madeireira', categoria: 'Fábrica', icone: 'madeireira',
     descricao: 'Desmatamento: mais barata, rende menos, polui menos.',
-    custo: 3500, ganhoPorTick: 160, poluicaoPorTick: 8,
+    custo: 58000, ganhoPorTick: 2700, poluicaoPorTick: 20,
     // pegada larga (3x1): o desenho real é bem espalhado na horizontal
     // (pilha de toras + galpão + tábuas lado a lado) — o tamanho
     // renderizado em si já ficava bom nessa pegada
@@ -298,8 +311,8 @@ const FABRICAS = {
   },
   'refinaria-petroleo': {
     nome: 'Refinaria de Petróleo', categoria: 'Fábrica', icone: 'refinaria',
-    descricao: 'Ganho pesado, poluição desproporcional. Alto risco.',
-    custo: 12000, ganhoPorTick: 600, poluicaoPorTick: 48,
+    descricao: 'A mais lucrativa — e a mais suja. Ganho pesado, poluição desproporcional.',
+    custo: 200000, ganhoPorTick: 10000, poluicaoPorTick: 120,
     // pegada compacta (2x2): o desenho real é praticamente quadrado
     // (torres sobem mais do que se espalham no chão)
     sprite: 'imagens/refinaria-petroleo.png', celulasCol: 2, celulasRow: 2,
@@ -308,21 +321,23 @@ const FABRICAS = {
   'usina-agua': {
     nome: 'Usina de Água', categoria: 'Usina', icone: 'usina',
     descricao: 'Pouca poluição; turbina o ganho das vizinhas.',
-    custo: 3000, ganhoPorTick: 100, poluicaoPorTick: 2, bonusAdjacencia: 0.20,
+    custo: 50000, ganhoPorTick: 1700, poluicaoPorTick: 5, bonusAdjacencia: 0.20,
     sprite: 'imagens/usina-agua.png', celulasCol: 1, celulasRow: 1,
     larguraImagemPx: 414, alturaImagemPx: 1299,
   },
   'usina-eolica': {
     nome: 'Usina Eólica', categoria: 'Usina', icone: 'eolica',
-    descricao: 'Quase não polui; reduz a poluição das vizinhas.',
-    custo: 2500, ganhoPorTick: 60, poluicaoPorTick: 1, reducaoPoluicaoAdjacencia: 0.25,
+    descricao: 'Quase não polui e reduz a poluição das vizinhas — mas também reduz um pouco o ganho delas.',
+    custo: 42000, ganhoPorTick: 1000, poluicaoPorTick: 2,
+    reducaoPoluicaoAdjacencia: 0.25, penalidadeGanhoAdjacencia: -0.10,
     sprite: 'imagens/usina-eolica.png', celulasCol: 1, celulasRow: 1,
     larguraImagemPx: 474, alturaImagemPx: 1327,
   },
   'estacao-tratamento': {
     nome: 'Estação de Tratamento', categoria: 'Usina', icone: 'tratamento',
-    descricao: 'Não rende nada; limpa poluição acumulada da região inteira.',
-    custo: 5000, ganhoPorTick: 0, poluicaoPorTick: 0, reducaoGlobalPorTick: 20,
+    descricao: 'Não rende nada e é cara — mas limpa poluição da região inteira. Reduz o ganho das vizinhas: ser sustentável tem seu preço.',
+    custo: 150000, ganhoPorTick: 0, poluicaoPorTick: 0,
+    reducaoGlobalPorTick: 25, penalidadeGanhoAdjacencia: -0.20,
     // pegada 2x1: são dois tanques lado a lado, mais larga que uma
     // construção de célula única
     sprite: 'imagens/estacao-tratamento.png', celulasCol: 2, celulasRow: 1,
@@ -332,9 +347,12 @@ const FABRICAS = {
 
 // tetos globais: uma construção não pode ganhar mais que +60% de ganho
 // nem perder mais que -50% de poluição só de vizinhança — sem isso,
-// cercar uma fábrica de usinas vira ganho infinito ou poluição zerada
+// cercar uma fábrica de usinas vira ganho infinito ou poluição zerada.
+// PENALIDADE_ADJACENCIA_MAX é negativo (é um piso, não um teto): o ganho
+// não pode cair mais que 40% só por causa de vizinhas "limpas" ao redor.
 const BONUS_ADJACENCIA_MAX = 0.60;
 const REDUCAO_ADJACENCIA_MAX = 0.50;
+const PENALIDADE_ADJACENCIA_MAX = -0.40;
 
 // ---- melhoria e venda de construções já colocadas (clique numa
 // construção construída pra abrir #painel-instancia) ----
@@ -408,7 +426,9 @@ function precoAtual(tipo) {
   return Math.round(config.custo * Math.pow(MULTIPLICADOR_CUSTO_REPETIDO, quantidade));
 }
 
-let dinheiro = 5000;
+// precisa escalar junto com os custos rebalanceados (~16,7x) — senão o
+// jogador não consegue nem comprar a primeira construção
+let dinheiro = 83000;
 let poluicaoTotal = 0;
 let totalFabricas = 0;
 let tempoJogadoAcumulado = 0; // segundos, restaurado do progresso salvo (se houver)
@@ -439,10 +459,13 @@ function atualizarCartasFabricas() {
   });
 }
 
-// níveis de severidade visual do HUD de poluição — puramente estético
-// por enquanto, sem nenhum efeito de jogo além do aviso narrativo abaixo
-const LIMIAR_POLUICAO_ATENCAO = 500;
-const LIMIAR_POLUICAO_CRITICO = 1500;
+// níveis de severidade visual do HUD de poluição — puramente estético,
+// sem efeito de jogo além do aviso narrativo abaixo. Valores = 25%/75%
+// de META_POLUICAO (15.000, definida mais abaixo junto de META_DINHEIRO)
+// — mesmos cortes usados pelos estágios da neblina de poluição (ver
+// ESTAGIOS_NEBLINA), pra HUD e neblina concordarem sobre "o que é grave".
+const LIMIAR_POLUICAO_ATENCAO = 3750;
+const LIMIAR_POLUICAO_CRITICO = 11250;
 let avisoPoluicaoMostrado = false;
 
 function atualizarHudPoluicao() {
@@ -456,6 +479,54 @@ function atualizarHudPoluicao() {
     forte.textContent = 'níveis críticos';
     mostrarToast('Os índices de poluição da região já atingem ', forte, '. A floresta ao redor sente cada usina.');
   }
+  atualizarNeblinaPoluicao();
+}
+
+// ============ NEBLINA DE POLUIÇÃO (feedback visual ambiental) ============
+// por ESTÁGIOS (faixa de poluição), não uma partícula por unidade — com
+// a meta em 15.000 isso quebraria a performance. Reaproveita o mesmo
+// mecanismo de partículas caindo do menu principal (.fuligem/.particula
+// em style.css, lógica de geração em script.js), só trocando quantidade/
+// opacidade/velocidade por estágio, mais uma camada de neblina que fica
+// mais forte (ver .neblina-filtro no CSS) — no estágio mais alto ela
+// também dessatura a cena (mix-blend-mode:saturation), puxando pro
+// acinzentado sem precisar aplicar filter em cada elemento da cena.
+const ESTAGIOS_NEBLINA = [
+  { limiar: 0 },
+  { limiar: 3750, particulas: 8, opacidadeMin: 0.15, opacidadeMax: 0.30, duracaoMin: 14, duracaoMax: 20 },
+  { limiar: 7500, particulas: 18, opacidadeMin: 0.30, opacidadeMax: 0.45, duracaoMin: 9, duracaoMax: 14 },
+  { limiar: 11250, particulas: 30, opacidadeMin: 0.40, opacidadeMax: 0.60, duracaoMin: 5, duracaoMax: 9 },
+];
+const campoNeblina = document.getElementById('neblina-poluicao');
+const filtroNeblina = document.getElementById('neblina-filtro');
+let estagioNeblinaAtual = -1; // -1 força a primeira aplicação, mesmo no estágio 0
+
+function atualizarNeblinaPoluicao() {
+  let indice = 0;
+  for (let i = 1; i < ESTAGIOS_NEBLINA.length; i++) {
+    if (poluicaoTotal >= ESTAGIOS_NEBLINA[i].limiar) indice = i;
+  }
+  if (indice === estagioNeblinaAtual) return; // já está no estágio certo, não remonta à toa
+  estagioNeblinaAtual = indice;
+  const estagio = ESTAGIOS_NEBLINA[indice];
+
+  if (campoNeblina) {
+    campoNeblina.innerHTML = '';
+    for (let i = 0; i < (estagio.particulas || 0); i++) {
+      const p = document.createElement('div');
+      p.className = 'particula';
+      const duracao = estagio.duracaoMin + Math.random() * (estagio.duracaoMax - estagio.duracaoMin);
+      const tamanho = 2 + Math.random() * 2;
+      p.style.left = Math.random() * 100 + 'vw';
+      p.style.width = tamanho + 'px';
+      p.style.height = tamanho + 'px';
+      p.style.animationDuration = duracao + 's';
+      p.style.animationDelay = '-' + (Math.random() * duracao) + 's';
+      p.style.opacity = (estagio.opacidadeMin + Math.random() * (estagio.opacidadeMax - estagio.opacidadeMin)).toFixed(2);
+      campoNeblina.appendChild(p);
+    }
+  }
+  if (filtroNeblina) filtroNeblina.dataset.estagio = String(indice);
 }
 
 function pulsarGanhoNoHud() {
@@ -485,20 +556,26 @@ function footprintsVizinhos(a, b) {
   return false;
 }
 
-// ganho efetivo de UMA instância construída no tick atual, já somando o
-// bônus de todas as vizinhas ortogonais com bonusAdjacencia (ex: Usina
-// de Água), respeitando o teto BONUS_ADJACENCIA_MAX
+// ganho efetivo de UMA instância construída no tick atual: soma o bônus
+// de vizinhas com bonusAdjacencia (ex: Usina de Água) E desconta a
+// penalidade de vizinhas com penalidadeGanhoAdjacencia (ex: Usina Eólica,
+// Estação de Tratamento — "ser do bem" atrapalha quem produz do lado),
+// respeitando os tetos BONUS_ADJACENCIA_MAX/PENALIDADE_ADJACENCIA_MAX
 function calcularGanhoInstancia(instancia) {
   const config = FABRICAS[instancia.tipo];
   let bonus = 0;
+  let penalidade = 0;
   for (const outra of instanciasConstruidas) {
     if (outra === instancia) continue;
     const configOutra = FABRICAS[outra.tipo];
-    if (!configOutra.bonusAdjacencia) continue;
-    if (footprintsVizinhos(instancia, outra)) bonus += configOutra.bonusAdjacencia;
+    if (!configOutra.bonusAdjacencia && !configOutra.penalidadeGanhoAdjacencia) continue;
+    if (!footprintsVizinhos(instancia, outra)) continue;
+    if (configOutra.bonusAdjacencia) bonus += configOutra.bonusAdjacencia;
+    if (configOutra.penalidadeGanhoAdjacencia) penalidade += configOutra.penalidadeGanhoAdjacencia;
   }
   bonus = Math.min(bonus, BONUS_ADJACENCIA_MAX);
-  return Math.round(config.ganhoPorTick * (1 + bonus) * multiplicadorUpgrade(instancia) * configDificuldade().multGanho);
+  penalidade = Math.max(penalidade, PENALIDADE_ADJACENCIA_MAX);
+  return Math.round(config.ganhoPorTick * (1 + bonus + penalidade) * multiplicadorUpgrade(instancia) * configDificuldade().multGanho);
 }
 
 // poluição efetiva de UMA instância no tick atual, já descontando a
@@ -692,11 +769,18 @@ function aplicarFiscalizacao() {
 setInterval(aplicarFiscalizacao, FISCALIZACAO_INTERVALO_MS);
 
 // ============ META DE VITÓRIA / COLAPSO DA EMPRESA ============
-// aumentados em +50% em relação ao valor original (60000/4000) — com 6
-// construções diferentes agora, o jogo precisa de mais fôlego pra dar
-// tempo de experimentar a economia toda antes de acabar
-const META_CAIXA = 90000;
-const LIMIAR_COLAPSO = 6000;
+// o objetivo da Fase 1 deixou de ser "crescer evitando poluir" — agora é
+// crescer MUITO, o que exige poluir MUITO: vitória passa a exigir as duas
+// metas (dinheiro E poluição), não só dinheiro. LIMIAR_COLAPSO fica bem
+// acima de META_POLUICAO (não colado nela) — dá margem pra quem joga com
+// algum cuidado bater as duas metas sem flertar com colapso sem querer,
+// mas ainda pune quem constrói sem nenhum freio (testado por simulação:
+// reinvestir tudo sem parar cruza LIMIAR_COLAPSO bem antes de juntar
+// META_DINHEIRO — de propósito, reforça que ganância sem limite colapsa
+// a empresa antes dela enriquecer).
+const META_DINHEIRO = 1500000;
+const META_POLUICAO = 15000;
+const LIMIAR_COLAPSO = 20000;
 let jogoEncerrado = null; // null | 'colapso' | 'vitoria'
 
 function segundosJogados() {
@@ -732,13 +816,15 @@ function verificarFimDeJogo() {
   if (poluicaoTotal >= LIMIAR_COLAPSO) {
     jogoEncerrado = 'colapso';
     mostrarTelaColapso();
-  } else if (dinheiro >= META_CAIXA) {
+  } else if (dinheiro >= META_DINHEIRO && poluicaoTotal >= META_POLUICAO) {
     jogoEncerrado = 'vitoria';
     mostrarTelaVitoria();
   }
 }
 const hudMetaEl = document.getElementById('hud-meta');
-if (hudMetaEl) hudMetaEl.textContent = 'meta ' + formatarDinheiro(META_CAIXA);
+if (hudMetaEl) hudMetaEl.textContent = 'meta ' + formatarDinheiro(META_DINHEIRO);
+const hudMetaPoluicaoEl = document.getElementById('hud-meta-poluicao');
+if (hudMetaPoluicaoEl) hudMetaPoluicaoEl.textContent = 'meta ' + META_POLUICAO.toLocaleString('pt-BR');
 
 // ============ COLOCAÇÃO DE FÁBRICAS NO GRID ============
 function chaveCelula(col, row) {

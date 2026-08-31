@@ -7,12 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=1">
+<link rel="stylesheet" href="style.css?v=2">
 </head>
 <body class="fase1-body">
 
   <div class="fase1-bg" aria-hidden="true"></div>
   <canvas id="grid-fase1" class="fase1-grid"></canvas>
+  <div class="neblina-filtro" id="neblina-filtro" aria-hidden="true"></div>
+  <div class="fuligem neblina-poluicao" id="neblina-poluicao" aria-hidden="true"></div>
 
   <div class="boas-vindas" id="boas-vindas" aria-hidden="true"></div>
 
@@ -24,7 +26,7 @@
     <div class="hud-stat">
       <span class="hud-stat-texto">
         <span class="hud-stat-rotulo">Caixa</span>
-        <span class="hud-stat-valor" id="hud-dinheiro">R$ 5.000</span>
+        <span class="hud-stat-valor" id="hud-dinheiro">R$ 83.000</span>
         <span class="hud-stat-meta" id="hud-meta"></span>
       </span>
     </div>
@@ -47,6 +49,7 @@
       <div class="hud-stat-texto">
         <span class="hud-stat-rotulo">Poluição</span>
         <span class="hud-stat-valor" id="hud-poluicao">0</span>
+        <span class="hud-stat-meta" id="hud-meta-poluicao"></span>
       </div>
     </div>
   </header>
@@ -123,9 +126,11 @@
       <p class="painel-rotulo">Fase 1 Completa</p>
       <h2 class="painel-titulo">Expansão Garantida</h2>
       <p class="painel-explicacao">
-        Sua empresa atingiu a meta de caixa — o crescimento que você buscou
-        desde o início. Mas nada disso veio de graça: o rastro ambiental já
-        está posto, e ele não desaparece só porque o balanço fechou no azul.
+        Sua empresa atingiu a meta de caixa — e a de poluição junto. Não
+        foi um efeito colateral: não existia caminho pra esse tanto de
+        dinheiro sem esse tanto de rastro ambiental. O crescimento que você
+        buscou desde o início veio exatamente do jeito que a lógica da
+        empresa sempre previu.
       </p>
       <ul class="painel-lista painel-lista--stats">
         <li><span>Tempo jogado</span><strong id="vitoria-tempo">—</strong></li>
@@ -170,6 +175,6 @@
     </div>
   </section>
 
-<script type="module" src="fase1.js?v=3"></script>
+<script type="module" src="fase1.js?v=4"></script>
 </body>
 </html>

@@ -538,16 +538,18 @@ rende dinheiro nenhum (`ganhoPorTick: 0`) — é puramente uma ferramenta de
 mitigação, o preço dela compete por espaço no orçamento contra construções
 que rendem.
 
-**Valores atuais** (ajustar aqui se rebalancear):
+**Valores atuais** (rebalanceados pra meta de R$1.500.000/15.000 de
+poluição — ver seção "Rebalanceamento econômico + neblina de poluição"
+mais abaixo pro histórico completo dessa mudança):
 
 | Construção | categoria | pegada | custo base | ganho/tick | poluição/tick | mecanismo especial |
 |---|---|---|---|---|---|---|
-| Usina de Carvão | Fábrica | 1x2 | R$ 4.500 | R$ 225 | 15 | — |
-| Madeireira | Fábrica | 3x1 | R$ 3.500 | R$ 160 | 8 | mais barata, rende menos, polui menos que o carvão |
-| Refinaria de Petróleo | Fábrica | 2x2 | R$ 12.000 | R$ 600 | 48 | ganho pesado, poluição desproporcional — alto risco/retorno |
-| Usina de Água | Usina | 1x1 | R$ 3.000 | R$ 100 | 2 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
-| Usina Eólica | Usina | 1x1 | R$ 2.500 | R$ 60 | 1 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%) |
-| Estação de Tratamento | Usina | 2x1 | R$ 5.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -20 (fixo, jogo inteiro, todo tick) |
+| Usina de Carvão | Fábrica | 1x2 | R$ 75.000 | R$ 3.750 | 38 | — |
+| Madeireira | Fábrica | 3x1 | R$ 58.000 | R$ 2.700 | 20 | mais barata, rende menos, polui menos que o carvão |
+| Refinaria de Petróleo | Fábrica | 2x2 | R$ 200.000 | R$ 10.000 | 120 | a mais lucrativa E a mais suja — ganho/poluição é o pior da lista |
+| Usina de Água | Usina | 1x1 | R$ 50.000 | R$ 1.700 | 5 | `bonusAdjacencia` +20%/vizinha (teto 60%) |
+| Usina Eólica | Usina | 1x1 | R$ 42.000 | R$ 1.000 | 2 | `reducaoPoluicaoAdjacencia` -25%/vizinha (teto 50%), `penalidadeGanhoAdjacencia` -10%/vizinha (piso -40%) |
+| Estação de Tratamento | Usina | 2x1 | R$ 150.000 | R$ 0 | 0 | `reducaoGlobalPorTick` -25 (fixo, jogo inteiro, todo tick), `penalidadeGanhoAdjacencia` -20%/vizinha (piso -40%) |
 
 As pegadas de Madeireira/Refinaria/Estação foram ajustadas depois que a
 arte final (PNG) chegou, substituindo os chutes originais feitos em cima
@@ -672,14 +674,15 @@ ao longo da partida — é intencional, cria uma rampa de pressão que fica
 pesada perto do limiar de colapso.
 
 **Meta de vitória / colapso** (`verificarFimDeJogo()`, chamada no fim de
-todo `tickEconomia`): `META_CAIXA` = 90000 e `LIMIAR_COLAPSO` = 6000 (+50%
-em relação aos valores anteriores — reajustados quando as 4 construções
-novas entraram, porque o ganho/tick disponível subiu bastante com a
-Refinaria e a Madeireira, e as metas antigas ficavam curtas demais/rápidas
-demais em cima do novo teto de ganho) são **iguais nas três dificuldades** — só a VELOCIDADE de chegar neles muda
-(via os multiplicadores acima), não os alvos. Colapso é checado antes da
-vitória (se os dois baterem no mesmo tick, colapso ganha — o tema do jogo é
-que o crescimento insustentável cobra a conta). `jogoEncerrado` (`null` |
+todo `tickEconomia`): `META_DINHEIRO` = 1.500.000, `META_POLUICAO` =
+15.000, `LIMIAR_COLAPSO` = 20.000 — ver seção "Rebalanceamento econômico +
+neblina de poluição" mais abaixo pro histórico completo (por que a
+vitória passou a exigir as DUAS metas, não só dinheiro). São **iguais nas
+três dificuldades** — só a VELOCIDADE de chegar neles muda (via os
+multiplicadores acima), não os alvos. Colapso é checado antes da vitória
+(se poluição já bateu LIMIAR_COLAPSO, colapso ganha mesmo que dinheiro já
+tenha batido a meta no mesmo tick — o tema do jogo é que o crescimento
+insustentável cobra a conta). `jogoEncerrado` (`null` |
 `'colapso'` | `'vitoria'`) trava novas construções
 (`iniciarColocacao`/`btnFabricas.disabled`) e mostra uma tela cheia
 (`#tela-vitoria` / `#tela-colapso`, reaproveitam o padrão `.painel`) com
@@ -861,6 +864,82 @@ só não autosalva nem restaura nada. **Os dados de verdade (os 3 slots, com
 `progresso` de cada um) vivem no Firestore** (`usuarios/{uid}`, ver seções
 acima), não mais no `localStorage`.
 
+### Rebalanceamento econômico + neblina de poluição
+
+Mudança de design deliberada: o objetivo da Fase 1 deixou de ser "crescer
+evitando poluir" e passou a ser "crescer MUITO, o que exige poluir MUITO"
+— reforça a mensagem central do jogo (a lógica perversa que levou a
+empresa a esse ponto), não é só um reajuste de números.
+
+**Novas metas**: `META_DINHEIRO` = 1.500.000 (era 90.000),
+`META_POLUICAO` = 15.000 (nova), `LIMIAR_COLAPSO` = 20.000 (era 6.000).
+`verificarFimDeJogo()` agora exige as DUAS metas pra vitória
+(`dinheiro >= META_DINHEIRO && poluicaoTotal >= META_POLUICAO`), não só
+dinheiro — não dá pra vencer sem ter poluído bastante. `dinheiro` inicial
+subiu de 5.000 pra 83.000 (tem que escalar junto com os custos, senão o
+jogador não consegue comprar nem a primeira construção).
+
+**Validado por simulação numérica** (script Python fora do repo, não por
+matemática de cabeça) antes de aplicar: um jogador "disciplinado" (constrói
+um parque inicial nos primeiros minutos, depois só deixa acumular sem
+comprar mais nada) bate as duas metas quase juntas (poluição fica entre
+84%-134% da meta no momento em que o dinheiro cruza 1,5M). Um jogador
+"guloso" (reinveste tudo, sempre construindo mais) ultrapassa a meta de
+poluição em ~20x antes de juntar o dinheiro — porque poluição acumula sem
+filtro (soma pura, tick a tick, sem desconto por reinvestimento) enquanto
+"dinheiro líquido" é renda MENOS o que foi reinvestido em novas
+construções, então cresce bem mais devagar. `LIMIAR_COLAPSO` = 20.000 foi
+calibrado pra isso: alto o suficiente pra não pegar o jogador cuidadoso de
+surpresa, baixo o suficiente pra realmente punir quem constrói sem
+nenhum freio (o guloso da simulação cruzaria o colapso bem antes de
+enriquecer). Essa dinâmica (ganância sem limite colapsa a empresa antes
+dela enriquecer) foi um achado feliz da simulação, não um acidente — mas
+é bom saber que ela existe caso o balanceamento precise de ajuste fino
+depois de playtesting humano de verdade.
+
+**`penalidadeGanhoAdjacencia`** (mecânica nova, mesmo padrão de
+`bonusAdjacencia`/`reducaoPoluicaoAdjacencia` — ver `calcularGanhoInstancia`
+em `fase1.js`): fração NEGATIVA de ganho que uma construção tira de CADA
+vizinha ortogonal, com piso em `PENALIDADE_ADJACENCIA_MAX` = -0.40 (não
+deixa cair mais que 40% só por vizinhança). Aplicado na Usina Eólica
+(-10%) e na Estação de Tratamento (-20%) — as duas construções que já
+reduziam poluição de outras agora também atrapalham o ganho de quem
+produz do lado, de propósito: "ser do bem" tem custo real, não é só
+benefício de graça. Testado com o jogo de verdade (Playwright, fluxo real
+de colocação): Usina de Carvão isolada rende R$3.750/tick; com uma Usina
+Eólica vizinha, cai pra R$3.375/tick (exatamente ×0,90, bate com a conta).
+
+**Neblina de poluição** (feedback visual ambiental, por ESTÁGIOS — não
+partícula-por-unidade, com meta em 15.000 isso quebraria performance):
+reaproveita o MESMO mecanismo de partículas caindo do menu principal
+(`.fuligem`/`.particula`, já existente em `style.css`/`script.js`), só
+trocando quantidade/opacidade/velocidade por estágio, controlado por
+`ESTAGIOS_NEBLINA` em `fase1.js` e `atualizarNeblinaPoluicao()` (chamada
+de dentro de `atualizarHudPoluicao()`, só remonta as partículas quando o
+ESTÁGIO muda de verdade, não a cada tick):
+
+| Estágio | Faixa de poluição | Partículas | Opacidade | Velocidade de queda |
+|---|---|---|---|---|
+| 0 | 0 – 3.749 | 0 | — | — |
+| 1 | 3.750 – 7.499 | 8 | 0,15–0,30 | 14–20s |
+| 2 | 7.500 – 11.249 | 18 | 0,30–0,45 | 9–14s |
+| 3 | 11.250+ | 30 (teto, nunca mais) | 0,40–0,60 | 5–9s |
+
+Além das partículas, `.neblina-filtro` (novo elemento em `fase1.html`, CSS
+em `style.css`) é uma camada de gradiente com opacidade crescente por
+estágio (10%/22%/38%) — no estágio 3 ela também troca pra
+`mix-blend-mode:saturation` com uma cor neutra (`--paper-dim`), dessaturando
+a cena inteira (fundo + grid + construções) por baixo dela sem precisar
+aplicar `filter` em cada elemento separado. `LIMIAR_POLUICAO_ATENCAO`/
+`CRITICO` (cor do número no HUD) foram realinhados pros mesmos cortes
+(3.750/11.250), pra HUD e neblina concordarem sobre "o que é grave".
+Z-index em 34-35: acima de todas as construções (faixa dinâmica ~2-30),
+abaixo da UI da Fase 1 (40+) — cobre a cena sem tapar HUD/painéis.
+`.particula` já está coberto pelo bloco `@media (prefers-reduced-motion)`
+existente (a regra não é específica do menu, pega qualquer `.particula`);
+adicionei `.neblina-filtro{transition:none}` no mesmo bloco pra cobrir a
+transição de opacidade nova.
+
 ## Preferências de fluxo de trabalho do autor
 
 - **Editar arquivos existentes de forma pontual** (tipo find & replace) —
@@ -880,8 +959,9 @@ acima), não mais no `localStorage`.
 
 - **Venda e melhoria por instância** (clicar numa construção do grid) só
   afeta a métrica principal dela (ganho, ou a redução global da Estação de
-  Tratamento) — não escala `bonusAdjacencia`/`reducaoPoluicaoAdjacencia`
-  (os efeitos que uma construção dá às vizinhas). Foi decisão deliberada
+  Tratamento) — não escala `bonusAdjacencia`/`reducaoPoluicaoAdjacencia`/
+  `penalidadeGanhoAdjacencia` (os efeitos que uma construção dá às
+  vizinhas, positivos ou negativos). Foi decisão deliberada
   pra não empilhar upgrade com adjacência de forma difícil de comunicar no
   card/painel, mas é um ponto de rebalanceamento possível se upgrade em
   Usina de Água/Eólica parecer fraco perto de melhorar uma Fábrica.
@@ -960,10 +1040,13 @@ acima), não mais no `localStorage`.
   mandou os PNGs, já trocados em `FABRICAS` e commitados; os SVGs foram
   removidos do repositório (ver seção de imagens no topo do arquivo).
 - Valores de balanceamento (multiplicadores de dificuldade, `FATOR_MULTA`,
-  `FISCALIZACAO_INTERVALO_MS`, `META_CAIXA` = 90000, `LIMIAR_COLAPSO` = 6000,
-  custo/ganho/poluição das 6 construções) são ajustados por raciocínio +
-  automação de navegador, não por playtesting humano longo — vale jogar de
-  verdade pra sentir o ritmo e ajustar se ainda estiver monótono ou rápido
+  `FISCALIZACAO_INTERVALO_MS`, `META_DINHEIRO` = 1.500.000, `META_POLUICAO`
+  = 15.000, `LIMIAR_COLAPSO` = 20.000, custo/ganho/poluição das 6
+  construções) são ajustados por raciocínio + simulação numérica (script
+  Python fora do repo, testando estratégias "guloso" vs "constrói e
+  deixa acumular") + automação de navegador — não por playtesting humano
+  longo. Vale jogar de verdade pra sentir o ritmo e ajustar se ainda
+  estiver monótono ou rápido
   demais.
 - Painel de Configurações (Esc / engrenagem) cobre salvar/menu/sair — não
   tem ainda opções de áudio, idioma, ou dificuldade-em-tempo-real (a

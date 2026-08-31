@@ -794,6 +794,36 @@ footer{
   pointer-events:none;
 }
 
+/* ============ NEBLINA DE POLUIÇÃO (Fase 1) ============ */
+/* fica acima de todas as construções (faixa dinâmica ~2-30, ver
+   .fabrica-instancia) mas abaixo da UI da Fase 1 (40+) — cobre a cena
+   sem tapar HUD/painéis. Estágio (0-3) controlado por fase1.js via
+   atualizarNeblinaPoluicao(), guardado em data-estagio/quantidade de
+   .particula — ver ESTAGIOS_NEBLINA lá pros números de cada estágio. */
+.neblina-poluicao{
+  z-index:35;
+}
+.neblina-filtro{
+  position:fixed;
+  inset:0;
+  z-index:34;
+  pointer-events:none;
+  background:linear-gradient(180deg, rgba(157,148,127,0.55) 0%, rgba(157,148,127,0.18) 45%, transparent 75%);
+  opacity:0;
+  transition:opacity 2.5s ease;
+}
+.neblina-filtro[data-estagio="1"]{opacity:0.10;}
+.neblina-filtro[data-estagio="2"]{opacity:0.22;}
+.neblina-filtro[data-estagio="3"]{
+  opacity:0.38;
+  /* só no estágio mais alto: dessatura a cena inteira por baixo (fundo,
+     grid, construções) sem precisar de filter em cada elemento — o
+     blend "saturation" impõe a saturação (bem baixa) desta camada sobre
+     a luminosidade/matiz de tudo que está atrás dela */
+  background:var(--paper-dim);
+  mix-blend-mode:saturation;
+}
+
 .hud-fase1{
   position:fixed;
   top:0;
@@ -1286,6 +1316,7 @@ footer{
   .fabrica-tinta--sucesso, .fabrica-tinta--erro{animation:none !important;opacity:0.6 !important;}
   .numero-flutuante{animation:none !important;opacity:0.9;transform:translate(-50%, -14px) !important;}
   .hud-stat-valor.pulso-ganho, .hud-stat-valor.pulso-multa{animation:none !important;}
+  .neblina-filtro{transition:none !important;}
 }
 
 /* ---- HUD da fase 1 em telas estreitas: empilha em vez de estourar a
