@@ -960,6 +960,25 @@ existente (a regra não é específica do menu, pega qualquer `.particula`);
 adicionei `.neblina-filtro{transition:none}` no mesmo bloco pra cobrir a
 transição de opacidade nova.
 
+**Atualização — partículas com mais variedade + meta de poluição saiu do
+HUD**: o usuário achou os pontinhos originais "sem graça". Em vez de mexer
+em `.particula`/`.fuligem` (compartilhada com o menu — mudar ali mudaria a
+fuligem do `index.html` também, sem pedido pra isso), criei uma classe nova
+só da Fase 1: `.particula-fumaca` (blob borrado com gradiente radial,
+`filter:blur`, cresce de escala e rotaciona caindo — `@keyframes
+cair-fumaca`, direção oposta ao `cair` original pra dar mais sensação de
+dispersão). Em `atualizarNeblinaPoluicao()`, 1 a cada 3 partículas geradas
+agora é um blob de fumaça em vez de ponto — mistura os dois tipos em todos
+os estágios. No estágio 3 (crítico) a fumaça troca pra
+`.particula-fumaca--critica`, com um gradiente puxando pro `--rust`
+(mesma cor de aviso/perigo usada em outros lugares do jogo), reforçando que
+aquele é o estágio mais grave. Bloco `prefers-reduced-motion` ganhou
+`.particula-fumaca{animation:none;opacity:0.3;transform:none}` junto.
+Também removi o `<span id="hud-meta-poluicao">` do HUD (mostrava "meta
+15.000" embaixo do número de Poluição) — o HUD de Poluição agora só mostra
+o valor atual, sem meta visível; a meta de Caixa (`hud-meta`, "meta R$
+1.500.000") continua normalmente, não foi pedido pra tirar essa.
+
 ## Preferências de fluxo de trabalho do autor
 
 - **Editar arquivos existentes de forma pontual** (tipo find & replace) —

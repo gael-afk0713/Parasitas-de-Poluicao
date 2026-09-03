@@ -526,13 +526,18 @@ function atualizarNeblinaPoluicao() {
     campoNeblina.innerHTML = '';
     for (let i = 0; i < (estagio.particulas || 0); i++) {
       const p = document.createElement('div');
-      p.className = 'particula';
+      // 1 em cada 3 partículas vira um "blob" de fumaça borrado (mais volume/
+      // profundidade) em vez de ponto sólido — mistura visual, ver .particula-fumaca
+      const ehFumaca = i % 3 === 2;
+      p.className = ehFumaca
+        ? 'particula-fumaca' + (indice === 3 ? ' particula-fumaca--critica' : '')
+        : 'particula';
       const duracao = estagio.duracaoMin + Math.random() * (estagio.duracaoMax - estagio.duracaoMin);
-      const tamanho = 2 + Math.random() * 2;
+      const tamanho = ehFumaca ? 10 + Math.random() * 14 : 2 + Math.random() * 2;
       p.style.left = Math.random() * 100 + 'vw';
       p.style.width = tamanho + 'px';
       p.style.height = tamanho + 'px';
-      p.style.animationDuration = duracao + 's';
+      p.style.animationDuration = (ehFumaca ? duracao * 1.3 : duracao) + 's';
       p.style.animationDelay = '-' + (Math.random() * duracao) + 's';
       p.style.opacity = (estagio.opacidadeMin + Math.random() * (estagio.opacidadeMax - estagio.opacidadeMin)).toFixed(2);
       campoNeblina.appendChild(p);
@@ -839,8 +844,6 @@ function verificarFimDeJogo() {
 }
 const hudMetaEl = document.getElementById('hud-meta');
 if (hudMetaEl) hudMetaEl.textContent = 'meta ' + formatarDinheiro(META_DINHEIRO);
-const hudMetaPoluicaoEl = document.getElementById('hud-meta-poluicao');
-if (hudMetaPoluicaoEl) hudMetaPoluicaoEl.textContent = 'meta ' + META_POLUICAO.toLocaleString('pt-BR');
 
 // ============ COLOCAÇÃO DE FÁBRICAS NO GRID ============
 function chaveCelula(col, row) {

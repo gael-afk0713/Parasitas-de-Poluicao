@@ -799,9 +799,31 @@ footer{
    .fabrica-instancia) mas abaixo da UI da Fase 1 (40+) — cobre a cena
    sem tapar HUD/painéis. Estágio (0-3) controlado por fase1.js via
    atualizarNeblinaPoluicao(), guardado em data-estagio/quantidade de
-   .particula — ver ESTAGIOS_NEBLINA lá pros números de cada estágio. */
+   .particula/.particula-fumaca — ver ESTAGIOS_NEBLINA lá pros números
+   de cada estágio. */
 .neblina-poluicao{
   z-index:35;
+}
+/* variante "fumaça" só da Fase 1 — não mexe em .particula porque essa
+   classe é compartilhada com a fuligem do menu (index.html). Blob
+   borrado com gradiente radial (em vez de ponto sólido) + rotação e
+   crescimento de escala durante a queda, pra dar volume/profundidade
+   à neblina em vez de só pontos caindo igual. */
+.particula-fumaca{
+  position:absolute;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 35%, rgba(157,148,127,0.85), rgba(11,9,6,0.55) 55%, transparent 78%);
+  filter:blur(1.5px);
+  animation:cair-fumaca linear infinite;
+}
+/* estágio mais crítico (3): fumaça ganha um tom ferrugem/tóxico,
+   reaproveitando --rust já usado nos outros avisos de perigo do jogo */
+.particula-fumaca--critica{
+  background:radial-gradient(circle at 35% 35%, rgba(217,154,53,0.75), rgba(138,74,47,0.55) 55%, transparent 80%);
+}
+@keyframes cair-fumaca{
+  from{transform:translateY(-12vh) translateX(0) scale(0.6) rotate(0deg);}
+  to{transform:translateY(112vh) translateX(-26px) scale(1.6) rotate(-45deg);}
 }
 .neblina-filtro{
   position:fixed;
@@ -1317,6 +1339,7 @@ footer{
   .numero-flutuante{animation:none !important;opacity:0.9;transform:translate(-50%, -14px) !important;}
   .hud-stat-valor.pulso-ganho, .hud-stat-valor.pulso-multa{animation:none !important;}
   .neblina-filtro{transition:none !important;}
+  .particula-fumaca{animation:none !important;opacity:0.3;transform:none;}
 }
 
 /* ---- HUD da fase 1 em telas estreitas: empilha em vez de estourar a
