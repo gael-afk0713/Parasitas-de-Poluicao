@@ -142,10 +142,15 @@ aplicarSaveAtivo();
 // escolhida no painel Novo Jogo, ignorada até agora — passa a valer pra
 // ganho (recompensa o risco), velocidade de acúmulo de poluição e
 // severidade das multas de fiscalização (ver seções mais abaixo)
+// multGanho igual (1.0) em todas: dificuldade é um dial de RISCO, não de
+// risco+recompensa — Expert já tinha 1.3 aqui, o que dava mais dinheiro
+// por tick que o Médio nas mesmas construções e mais que compensava o
+// multPoluicao/multMulta mais altos, então "difícil" acabava sendo o jeito
+// mais eficiente de jogar (o oposto do esperado). Removido.
 const DIFICULDADES = {
   'Iniciante': { multGanho: 1.0, multPoluicao: 0.65, multMulta: 0.6 },
   'Médio': { multGanho: 1.0, multPoluicao: 1.0, multMulta: 1.0 },
-  'Expert': { multGanho: 1.3, multPoluicao: 1.5, multMulta: 1.5 },
+  'Expert': { multGanho: 1.0, multPoluicao: 1.5, multMulta: 1.5 },
 };
 function configDificuldade() {
   return DIFICULDADES[saveAtivoInfo?.dificuldade] || DIFICULDADES['Médio'];
@@ -617,6 +622,24 @@ function calcularPoluicaoInstancia(instancia) {
   return Math.round(config.poluicaoPorTick * multiplicadorUpgrade(instancia) * (1 - reducao + aumento) * configDificuldade().multPoluicao);
 }
 
+// ============ CUSTO DE MANUTENÇÃO (mecânica de dificuldade geral) ============
+// cada construção cobra uma manutenção por tick, e o custo POR construção
+// sobe conforme a base cresce (2% a mais a cada construção além da
+// primeira) — sem isso, empilhar construções era "de graça" (só o preço de
+// compra e a poluição desincentivavam), então spam horizontal era sempre a
+// jogada ótima. Discreto no início (poucas construções), mas vira uma
+// fatia real da receita numa base grande — recompensa jogar mais denso
+// (upgrade/adjacência) em vez de só espalhar construções pelo grid.
+const MANUTENCAO_BASE = 10;
+const MANUTENCAO_CRESCIMENTO_POR_CONSTRUCAO = 0.02;
+
+function calcularManutencaoDoTick() {
+  const total = instanciasConstruidas.length;
+  if (total === 0) return 0;
+  const fator = 1 + MANUTENCAO_CRESCIMENTO_POR_CONSTRUCAO * (total - 1);
+  return Math.round(total * MANUTENCAO_BASE * fator);
+}
+
 function mostrarNumeroFlutuante(instancia, texto, classeExtra) {
   const ponto = centroFootprintNaTela(instancia.col, instancia.row, instancia.colSpan, instancia.rowSpan);
   const numero = document.createElement('div');
@@ -645,7 +668,8 @@ function tickEconomia() {
     }
   });
   poluicaoTotal = Math.max(0, poluicaoTotal - reducaoGlobalDoTick);
-  dinheiro += ganhoDoTick;
+  const manutencaoDoTick = calcularManutencaoDoTick();
+  dinheiro = Math.max(0, dinheiro + ganhoDoTick - manutencaoDoTick);
   atualizarHudDinheiro();
   atualizarHudPoluicao();
   pulsarGanhoNoHud();

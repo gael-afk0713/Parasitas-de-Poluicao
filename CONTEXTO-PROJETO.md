@@ -979,6 +979,55 @@ Também removi o `<span id="hud-meta-poluicao">` do HUD (mostrava "meta
 o valor atual, sem meta visível; a meta de Caixa (`hud-meta`, "meta R$
 1.500.000") continua normalmente, não foi pedido pra tirar essa.
 
+**Atualização — paradoxo da dificuldade + custo de manutenção**: o autor
+notou que aumentar a dificuldade parecia deixar o jogo MAIS fácil. Causa:
+`DIFICULDADES.Expert` tinha `multGanho: 1.3` — Expert rendia 30% mais
+dinheiro por tick que o Médio nas MESMAS construções, e esse bônus de
+renda mais que compensava o `multPoluicao`/`multMulta` mais altos (o
+jogador chegava em `META_DINHEIRO` mais rápido, com menos tempo de
+exposição à poluição, logo com MENOS risco de colapso que um jogador no
+Médio). Fix: `multGanho` do Expert voltou pra `1.0`, igual às outras
+dificuldades — agora `DIFICULDADES` só escala risco (velocidade de
+poluição + severidade de multa), nunca dá vantagem de dinheiro. Testado
+numericamente (10 Madeireiras, mesmo save): Médio e Expert renderam
+exatamente o mesmo dinheiro por tick (R$1.482 líquido de manutenção),
+mas o Expert acumulou 120 de poluição contra 80 do Médio no mesmo tick —
+exatamente a proporção 1.5x esperada de `multPoluicao`, sem nenhum atalho
+de renda escondendo o risco.
+
+Além do fix, o autor pediu uma mecânica geral pra desincentivar "spamar"
+construções sem pensar (o preço de compra e a poluição já desincentivavam
+um pouco, mas empilhar construção idêntica virava sempre a jogada ótima
+depois que o preço subia — ver `MULTIPLICADOR_CUSTO_REPETIDO`). Nova
+seção "CUSTO DE MANUTENÇÃO" em `fase1.js`, logo antes de
+`mostrarNumeroFlutuante`: cada construção cobra uma manutenção por tick
+(`TICK_ECONOMIA_MS`, mesmo tick do ganho/poluição), e o custo POR
+construção cresce com o tamanho da base — 2% a mais por construção além
+da primeira (`MANUTENCAO_CRESCIMENTO_POR_CONSTRUCAO = 0.02`), sobre uma
+base de `MANUTENCAO_BASE = 10`:
+
+```
+fator = 1 + 0.02 × (totalConstruções − 1)
+manutençãoDoTick = round(totalConstruções × 10 × fator)
+```
+
+Com poucas construções o efeito é quase imperceptível (5 construções ≈
+R$58/tick), mas numa base grande vira uma fatia real da receita (40
+construções ≈ R$712/tick, ~9-10% do ganho bruto típico) — sem impedir
+espalhar o grid, só tira a vantagem de "spam sem pensar" ser sempre
+estritamente melhor que investir em upgrade/adjacência. Deduzido junto do
+ganho em `tickEconomia()` (`dinheiro = Math.max(0, dinheiro + ganhoDoTick
+- manutencaoDoTick)`), sem número flutuante por construção (com dezenas de
+construções isso poluiria a tela de números) — só reflete no valor da
+Caixa no HUD.
+
+Ambas as mudanças foram propostas ao autor com números/mecânica explicados
+antes de codar (via pergunta de múltipla escolha) — ele escolheu tirar o
+`multGanho` do Expert e adicionar o custo de manutenção; as outras opções
+apresentadas (multa escalada por tempo na zona crítica, fiscalização com
+horário incerto, janela mais apertada só no Expert) ficam como ideias
+futuras se o jogo ainda precisar de mais dificuldade depois de testado.
+
 ## Preferências de fluxo de trabalho do autor
 
 - **Editar arquivos existentes de forma pontual** (tipo find & replace) —
