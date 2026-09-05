@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/lembrete_cache_busting.py 2>/dev/null",
+            "statusMessage": "Checando se precisa subir o ?v=N..."
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/confirmar_firestore_rules.py 2>/dev/null",
+            "statusMessage": "Checando se e o firestore.rules..."
+          }
+        ]
+      }
+    ]
+  }
+}

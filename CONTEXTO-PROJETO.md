@@ -1043,6 +1043,31 @@ futuras se o jogo ainda precisar de mais dificuldade depois de testado.
   estilo novo (ex: os botões Confirmar/Cancelar da construção reaproveitam
   `.painel-confirmar`/`.painel-voltar` já usadas nos outros painéis).
 
+## Automações do Claude Code (`.claude/`)
+
+Configuradas via o skill `claude-automation-recommender` (plugin
+`claude-code-setup`). Se algum desses arquivos não existir mais, foi
+removido intencionalmente — não recriar sem pedir.
+
+- **Skills** (`.claude/skills/`):
+  - `testar-fluxo` — roteiro de teste manual completo (subir servidor,
+    Menu → Novo Jogo → Fase 1 → construção, checar console). Invocável
+    pelo usuário (`/testar-fluxo`) ou pelo Claude.
+  - `atualizar-contexto` — instrui o Claude a manter este próprio arquivo
+    (`CONTEXTO-PROJETO.md`) atualizado depois de mudanças relevantes, sem
+    precisar ser pedido. Só o Claude invoca (`user-invocable: false`).
+- **Hooks** (`.claude/settings.json`, scripts em `.claude/hooks/*.py`):
+  - `PostToolUse` em Edit/Write de `script.js`, `fase1.js` ou `style.css`
+    → lembrete pra checar o cache-busting (`?v=N`) nos HTMLs.
+  - `PreToolUse` em Edit/Write de `firestore.rules` → força confirmação
+    extra antes de aplicar (arquivo que controla segurança de dados reais
+    de usuário).
+- **Subagents** (`.claude/agents/`):
+  - `code-reviewer` — revisão de lógica antes de push, atenção especial à
+    matemática isométrica/economia/estado de construção de `fase1.js`.
+  - `security-reviewer` — revisão focada só em `firestore.rules`,
+    `firebase-config.js` e no fluxo de login/senha de `script.js`.
+
 ## O que falta / próximos passos possíveis
 
 - **Venda e melhoria por instância** (clicar numa construção do grid) só
