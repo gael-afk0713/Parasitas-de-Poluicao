@@ -2,7 +2,7 @@
   "mcpServers": {
     "firebase": {
       "command": "firebase.cmd",
-      "args": ["mcp"]
+      "args": ["mcp", "--dir", "C:\\Users\\gaels\\OneDrive\\Desktop\\Parasitas de Poluição"]
     }
   }
 }
