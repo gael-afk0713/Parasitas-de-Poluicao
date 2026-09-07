@@ -1,0 +1,225 @@
+/* =========================================================================
+   fase2/main.js — montagem e laço de desenho
+   -------------------------------------------------------------------------
+   Este arquivo só LIGA as peças. Nenhuma regra de jogo mora aqui: se você
+   estiver prestes a escrever um `if` sobre vida, dano ou progressão neste
+   arquivo, ele pertence a mundo/mundo.js ou a uma entidade.
+   ========================================================================= */
+
+import { Tela, Laco, Camera, Transicao } from './core/laco.js';
+import { Entrada } from './core/entrada.js';
+import { Renderizador, luzRadial, feixeLuz } from './render/renderizador.js';
+import { Mundo } from './mundo/mundo.js';
+import { validarRegistro } from './mundo/salas.js';
+import { desenharParallax, desenharPrimeiroPlano } from './render/parallax.js';
+import { desenharParticulas, desenharNevoa } from './render/particulas.js';
+import { criarEntidade } from './entidades/catalogo.js';
+import { Hud } from './ui/hud.js';
+import { Audio } from './audio/audio.js';
+
+import './mundo/salas-raizes.js';
+
+/* ---------------------------------------------------------------- montagem -- */
+
+const canvas = document.getElementById('tela-fase2');
+const tela = new Tela(canvas);
+const camera = new Camera(tela.largura, tela.altura);
+const entrada = new Entrada(window);
+const render = new Renderizador(tela);
+const transicao = new Transicao();
+const audio = new Audio();
+
+const laco = new Laco(passo, quadro);
+const mundo = new Mundo(camera, laco, render);
+const hud = new Hud(document.getElementById('hud-fase2'), mundo);
+
+mundo.fabricaEntidade = criarEntidade;
+mundo._transicao = (cb) => transicao.cortar(cb, 0.3);
+mundo.aoEvento = (ev) => { efeitoDeEvento(ev); audio.aoEvento(ev, mundo); };
+mundo.aoTrocarSala = (sala) => { hud.anunciarSala(sala, mundo); audio.trocarAmbiente(sala, mundo); };
+
+tela.aoRedimensionar = (w, h) => camera.redimensionar(w, h);
+entrada.ligar();
+entrada.ligarToque(document.getElementById('toque-fase2'));
+
+const problemas = validarRegistro();
+if (problemas.length) console.warn('[fase2] Problemas no mapa:\n' + problemas.join('\n'));
+
+mundo.entrarNaSala('raizes-01');
+laco.iniciar();
+
+/* -------------------------------------------------------------- abertura -- */
+// O laço já roda por trás da tela de abertura (a cena aparece viva assim que
+// o overlay some, sem um frame preto). Só a ENTRADA fica bloqueada até lá.
+const abertura = document.getElementById('abertura-fase2');
+laco.pausado = true;
+
+document.getElementById('btn-comecar-fase2')?.addEventListener('click', () => {
+  abertura.classList.add('escondida');
+  laco.pausado = false;
+  entrada.limparTudo();   // o clique/tecla que abriu não deve virar uma ação
+  canvas.focus?.();
+});
+
+/* Cursor some enquanto se joga no teclado e volta ao mexer o mouse. */
+let timerCursor = null;
+window.addEventListener('pointermove', () => {
+  document.body.classList.remove('cursor-oculto');
+  clearTimeout(timerCursor);
+  timerCursor = setTimeout(() => document.body.classList.add('cursor-oculto'), 1800);
+});
+
+/* Respeita a preferência do sistema: sem shake, sem aberração, sem flash forte. */
+const movimentoReduzido = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (movimentoReduzido) {
+  camera.sacudir = () => {};
+  render.sacudirCor = () => {};
+  render.piscar = (cor, v) => { render.flash.cor = cor; render.flash.valor = Math.min(v, 0.12); };
+}
+
+/* -------------------------------------------------------------------- passo -- */
+
+function passo(dt) {
+  entrada.atualizar(dt);
+
+  if (entrada.acabouDePressionar('pausa')) {
+    laco.pausado = !laco.pausado;
+    hud.definirPausa(laco.pausado);
+  }
+  if (laco.pausado) return;
+
+  mundo.atualizar(dt, entrada);
+}
+
+/* ------------------------------------------------------------------ quadro -- */
+
+function quadro(alpha, dtReal) {
+  transicao.atualizar(dtReal);
+  mundo.atualizarApresentacao(dtReal);
+  audio.atualizar(dtReal, mundo);
+
+  const tema = mundo.tema;
+  const sala = mundo.sala;
+  if (!sala) return;
+
+  render.iniciarFrame(tema, camera);
+
+  // 1 · céu
+  render.desenharCeu(sala.altura);
+
+  // 2-5 · parallax + luz volumétrica
+  desenharParallax(render, sala, mundo);
+
+  // 6 · decoração de fundo colada ao terreno
+  render.camada(1, (ctx) => {
+    for (const e of mundo.entidades) e.desenharFundo?.(ctx, tema, camera);
+  });
+
+  // 7 · terreno
+  render.camada(1, (ctx) => mundo.arteTerreno.desenhar(ctx, tema, camera));
+  render.emissivo(1, (ctx) => mundo.arteTerreno.desenharLuz(ctx, tema));
+
+  // 8 · entidades + jogador
+  render.camada(1, (ctx) => {
+    for (const e of mundo.entidades) e.desenhar?.(ctx, tema, camera);
+    mundo.arteJogador.desenhar(ctx, mundo.jogador, tema);
+  });
+  render.emissivo(1, (ctx) => {
+    for (const e of mundo.entidades) e.desenharLuz?.(ctx, tema, camera);
+    mundo.arteJogador.desenharLuz(ctx, mundo.jogador, tema);
+    for (const l of sala.luzes) {
+      if (l.feixe) feixeLuz(ctx, l.x, l.y, sala.altura, 130, l.angulo ?? 0, tema.luz, l.intensidade ?? 1);
+      else luzRadial(ctx, l.x, l.y, l.raio, tema.luz, l.intensidade ?? 1);
+    }
+  });
+
+  // 9-10 · névoa rasteira + partículas
+  desenharNevoa(render, mundo);
+  desenharParticulas(render, mundo);
+
+  // 11 · primeiro plano
+  render.camada(1.28, (ctx) => {
+    for (const e of mundo.entidades) e.desenharFrente?.(ctx, tema, camera);
+  });
+  desenharPrimeiroPlano(render, mundo);
+
+  // 12 · composição
+  render.finalizar(dtReal);
+
+  transicao.desenhar(tela.ctx, tela.largura, tela.altura);
+  hud.desenhar(dtReal, tema);
+}
+
+/* ------------------------------------------------------------------ efeitos -- */
+
+function efeitoDeEvento(ev) {
+  const j = mundo.jogador;
+  const tema = mundo.tema;
+  switch (ev.tipo) {
+    case 'pulo':
+      mundo.emitir(j.pesX, j.pesY, ev.variante === 'duplo' ? 12 : 5, {
+        angulo: Math.PI / 2, espalhamento: 1.6, velMin: 30, velMax: 110, g: 160,
+        cor: ev.variante === 'duplo' ? tema.acento : tema.particula,
+        brilha: ev.variante === 'duplo',
+      });
+      break;
+    case 'habilidade':
+      hud.anunciarHabilidade(ev.habilidade);
+      render.piscar(tema.crista, 0.55);
+      laco.definirEscalaTempo(0.3, 0.15);
+      setTimeout(() => laco.definirEscalaTempo(1, 0.8), 800);
+      break;
+    case 'aterrissar': {
+      const n = Math.round(4 + ev.impacto * 14);
+      mundo.emitir(ev.x, ev.y, n, {
+        angulo: 0, espalhamento: Math.PI * 2, velMin: 20, velMax: 60 + ev.impacto * 190,
+        g: 420, vidaMin: 0.2, vidaMax: 0.55, cor: tema.particula,
+      });
+      if (ev.impacto > 0.45) { camera.sacudir(ev.impacto * 0.3); camera.recuar(0, ev.impacto * 7); }
+      break;
+    }
+    case 'investida':
+      mundo.emitir(j.centroX, j.centroY, 12, {
+        angulo: ev.direcao > 0 ? Math.PI : 0, espalhamento: 0.8,
+        velMin: 80, velMax: 260, g: 20, cor: tema.acento, brilha: true,
+      });
+      camera.recuar(-ev.direcao * 9, 0);
+      break;
+    case 'acerto':
+      mundo.emitir(j.centroX + ev.direcao * 34, j.centroY, 14, {
+        angulo: ev.direcao > 0 ? 0 : Math.PI, espalhamento: 1.5,
+        velMin: 90, velMax: 300, g: 260, cor: tema.crista, brilha: true,
+      });
+      break;
+    case 'dano':
+      render.piscar('#ff5a4a', 0.42);
+      render.sacudirCor(0.9);
+      camera.sacudir(0.6);
+      laco.congelar(0.09);
+      mundo.emitir(j.centroX, j.centroY, 18, {
+        velMin: 60, velMax: 240, g: 380, cor: '#c8503a', brilha: true,
+      });
+      break;
+    case 'morte':
+      render.piscar('#ffffff', 0.7);
+      laco.congelar(0.16);
+      camera.sacudir(1);
+      break;
+    case 'canto':
+      render.piscar(tema.crista, 0.22);
+      break;
+    case 'semente':
+      render.piscar(tema.acento, 0.5);
+      camera.sacudir(0.3);
+      laco.definirEscalaTempo(0.35, 0.2);
+      setTimeout(() => laco.definirEscalaTempo(1, 0.7), 900);
+      break;
+  }
+}
+
+/* ------------------------------------------------------------------ debug --- */
+
+if (new URLSearchParams(location.search).has('debug')) {
+  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio };
+  console.info('[fase2] modo debug: window.__fase2 disponível');
+}

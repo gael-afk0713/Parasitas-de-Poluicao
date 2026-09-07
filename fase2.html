@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d10">
+<title>Fase 2 · Parasitas de Poluição</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="fase2.css?v=1">
+</head>
+<body class="fase2-body">
+
+  <!-- Camada do jogo. Tudo do mundo é desenhado aqui. -->
+  <canvas id="tela-fase2" class="fase2-tela"></canvas>
+
+  <!-- HUD num canvas separado: redesenha só quando precisa e nunca
+       interfere na composição/bloom da cena. -->
+  <canvas id="hud-fase2" class="fase2-hud" aria-hidden="true"></canvas>
+
+  <!-- Controles de toque — só aparecem em ponteiro grosso (ver fase2.css). -->
+  <div class="fase2-toque" id="toque-fase2" aria-hidden="true">
+    <div class="toque-esquerda">
+      <button class="toque-botao toque-direcional" data-acao="esquerda" aria-label="Esquerda">◀</button>
+      <button class="toque-botao toque-direcional" data-acao="direita" aria-label="Direita">▶</button>
+    </div>
+    <div class="toque-direita">
+      <button class="toque-botao toque-acao" data-acao="atacar" aria-label="Atacar">✦</button>
+      <button class="toque-botao toque-acao toque-acao--principal" data-acao="pular" aria-label="Pular">▲</button>
+      <button class="toque-botao toque-acao" data-acao="investida" aria-label="Investida">»</button>
+      <button class="toque-botao toque-acao" data-acao="canto" aria-label="Canto">◎</button>
+    </div>
+  </div>
+
+  <!-- Tela inicial: existe porque o áudio do navegador exige um gesto do
+       usuário antes de tocar qualquer coisa, e começar um jogo de atmosfera
+       em silêncio arruína a primeira impressão. -->
+  <div class="fase2-abertura" id="abertura-fase2">
+    <div class="abertura-conteudo">
+      <p class="abertura-rotulo">Fase 2</p>
+      <h1 class="abertura-titulo">O Guardião</h1>
+      <p class="abertura-texto">
+        A empresa caiu. O que sobrou dela ainda respira debaixo da terra —
+        e chama o que resta de você.
+      </p>
+      <button class="abertura-comecar" id="btn-comecar-fase2">Descer</button>
+      <ul class="abertura-controles">
+        <li><kbd>A</kbd><kbd>D</kbd> mover</li>
+        <li><kbd>Espaço</kbd> pular</li>
+        <li><kbd>C</kbd> atacar</li>
+        <li><kbd>Shift</kbd> investida</li>
+        <li><kbd>E</kbd> canto</li>
+        <li><kbd>Esc</kbd> pausar</li>
+      </ul>
+    </div>
+  </div>
+
+<script type="module" src="fase2/main.js?v=1"></script>
+</body>
+</html>
