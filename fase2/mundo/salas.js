@@ -24,19 +24,37 @@
 
 import { Terreno, TILE, normalizarMapa } from './terreno.js';
 
-/** char → tipo de entidade. Tudo aqui vira VAZIO no terreno. */
+/**
+ * char → tipo de entidade. Tudo aqui vira VAZIO no terreno.
+ *
+ * Este conjunto é CONGELADO: o desenhista de salas e o autor de inimigos
+ * dependem os dois dele. Precisa de um símbolo novo? Adicione aqui primeiro e
+ * avise os dois lados — inventar um char só num dos mapas produz uma sala que
+ * carrega em silêncio com um buraco no lugar do inimigo.
+ */
 export const LEGENDA_OBJETOS = {
   '@': 'inicio',
-  'o': 'semente',
-  'e': 'parasita',
-  'v': 'voador',
-  'c': 'cuspidor',
-  'r': 'rastejante',
-  'B': 'chefe',
-  '!': 'altar',
-  '+': 'fonte',
-  '$': 'fragmento',
-  'S': 'salvamento',
+  'o': 'semente',       // restaura a sala — o objetivo de cada área
+  'S': 'salvamento',    // checkpoint + cura
+  '!': 'altar',         // destrava habilidade
+  '+': 'fonte',         // cura pontual
+  '$': 'fragmento',     // coletável (aumenta vida máxima a cada 4)
+  'l': 'lapide',        // pedra de lore, sem efeito mecânico
+
+  // --- inimigos ---
+  'e': 'parasita',      // andarilho comum
+  'v': 'voador',        // persegue em linha, ignora terreno
+  'c': 'cuspidor',      // fixo, atira projétil
+  'r': 'rastejante',    // rápido e frágil, anda por parede/teto
+  'x': 'explosivo',     // corre até o jogador e estoura
+  'w': 'tecelao',       // ancorado no teto, desce em fio
+  'B': 'chefe',         // arena de chefe (a sala define QUAL em `def.chefe`)
+
+  // --- travas de progressão ---
+  'g': 'portao',        // exige a habilidade dita em `def.portoes`
+  'b': 'barreira',      // matéria corrompida, só quebra com o Canto
+
+  // --- portas entre salas ---
   '>': 'porta-dir',
   '<': 'porta-esq',
   '¨': 'porta-cima',

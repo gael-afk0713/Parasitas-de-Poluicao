@@ -71,19 +71,61 @@ export class ArteTerreno {
     this._cristas(ctx, tema);
   }
 
+  /**
+   * Textura interna do solo.
+   *
+   * Antes eram FAIXAS HORIZONTAIS de largura total, imitando estrato de
+   * rocha sedimentar. Ficava errado por dois motivos: o lugar é floresta, não
+   * gruta, e faixa que atravessa a tela inteira amarra visualmente pedaços de
+   * terreno que não têm relação nenhuma entre si, achatando a cena em lajes.
+   *
+   * Agora é manchado irregular (terra socada) mais filamentos de raiz perto
+   * da superfície. Nada atravessa a tela, então cada pedaço de chão lê como
+   * um pedaço de chão.
+   */
   _estratos(ctx, tema, camera, alturaMundo) {
-    const corA = rgba(tema.terrenoFundo, 0.5);
-    const corB = rgba(misturarHex(tema.terreno, tema.borda, 0.5), 0.32);
     const a = camera.areaVisivel(80);
-    const passo = 34;
+    const passo = 46;
+    const x0 = Math.floor(a.x / passo) * passo;
     const y0 = Math.floor(a.y / passo) * passo;
+
+    // 1 · manchas de terra: elipses grandes e suaves, alfa baixo.
     for (let y = y0; y < a.y + a.altura; y += passo) {
-      const n = ruido1(y * 0.021, this.semente);
-      ctx.fillStyle = n > 0.5 ? corA : corB;
-      // Faixa com altura e deslocamento variáveis — faixa regular vira listra.
-      const h = lerp(4, 15, ruido1(y * 0.037 + 11, this.semente));
-      const dx = (ruido1(y * 0.013 + 5, this.semente) - 0.5) * 60;
-      ctx.fillRect(a.x + dx, y, a.largura, h);
+      for (let x = x0; x < a.x + a.largura; x += passo) {
+        const h = hash2(x, y, this.semente);
+        if (h > 0.55) continue;
+        const h2 = hash2(x, y, this.semente + 17);
+        ctx.fillStyle = h2 > 0.5
+          ? rgba(tema.terrenoFundo, 0.34)
+          : rgba(misturarHex(tema.terreno, tema.borda, 0.45), 0.20);
+        ctx.beginPath();
+        ctx.ellipse(
+          x + (h - 0.5) * passo, y + (h2 - 0.5) * passo,
+          lerp(20, 52, h), lerp(12, 30, h2),
+          (h - 0.5) * 1.2, 0, TAU
+        );
+        ctx.fill();
+      }
+    }
+
+    // 2 · filamentos de raiz descendo a partir das superfícies pisáveis.
+    ctx.strokeStyle = rgba(tema.terrenoFundo, 0.5);
+    ctx.lineCap = 'round';
+    for (const faixa of this.terreno.arestasSuperiores(0.5)) {
+      for (let i = 0; i < faixa.length - 1; i += 3) {
+        const p = faixa[i];
+        const h = hash2(Math.round(p.x), Math.round(p.y), this.semente + 3);
+        if (h > 0.4) continue;
+        const comp = lerp(10, 40, h * 2.5);
+        ctx.lineWidth = lerp(0.8, 2.4, h * 2.5);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y);
+        ctx.quadraticCurveTo(
+          p.x + (h - 0.2) * 26, p.y + comp * 0.55,
+          p.x + (h - 0.2) * 12, p.y + comp
+        );
+        ctx.stroke();
+      }
     }
   }
 

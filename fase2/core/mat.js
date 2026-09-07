@@ -148,6 +148,22 @@ export function difAngulo(a, b) {
 export const aabbColide = (ax, ay, aw, ah, bx, by, bw, bh) =>
   ax < bx + bw && ax + aw > bx && ay < by + bh && ay + ah > by;
 
+/**
+ * Sobreposição entre dois retângulos no formato `{x, y, largura, altura}` —
+ * o formato que `caixa()` das entidades devolve.
+ *
+ * Mora aqui, e não em `mundo/mundo.js`, de propósito: as entidades precisam
+ * disso e `mundo.js` precisa do catálogo de entidades, então tê-lo lá criava
+ * um ciclo de importação. `core/mat.js` não importa nada, então é sempre o
+ * lugar seguro para um utilitário compartilhado.
+ */
+export const sobrepoe = (a, b) =>
+  a.x < b.x + b.largura && a.x + a.largura > b.x &&
+  a.y < b.y + b.altura && a.y + a.altura > b.y;
+
+/** Entidade (que tem x/y/largura/altura soltos) → retângulo. */
+export const caixaDe = (e) => ({ x: e.x, y: e.y, largura: e.largura, altura: e.altura });
+
 /** Ponto dentro de um círculo — usa dist2 pra evitar a raiz quadrada. */
 export const noCirculo = (px, py, cx, cy, r) => dist2(px, py, cx, cy) <= r * r;
 

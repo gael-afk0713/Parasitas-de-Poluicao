@@ -58,180 +58,200 @@ const CHAVES_COR = [
 const CHAVES_NUM = ['densidadeBruma', 'vinheta', 'saturacao', 'brilhoBloom'];
 
 /* =========================================================================
-   ÁREAS
+   ÁREAS — uma floresta morta, restaurada aos poucos
    =========================================================================
-   A ordem aqui é a ordem narrativa de descoberta. Cada área tem uma cor
-   dominante distinta no estado restaurado, pra que o mapa do jogo seja
-   legível por cor (o jogador lembra "a área turquesa", "a área âmbar").
+   O lugar é UMA FLORESTA, do começo ao fim: não é caverna, não é fábrica.
+   A fábrica da Fase 1 aparece só como uma ferida dentro dela.
+
+   Duas decisões de valor que valem para todas as áreas:
+
+   · RESTAURAR NÃO CLAREIA. O mundo restaurado continua escuro — ele fica
+     LUMINOSO, não iluminado. Musgo que brilha, esporo que acende, água que
+     reflete. Uma floresta viva à noite, não uma floresta de dia. Isso
+     mantém o jogo sombrio (pedido do autor) e ainda dá o salto emocional,
+     porque o salto vem de contraste e cor, não de brilho geral.
+
+   · SATURAÇÃO É RECURSO ESCASSO. Quase tudo fica entre cinza-azulado e
+     quase-preto; a cor saturada aparece só na fonte de luz e no acento.
+     É o que segura a leitura de silhueta e o que faz o pouco verde que
+     existe no estado poluído doer de tão raro.
+
+   A ordem abaixo é a ordem narrativa de descoberta. Cada área restaurada
+   tem uma cor dominante distinta, pra que o mapa seja legível por cor.
    ========================================================================= */
 
 export const AREAS = {
   /* --------------------------------------------------------------------
-     1. RAÍZES CINZENTAS — área inicial, subterrânea.
-     Poluída: cinza-chumbo sufocado, luz de sódio doente vazando de cima.
-     Restaurada: turquesa fria de raiz viva, bioluminescência.
+     1. SUB-BOSQUE CINZENTO — chão da floresta, entre raízes mortas.
+     Área de abertura. Quase monocromática: o jogador precisa sentir que a
+     cor foi EMBORA daqui, não que o lugar sempre foi assim.
+     Poluída: cinza-azulado de cinza fria, com uma única luz de sódio doente
+     furando o dossel morto lá em cima.
+     Restaurada: musgo bioluminescente turquesa. Continua noite.
      -------------------------------------------------------------------- */
   raizes: {
-    nome: 'Raízes Cinzentas',
-    nomeRestaurado: 'Raízes Vivas',
+    nome: 'Sub-bosque Cinzento',
+    nomeRestaurado: 'Sub-bosque Vivo',
     ordem: 1,
     poluido: {
-      ceuTopo: '#0a0d10', ceuBase: '#171a19',
-      bruma: '#20241f',
-      distante: '#191d1c', medio: '#141716', proximo: '#0e100f',
-      terreno: '#121412', terrenoFundo: '#0a0b0a',
-      borda: '#2b2f28', crista: '#3a3a2e',
-      primeiroPlano: '#050605',
-      luz: '#8a7a42', luzAmbiente: '#2a2b22',
-      particula: '#6b6a55', acento: '#7d6b32',
-      densidadeBruma: 0.62, vinheta: 0.72, saturacao: 0.55, brilhoBloom: 0.28,
+      ceuTopo: '#06090e', ceuBase: '#0f141c',
+      bruma: '#191f28',
+      distante: '#141a23', medio: '#0f141b', proximo: '#0a0e14',
+      terreno: '#0c1016', terrenoFundo: '#05070b',
+      borda: '#222933', crista: '#39404a',
+      primeiroPlano: '#03050a',
+      luz: '#8a7f52', luzAmbiente: '#181d27',
+      particula: '#4d545f', acento: '#6b6244',
+      densidadeBruma: 0.60, vinheta: 0.78, saturacao: 0.38, brilhoBloom: 0.22,
     },
     restaurado: {
-      ceuTopo: '#071319', ceuBase: '#0e2b2e',
-      bruma: '#1c4a48',
-      distante: '#173f42', medio: '#123033', proximo: '#0c2124',
-      terreno: '#0d1c1d', terrenoFundo: '#071113',
-      borda: '#2f6a5c', crista: '#7fd8a6',
-      primeiroPlano: '#040c0e',
-      luz: '#8ff2c4', luzAmbiente: '#1d4a44',
-      particula: '#a9f0cf', acento: '#5fe0b0',
-      densidadeBruma: 0.44, vinheta: 0.5, saturacao: 1.0, brilhoBloom: 0.7,
+      ceuTopo: '#040c11', ceuBase: '#0c1f27',
+      bruma: '#153239',
+      distante: '#112e37', medio: '#0c2229', proximo: '#07161c',
+      terreno: '#09181e', terrenoFundo: '#040d11',
+      borda: '#1e4846', crista: '#5fc9a8',
+      primeiroPlano: '#020a0d',
+      luz: '#7fe8c4', luzAmbiente: '#0f332e',
+      particula: '#8fe0c0', acento: '#48d9a8',
+      densidadeBruma: 0.42, vinheta: 0.58, saturacao: 0.92, brilhoBloom: 0.72,
     },
   },
 
   /* --------------------------------------------------------------------
-     2. VÁRZEA MORTA — alagado, água parada e oleosa.
-     Poluída: verde-doente de esgoto, reflexo iridescente de óleo.
-     Restaurada: azul-claro de água limpa, junco, libélula.
+     2. VÁRZEA AFOGADA — o alagado da floresta, envenenado.
+     Poluída: preto oleoso com iridescência doente na superfície da água.
+     Restaurada: azul-noite profundo, juncos e libélulas acesas.
      -------------------------------------------------------------------- */
   varzea: {
-    nome: 'Várzea Morta',
+    nome: 'Várzea Afogada',
     nomeRestaurado: 'Várzea Clara',
     ordem: 2,
     poluido: {
-      ceuTopo: '#0d1210', ceuBase: '#1c2418',
-      bruma: '#2c3524',
-      distante: '#212a1c', medio: '#1a2117', proximo: '#111610',
-      terreno: '#151a12', terrenoFundo: '#0b0e09',
-      borda: '#333d26', crista: '#4a5230',
-      primeiroPlano: '#060805',
-      luz: '#9aa844', luzAmbiente: '#2e3722',
-      particula: '#8a9455', acento: '#6f7d2a',
-      densidadeBruma: 0.7, vinheta: 0.66, saturacao: 0.6, brilhoBloom: 0.3,
+      ceuTopo: '#070a0b', ceuBase: '#121614',
+      bruma: '#1c211b',
+      distante: '#161a15', medio: '#111511', proximo: '#0b0e0b',
+      terreno: '#0d100d', terrenoFundo: '#060806',
+      borda: '#242a20', crista: '#3d452f',
+      primeiroPlano: '#030503',
+      luz: '#7e8a45', luzAmbiente: '#1a1f18',
+      particula: '#565c46', acento: '#5e6a2c',
+      densidadeBruma: 0.68, vinheta: 0.76, saturacao: 0.42, brilhoBloom: 0.24,
     },
     restaurado: {
-      ceuTopo: '#0a1e2c', ceuBase: '#1d4d5c',
-      bruma: '#3a7f8c',
-      distante: '#2d6b78', medio: '#215260', proximo: '#153a46',
-      terreno: '#12292f', terrenoFundo: '#0a181c',
-      borda: '#3c7f7a', crista: '#9ce8b6',
-      primeiroPlano: '#05141a',
-      luz: '#bff0ff', luzAmbiente: '#2a6070',
-      particula: '#cdf3ff', acento: '#6fd8e8',
-      densidadeBruma: 0.5, vinheta: 0.42, saturacao: 1.05, brilhoBloom: 0.72,
+      ceuTopo: '#04101a', ceuBase: '#0c2836',
+      bruma: '#17414f',
+      distante: '#133a48', medio: '#0e2b37', proximo: '#081c26',
+      terreno: '#0a1e28', terrenoFundo: '#040f16',
+      borda: '#1e4f58', crista: '#68d4e8',
+      primeiroPlano: '#020a10',
+      luz: '#a8ecff', luzAmbiente: '#0e3543',
+      particula: '#a2dced', acento: '#4fc4e0',
+      densidadeBruma: 0.50, vinheta: 0.56, saturacao: 0.95, brilhoBloom: 0.74,
     },
   },
 
   /* --------------------------------------------------------------------
-     3. CÂNION DE ESCÓRIA — as ruínas da própria fábrica da Fase 1.
-     Única área que cita a paleta industrial da Fase 1 (âmbar/ferrugem) — é
-     de propósito: o jogador tem que RECONHECER o que ele construiu antes.
-     Restaurada: o âmbar não some, esfria pra cobre com trepadeira por cima.
+     3. A CLAREIRA QUEIMADA — a cicatriz que a fábrica da Fase 1 deixou.
+     É a ÚNICA área quente do jogo, de propósito: tudo mais é frio, e o
+     calor aqui não é aconchego — é brasa que não apagou. É onde o jogador
+     reconhece o que ele mesmo construiu, agora enferrujando na floresta.
+     Restaurada: o metal esfria pra cobre e some sob trepadeira.
      -------------------------------------------------------------------- */
-  canion: {
-    nome: 'Cânion de Escória',
-    nomeRestaurado: 'Cânion Coberto',
+  clareira: {
+    nome: 'A Clareira Queimada',
+    nomeRestaurado: 'A Clareira Coberta',
     ordem: 3,
     poluido: {
-      ceuTopo: '#140c07', ceuBase: '#2a1509',
-      bruma: '#3a1f0e',
-      distante: '#2c1809', medio: '#221206', proximo: '#160c04',
-      terreno: '#1a1109', terrenoFundo: '#0d0703',
-      borda: '#4a2d13', crista: '#8a4a2f',
-      primeiroPlano: '#080402',
-      luz: '#d99a35', luzAmbiente: '#3d2410',
-      particula: '#c88a4a', acento: '#e8641f',
-      densidadeBruma: 0.58, vinheta: 0.75, saturacao: 0.75, brilhoBloom: 0.42,
+      ceuTopo: '#0d0805', ceuBase: '#1e1109',
+      bruma: '#2b1a0e',
+      distante: '#21140a', medio: '#180e07', proximo: '#100904',
+      terreno: '#120c07', terrenoFundo: '#080502',
+      borda: '#37220f', crista: '#6b3a22',
+      primeiroPlano: '#050301',
+      luz: '#c07a2a', luzAmbiente: '#2a1a0c',
+      particula: '#7a5a3a', acento: '#c2481a',
+      densidadeBruma: 0.56, vinheta: 0.80, saturacao: 0.60, brilhoBloom: 0.36,
     },
     restaurado: {
-      ceuTopo: '#161a10', ceuBase: '#3b3a1c',
-      bruma: '#5a5228',
-      distante: '#46441f', medio: '#343518', proximo: '#232610',
-      terreno: '#1d2011', terrenoFundo: '#0f1108',
-      borda: '#5c6b2e', crista: '#b8d96a',
-      primeiroPlano: '#0a0c05',
-      luz: '#ffd98a', luzAmbiente: '#4a4a22',
-      particula: '#e8e0a0', acento: '#8fbf72',
-      densidadeBruma: 0.4, vinheta: 0.48, saturacao: 1.0, brilhoBloom: 0.66,
+      ceuTopo: '#0a0f0a', ceuBase: '#1c2413',
+      bruma: '#2c3618',
+      distante: '#232c14', medio: '#1a2110', proximo: '#11160a',
+      terreno: '#121809', terrenoFundo: '#080c05',
+      borda: '#31461c', crista: '#8fbf5a',
+      primeiroPlano: '#050703',
+      luz: '#d8c878', luzAmbiente: '#243015',
+      particula: '#a8b878', acento: '#7ab84a',
+      densidadeBruma: 0.44, vinheta: 0.60, saturacao: 0.88, brilhoBloom: 0.60,
     },
   },
 
   /* --------------------------------------------------------------------
-     4. DOSSEL CINÉREO — escalada vertical pela árvore-mãe morta.
-     Poluída: branco-cinza de cinza de queimada, silhuetas nuas.
-     Restaurada: dourado quente de sol filtrado por folha — a área mais
-     luminosa do jogo, a recompensa visual do meio.
+     4. DOSSEL CINÉREO — a copa da árvore-mãe, escalada vertical.
+     Poluída: cinza de queimada, galho nu, névoa espessa. A área mais
+     dessaturada do jogo inteiro — quase uma litografia.
+     Restaurada: folha acesa por dentro, dourado-esverdeado contra céu
+     noturno. A recompensa visual do meio do jogo.
      -------------------------------------------------------------------- */
   dossel: {
     nome: 'Dossel Cinéreo',
-    nomeRestaurado: 'Dossel Dourado',
+    nomeRestaurado: 'Dossel Aceso',
     ordem: 4,
     poluido: {
-      ceuTopo: '#181a1c', ceuBase: '#33352f',
-      bruma: '#45463d',
-      distante: '#3a3b33', medio: '#2b2c26', proximo: '#1c1d19',
-      terreno: '#1a1b17', terrenoFundo: '#0e0f0c',
-      borda: '#3e4036', crista: '#5c5c4c',
-      primeiroPlano: '#090a08',
-      luz: '#c8c4a8', luzAmbiente: '#3a3b33',
-      particula: '#b0ad98', acento: '#8c8a70',
-      densidadeBruma: 0.74, vinheta: 0.6, saturacao: 0.35, brilhoBloom: 0.35,
+      ceuTopo: '#0e1013', ceuBase: '#1f2226',
+      bruma: '#2c2f33',
+      distante: '#24272b', medio: '#1a1c20', proximo: '#111316',
+      terreno: '#121417', terrenoFundo: '#08090b',
+      borda: '#2a2e33', crista: '#454a51',
+      primeiroPlano: '#050607',
+      luz: '#9aa0a8', luzAmbiente: '#232629',
+      particula: '#6e737a', acento: '#5e646c',
+      densidadeBruma: 0.74, vinheta: 0.66, saturacao: 0.18, brilhoBloom: 0.30,
     },
     restaurado: {
-      ceuTopo: '#1a2a14', ceuBase: '#6b8a2e',
-      bruma: '#8fae4a',
-      distante: '#6d8c34', medio: '#4e6a25', proximo: '#33491a',
-      terreno: '#22300f', terrenoFundo: '#111a07',
-      borda: '#5e8226', crista: '#d9f26a',
-      primeiroPlano: '#0c1305',
-      luz: '#fff0a8', luzAmbiente: '#5a7a28',
-      particula: '#fdf6c0', acento: '#ffd94a',
-      densidadeBruma: 0.46, vinheta: 0.34, saturacao: 1.12, brilhoBloom: 0.85,
+      ceuTopo: '#080f0a', ceuBase: '#1a2a12',
+      bruma: '#2c4018',
+      distante: '#243516', medio: '#1a2810', proximo: '#111b0a',
+      terreno: '#101a09', terrenoFundo: '#070d04',
+      borda: '#2e4a18', crista: '#b8d94a',
+      primeiroPlano: '#040802',
+      luz: '#f0e08a', luzAmbiente: '#22350f',
+      particula: '#d8dc90', acento: '#e0c040',
+      densidadeBruma: 0.48, vinheta: 0.50, saturacao: 0.95, brilhoBloom: 0.80,
     },
   },
 
   /* --------------------------------------------------------------------
-     5. O CORAÇÃO — origem da corrupção. Área final.
-     Poluída: violeta-doente de infecção, a única área com cor FRIA e
-     saturada no estado sujo — porque não é sujeira industrial, é a coisa
-     viva que a sujeira virou.
-     Restaurada: branco-rosado de amanhecer. Fim da jornada.
+     5. O CORAÇÃO — a origem da corrupção. Área final.
+     Poluída: violeta infeccioso. É a única cor SATURADA do estado sujo em
+     todo o jogo, e isso é intencional: aqui a poluição não é fuligem, é
+     uma coisa viva que a fuligem virou.
+     Restaurada: branco-esverdeado pálido, quase amanhecer. Fim da jornada.
      -------------------------------------------------------------------- */
   coracao: {
     nome: 'O Coração',
     nomeRestaurado: 'O Coração Desperto',
     ordem: 5,
     poluido: {
-      ceuTopo: '#0a0512', ceuBase: '#1d0c2e',
-      bruma: '#2e1244',
-      distante: '#240e36', medio: '#1a0a28', proximo: '#12061c',
-      terreno: '#150a1e', terrenoFundo: '#0a0410',
-      borda: '#3d1a58', crista: '#7a2f9e',
-      primeiroPlano: '#050208',
-      luz: '#c44ff0', luzAmbiente: '#2a1040',
-      particula: '#a25ec8', acento: '#e83fb0',
-      densidadeBruma: 0.55, vinheta: 0.82, saturacao: 0.95, brilhoBloom: 0.6,
+      ceuTopo: '#07040d', ceuBase: '#160a22',
+      bruma: '#231034',
+      distante: '#1b0c29', medio: '#14081e', proximo: '#0d0514',
+      terreno: '#100718', terrenoFundo: '#07030d',
+      borda: '#2e1444', crista: '#5f2280',
+      primeiroPlano: '#030108',
+      luz: '#a83fd0', luzAmbiente: '#1f0c30',
+      particula: '#7e46a0', acento: '#d02f96',
+      densidadeBruma: 0.54, vinheta: 0.84, saturacao: 0.85, brilhoBloom: 0.56,
     },
     restaurado: {
-      ceuTopo: '#2a1c3a', ceuBase: '#e8a88c',
-      bruma: '#f0c4a8',
-      distante: '#c99a92', medio: '#8e6f76', proximo: '#4e4054',
-      terreno: '#2a2436', terrenoFundo: '#151220',
-      borda: '#6a5a78', crista: '#ffd9c8',
-      primeiroPlano: '#100c18',
-      luz: '#fff4e0', luzAmbiente: '#7a5a68',
-      particula: '#ffe8d8', acento: '#ff9ec4',
-      densidadeBruma: 0.38, vinheta: 0.3, saturacao: 1.0, brilhoBloom: 0.9,
+      ceuTopo: '#0a1410', ceuBase: '#20362c',
+      bruma: '#375046',
+      distante: '#2b4239', medio: '#1e302a', proximo: '#14211d',
+      terreno: '#141f1b', terrenoFundo: '#0a110e',
+      borda: '#33564a', crista: '#c8e8d0',
+      primeiroPlano: '#050b08',
+      luz: '#e8f4e0', luzAmbiente: '#2a4238',
+      particula: '#d8ecdc', acento: '#8fe0b8',
+      densidadeBruma: 0.40, vinheta: 0.46, saturacao: 0.90, brilhoBloom: 0.85,
     },
   },
 };

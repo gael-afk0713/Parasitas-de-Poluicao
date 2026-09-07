@@ -14,12 +14,18 @@
    restauração PARECER causal em vez de um contador subindo num canto.
    ========================================================================= */
 
-import { clamp01, lerp, damp } from '../core/mat.js';
+import { clamp01, lerp, damp, sobrepoe, caixaDe } from '../core/mat.js';
 import { carregarSala, PORTA_OPOSTA } from './salas.js';
 import { AREAS, resolver } from '../render/paleta.js';
 import { ArteTerreno } from '../render/terreno-arte.js';
 import { Jogador } from '../entidades/jogador.js';
 import { ArteJogador } from '../entidades/jogador-arte.js';
+import { FRAGMENTOS_POR_VIDA } from '../entidades/catalogo.js';
+
+/** Quanto de pureza um Canto adiciona, e até onde ele sozinho consegue levar.
+ *  A semente é o que leva a sala a 1 — o Canto só prepara o terreno. */
+const GANHO_CANTO = 0.18;
+const TETO_CANTO = 0.55;
 
 export class Mundo {
   /**
@@ -42,8 +48,15 @@ export class Mundo {
 
     /** salaId → 0..1 */
     this.pureza = new Map();
-    /** Sementes já ativadas (persistem no save). */
+
+    /* Conjuntos de "isso já aconteceu". Todos persistem no save e são
+       consultados por `criarEntidade` ao popular a sala, para que um objeto
+       consumido não reapareça ao voltar. As chaves incluem a posição na
+       grade, então são estáveis entre sessões sem precisar de ID por objeto. */
     this.sementesAtivadas = new Set();
+    this.fragmentosColetados = new Set();
+    this.barreirasQuebradas = new Set();
+
     /** Último ponto de salvamento tocado. */
     this.checkpoint = { sala: null, x: 0, y: 0 };
 
@@ -145,6 +158,37 @@ export class Mundo {
     this.sementesAtivadas.add(chave);
     this._restaurando = { sala: salaId, de: this.purezaDaSala(salaId), para: 1, t: 0, dur: 2.6 };
     this.aoEvento?.({ tipo: 'semente', sala: salaId });
+    return true;
+  }
+
+  /**
+   * O Canto restaura PARCIALMENTE a sala em volta do jogador. Diferente da
+   * semente (que leva a sala a 1), ele dá um empurrão pequeno e com teto —
+   * senão o jogador cantaria em loop e restauraria o mundo inteiro parado num
+   * canto, o que esvaziaria a exploração de sentido.
+   */
+  cantar(salaId = this.sala?.id) {
+    const atual = this.purezaDaSala(salaId);
+    if (atual >= TETO_CANTO) return false;
+    const alvo = Math.min(TETO_CANTO, atual + GANHO_CANTO);
+    this._restaurando = { sala: salaId, de: atual, para: alvo, t: 0, dur: 1.4 };
+    return true;
+  }
+
+  coletarFragmento(chave) {
+    if (this.fragmentosColetados.has(chave)) return false;
+    this.fragmentosColetados.add(chave);
+    const total = this.fragmentosColetados.size;
+    const subiu = total % FRAGMENTOS_POR_VIDA === 0;
+    if (subiu) {
+      this.jogador.vidaMax++;
+      this.jogador.curar(1);
+    }
+    this.aoEvento?.({
+      tipo: 'fragmento', total,
+      faltam: (FRAGMENTOS_POR_VIDA - (total % FRAGMENTOS_POR_VIDA)) % FRAGMENTOS_POR_VIDA,
+      subiuVida: subiu,
+    });
     return true;
   }
 
@@ -285,13 +329,10 @@ export class Mundo {
   }
 }
 
-/* ------------------------------------------------------------------------- */
-
-const caixaDe = (e) => ({ x: e.x, y: e.y, largura: e.largura, altura: e.altura });
-
-function sobrepoe(a, b) {
-  return a.x < b.x + b.largura && a.x + a.largura > b.x &&
-         a.y < b.y + b.altura && a.y + a.altura > b.y;
-}
-
-export { sobrepoe, caixaDe };
+/* -------------------------------------------------------------------------
+   `sobrepoe`/`caixaDe` moraram aqui e migraram para `core/mat.js` quando
+   `mundo.js` passou a importar do catálogo de entidades — as entidades
+   precisavam desses helpers e o ciclo de importação se fechava. Reexportados
+   para não quebrar quem já importava daqui.
+   ------------------------------------------------------------------------- */
+export { sobrepoe, caixaDe } from '../core/mat.js';

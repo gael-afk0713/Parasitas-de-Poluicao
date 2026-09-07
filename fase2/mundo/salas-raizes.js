@@ -20,7 +20,7 @@ import { registrarSala } from './salas.js';
 registrarSala({
   id: 'raizes-01',
   area: 'raizes',
-  titulo: 'Raízes Cinzentas',
+  titulo: 'Sub-bosque Cinzento',
   semente: 101,
   mapa: [
     '########################################',

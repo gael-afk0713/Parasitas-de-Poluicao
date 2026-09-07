@@ -1,87 +1,85 @@
 /* =========================================================================
    fase2/entidades/jogador-arte.js — desenho do Guardião
    -------------------------------------------------------------------------
-   O personagem é desenhado por código, não sprite: assim ele responde à
-   física de forma contínua (squash real, capa com inércia, broto que floresce
-   conforme o mundo é restaurado) em vez de trocar entre quadros fixos.
+   INSPIRAÇÃO: o Ori. Uma criatura-espírito pequena, PÁLIDA E LUMINOSA, de
+   olhos grandes e escuros, orelhas longas caídas para trás, membros finos e
+   cauda que acompanha o movimento com atraso.
 
-   Quem é: o antigo CEO da Fase 1. Ainda veste o que sobrou do casaco
-   corporativo — rasgado, virando capa. A máscara pálida cobre o rosto porque
-   ele não tem mais um; do topo da cabeça brota um rebento que ABRE conforme
-   as áreas são restauradas. O jogador vê o próprio progresso no personagem,
-   sem HUD.
+   Inspiração, não cópia: o nosso é o que restou do CEO da Fase 1 depois que
+   a empresa caiu — a forma humana se foi e sobrou isto. As marcas no corpo
+   têm desenho de nervura de folha e ACENDEM conforme o mundo é restaurado,
+   então o jogador lê o próprio progresso no personagem, sem HUD.
 
-   Regras de silhueta (Ori/HK): o corpo é uma forma escura e SÓLIDA, legível
-   a 100px de distância. Todo o interesse visual mora em (a) o contorno e (b)
-   dois pontos de luz — máscara e broto. Detalhe interno em personagem
-   pequeno vira sujeira.
+   Por que luminoso e claro num mundo escuro:
+   1. Legibilidade. A floresta poluída é quase preta; um herói escuro sumiria
+      nela. Claro sobre escuro é lido antes de qualquer outra coisa na tela.
+   2. Ele é a única fonte de luz que se move — o mundo se ilumina em volta
+      dele conforme anda, e é isso que faz o lugar parecer explorado em vez
+      de apenas percorrido.
+   3. Tematicamente: a coisa viva que sobrou dentro de um lugar morto.
+
+   Regra de silhueta: a forma é SÓLIDA e simples, legível a 100 px. Todo o
+   interesse mora no contorno, nos olhos e nas marcas. Detalhe interno em
+   personagem pequeno vira sujeira.
    ========================================================================= */
 
 import {
-  TAU, clamp, clamp01, lerp, damp, easeOutCubic, easeOutBack, rgba, misturarHex,
+  TAU, clamp, clamp01, lerp, damp, easeOutCubic, easeOutQuad,
+  rgba, misturarHex,
 } from '../core/mat.js';
 import { ESTADOS } from './jogador.js';
 import { luzRadial } from '../render/renderizador.js';
 
-/* Estado de animação que não pertence à física — vive aqui. */
+/* ------------------------------------------------------------ proporções --
+   Origem do desenho: PÉS do personagem, olhando para a direita, y negativo
+   para cima. A caixa de colisão é 22×44; o desenho é maior de propósito
+   (orelhas, cauda), pra dar presença sem punir o jogador com hitbox grande. */
+const ALTURA_CORPO = 26;   // do chão ao topo da cabeça
+const RAIO_CABECA = 9.5;
+const CY_CABECA = -34;     // centro da cabeça em relação aos pés
+
 export class ArteJogador {
   constructor() {
-    /** Segmentos da capa: cada um segue o anterior com atraso (inércia). */
-    this.capa = Array.from({ length: 5 }, () => ({ x: 0, y: 0, vx: 0, vy: 0 }));
-    this.capaIniciada = false;
-    this.floracao = 0;        // 0..1 — quanto o broto abriu
+    /** Cauda: cadeia de molas que segue o corpo com atraso crescente. */
+    this.cauda = Array.from({ length: 7 }, () => ({ x: 0, y: 0, vx: 0, vy: 0 }));
+    this.caudaIniciada = false;
+
+    /** Orelhas: duas molas angulares, com inércia própria. */
+    this.orelhas = [{ ang: 0, vel: 0 }, { ang: 0, vel: 0 }];
+
+    this.floracao = 0;          // 0..1 — quanto as marcas acenderam
     this._floracaoAlvo = 0;
-    this.piscar = 0;          // timer de piscada da máscara
+
+    this.piscar = 0;
     this._proxPiscada = 2.5;
-    this.rastro = [];         // posições anteriores, pro rastro da investida
+
+    this.rastro = [];           // cópias fantasma da investida
+    this.respiro = 0;
   }
 
-  /** `floracao` 0..1 = média de pureza do mundo. Muda devagar, de propósito. */
+  /** `v` 0..1 = pureza média do mundo. Sobe devagar, de propósito. */
   definirFloracao(v) { this._floracaoAlvo = clamp01(v); }
 
+  /* ===================================================================== */
+
   atualizar(dt, j) {
+    this.respiro += dt;
     this.floracao = damp(this.floracao, this._floracaoAlvo, 0.9, dt);
 
-    // --- capa: cadeia de molas seguindo o corpo ---
-    const ancoraX = j.centroX - j.direcao * 5;
-    const ancoraY = j.y + 15;
-    if (!this.capaIniciada) {
-      for (const s of this.capa) { s.x = ancoraX; s.y = ancoraY; }
-      this.capaIniciada = true;
-    }
-    let alvoX = ancoraX, alvoY = ancoraY;
-    for (let i = 0; i < this.capa.length; i++) {
-      const s = this.capa[i];
-      // Rigidez decresce ao longo da capa: a ponta esvoaça mais que a gola.
-      const rigidez = lerp(340, 130, i / (this.capa.length - 1));
-      const amort = lerp(16, 10, i / (this.capa.length - 1));
-      s.vx += (alvoX - s.x) * rigidez * dt;
-      s.vy += (alvoY - s.y) * rigidez * dt;
-      // Gravidade própria da capa + arrasto contra a velocidade do corpo:
-      // é isso que faz ela levantar ao correr e cair ao parar.
-      s.vy += 520 * dt;
-      s.vx -= j.vx * 1.05 * dt;
-      s.vy -= j.vy * 0.5 * dt;
-      s.vx = damp(s.vx, 0, 1 / amort, dt);
-      s.vy = damp(s.vy, 0, 1 / amort, dt);
-      s.x += s.vx * dt;
-      s.y += s.vy * dt;
-      // Cada segmento não pode se afastar mais que L do anterior.
-      const L = 5.5;
-      const dx = s.x - alvoX, dy = s.y - alvoY;
-      const d = Math.hypot(dx, dy);
-      if (d > L) { s.x = alvoX + (dx / d) * L; s.y = alvoY + (dy / d) * L; }
-      alvoX = s.x; alvoY = s.y;
-    }
+    this._passoCauda(dt, j);
+    this._passoOrelhas(dt, j);
 
-    // --- piscada ---
+    // Piscada: intervalo irregular, senão vira metrônomo.
     this._proxPiscada -= dt;
-    if (this._proxPiscada <= 0) { this.piscar = 0.12; this._proxPiscada = 2 + Math.random() * 4; }
+    if (this._proxPiscada <= 0) {
+      this.piscar = 0.11;
+      this._proxPiscada = 1.8 + Math.random() * 4.2;
+    }
     if (this.piscar > 0) this.piscar -= dt;
 
-    // --- rastro da investida ---
+    // Rastro da investida.
     if (j.estado === ESTADOS.INVESTIDA) {
-      this.rastro.push({ x: j.centroX, y: j.centroY, t: 0.24, dir: j.direcao });
+      this.rastro.push({ x: j.centroX, y: j.pesY, t: 0.26, dir: j.direcao });
     }
     for (let i = this.rastro.length - 1; i >= 0; i--) {
       this.rastro[i].t -= dt;
@@ -89,273 +87,488 @@ export class ArteJogador {
     }
   }
 
-  /* --------------------------------------------------------------------- */
+  _passoCauda(dt, j) {
+    // A cauda nasce na base das costas e vive em coordenadas de MUNDO —
+    // simular no espaço local faria ela girar junto com o corpo ao virar,
+    // que é exatamente o oposto de inércia.
+    const ancoraX = j.centroX - j.direcao * 6;
+    const ancoraY = j.pesY - 16;
+
+    if (!this.caudaIniciada) {
+      for (const s of this.cauda) { s.x = ancoraX; s.y = ancoraY; }
+      this.caudaIniciada = true;
+    }
+
+    let alvoX = ancoraX, alvoY = ancoraY;
+    const n = this.cauda.length;
+    for (let i = 0; i < n; i++) {
+      const s = this.cauda[i];
+      const f = i / (n - 1);
+      // Rigidez cai ao longo da cauda: a base acompanha, a ponta chicoteia.
+      const rigidez = lerp(420, 120, f);
+      const amort = lerp(18, 9, f);
+
+      s.vx += (alvoX - s.x) * rigidez * dt;
+      s.vy += (alvoY - s.y) * rigidez * dt;
+      s.vy += 340 * dt;                 // peso próprio
+      s.vx -= j.vx * 0.85 * dt;         // arrasto contra o movimento do corpo
+      s.vy -= j.vy * 0.42 * dt;
+      s.vx = damp(s.vx, 0, 1 / amort, dt);
+      s.vy = damp(s.vy, 0, 1 / amort, dt);
+      s.x += s.vx * dt;
+      s.y += s.vy * dt;
+
+      // Trava de comprimento: cada elo não se afasta mais que L do anterior.
+      const L = 4.6;
+      const dx = s.x - alvoX, dy = s.y - alvoY;
+      const d = Math.hypot(dx, dy);
+      if (d > L) { s.x = alvoX + (dx / d) * L; s.y = alvoY + (dy / d) * L; }
+
+      alvoX = s.x; alvoY = s.y;
+    }
+  }
+
+  _passoOrelhas(dt, j) {
+    // Ângulo-alvo por estado. As orelhas são o rosto do personagem: elas
+    // dizem o que ele está sentindo antes de qualquer outra parte.
+    let alvo;
+    switch (j.estado) {
+      case ESTADOS.PULANDO:   alvo = -0.55; break;   // pra trás, empolgado
+      case ESTADOS.CAINDO:    alvo = -0.25; break;
+      case ESTADOS.INVESTIDA: alvo = -0.95; break;   // coladas de tanto vento
+      case ESTADOS.PLANEIO:   alvo = 0.30; break;    // abertas, pegando ar
+      case ESTADOS.ATORDOADO: alvo = 0.75; break;    // murchas
+      case ESTADOS.MORTO:     alvo = 0.95; break;
+      case ESTADOS.CANTO:     alvo = -0.15; break;
+      case ESTADOS.CORRENDO:  alvo = -0.34 - Math.abs(j.vx) / 232 * 0.2; break;
+      default:                alvo = -0.05; break;
+    }
+    for (let i = 0; i < 2; i++) {
+      const o = this.orelhas[i];
+      // Mola com amortecimento: overshoot leve dá o balanço de orelha.
+      const rigidez = 150, amort = 11;
+      // A orelha de trás reage um pouco depois da da frente.
+      const atraso = i === 0 ? 1 : 0.82;
+      o.vel += (alvo - o.ang) * rigidez * atraso * dt;
+      o.vel -= o.vel * amort * dt;
+      o.ang += o.vel * dt;
+      // Balanço passivo da corrida.
+      if (j.noChao) o.ang += Math.sin(j.faseAndar * 2 + i) * 0.004;
+    }
+  }
+
+  /* ===================================================================== */
 
   /**
-   * @param {CanvasRenderingContext2D} ctx  já transformado pro espaço do mundo
+   * @param {CanvasRenderingContext2D} ctx  já no espaço do mundo
    * @param {import('./jogador.js').Jogador} j
    * @param {import('../render/paleta.js').Tema} tema
    */
   desenhar(ctx, j, tema) {
-    if (!j.visivel) return;
+    const cores = this._cores(tema);
 
-    // Rastro primeiro, atrás de tudo.
+    // Rastro da investida — atrás de tudo, some rápido.
     for (const r of this.rastro) {
-      const a = clamp01(r.t / 0.24);
+      const a = clamp01(r.t / 0.26);
       ctx.save();
-      ctx.globalAlpha = a * 0.34;
+      ctx.globalAlpha = a * 0.3;
       ctx.translate(r.x, r.y);
       ctx.scale(r.dir, 1);
-      ctx.fillStyle = tema.acento;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, 12 * a + 4, 20 * a + 6, 0, 0, TAU);
-      ctx.fill();
+      ctx.fillStyle = cores.claro;
+      this._silhuetaSimples(ctx, 1 + (1 - a) * 0.3);
       ctx.restore();
     }
+
+    if (!j.visivel) return;
+
+    // A cauda é desenhada em MUNDO (é onde ela é simulada), antes do corpo.
+    this._cauda(ctx, j, cores);
 
     ctx.save();
     ctx.translate(j.centroX, j.pesY);
     ctx.rotate(j.inclinacao);
     ctx.scale(j.direcao * j.esticar, j.achatar);
-    // A partir daqui: origem nos PÉS, olhando pra direita, y negativo = cima.
 
-    this._capa(ctx, j, tema);
-    this._pernas(ctx, j, tema);
-    this._corpo(ctx, j, tema);
-    this._bracos(ctx, j, tema);
-    this._cabeca(ctx, j, tema);
-    this._broto(ctx, j, tema);
+    this._pernas(ctx, j, cores);
+    this._corpo(ctx, j, cores, tema);
+    this._bracos(ctx, j, cores);
+    this._cabeca(ctx, j, cores, tema);
 
     ctx.restore();
 
     this._ataque(ctx, j, tema);
   }
 
-  _capa(ctx, j, tema) {
-    // A capa vive em coordenadas de MUNDO (a simulação é lá), então
-    // desfazemos a transformação local pra desenhá-la.
-    ctx.save();
-    ctx.setTransform(ctx.getTransform());
-    ctx.restore();
-
-    ctx.save();
-    ctx.scale(j.direcao, 1);   // volta pra orientação neutra dentro do corpo
-    ctx.scale(j.direcao, 1);
-    const pts = this.capa;
-    ctx.beginPath();
-    ctx.moveTo(-6, -30);
-    // Aproxima a cadeia em coordenadas locais relativas ao corpo.
-    for (let i = 0; i < pts.length; i++) {
-      const s = pts[i];
-      const lx = (s.x - j.centroX) * j.direcao;
-      const ly = s.y - j.pesY;
-      const largura = lerp(9, 2.5, i / (pts.length - 1));
-      ctx.lineTo(lx - largura, ly);
-    }
-    for (let i = pts.length - 1; i >= 0; i--) {
-      const s = pts[i];
-      const lx = (s.x - j.centroX) * j.direcao;
-      const ly = s.y - j.pesY;
-      const largura = lerp(9, 2.5, i / (pts.length - 1));
-      ctx.lineTo(lx + largura, ly);
-    }
-    ctx.lineTo(6, -30);
-    ctx.closePath();
-    ctx.fillStyle = misturarHex(tema.primeiroPlano, tema.terreno, 0.35);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  _pernas(ctx, j, tema) {
-    const cor = tema.primeiroPlano;
-    ctx.fillStyle = cor;
-    const noAr = !j.noChao;
-    const passo = Math.sin(j.faseAndar);
-    const passo2 = Math.sin(j.faseAndar + Math.PI);
-    const amp = j.estado === ESTADOS.CORRENDO ? 5.5 : 0;
-
-    const perna = (dx, fase) => {
-      ctx.beginPath();
-      if (noAr) {
-        // No ar as pernas recolhem — silhueta compacta lê melhor em pulo.
-        const recolhe = clamp01(-j.vy / 400);
-        ctx.ellipse(dx + 1, -6 + recolhe * 2, 3.4, 6 - recolhe * 2, 0.3 * fase, 0, TAU);
-      } else {
-        ctx.ellipse(dx + fase * amp, -5, 3.2, 6, fase * 0.22, 0, TAU);
-      }
-      ctx.fill();
+  /** Uma paleta derivada do tema — o personagem esfria junto com a área. */
+  _cores(tema) {
+    // Base quase branca, levemente tingida pela luz dominante da área: é o
+    // que integra o personagem à cena em vez de deixá-lo como adesivo.
+    const claro = misturarHex('#f4f8f6', tema.luz, 0.22);
+    return {
+      claro,
+      meio: misturarHex(claro, tema.ceuBase, 0.30),
+      sombra: misturarHex(claro, tema.ceuTopo, 0.58),
+      escuro: tema.ceuTopo,
+      marca: tema.crista,
+      acento: tema.acento,
     };
-    perna(-4, passo);
-    perna(4, passo2);
   }
 
-  _corpo(ctx, j, tema) {
-    const g = ctx.createLinearGradient(0, -34, 0, -6);
-    g.addColorStop(0, misturarHex(tema.primeiroPlano, tema.terreno, 0.28));
-    g.addColorStop(1, tema.primeiroPlano);
-    ctx.fillStyle = g;
+  /** Contorno tosco usado só pelo rastro fantasma. */
+  _silhuetaSimples(ctx, escala) {
     ctx.beginPath();
-    // Tronco em forma de sino — ombros estreitos, base larga (o casaco).
-    ctx.moveTo(-6, -32);
-    ctx.bezierCurveTo(-11, -22, -12, -14, -10, -5);
-    ctx.lineTo(10, -5);
-    ctx.bezierCurveTo(12, -14, 11, -22, 6, -32);
-    ctx.closePath();
+    ctx.ellipse(0, -16 * escala, 9 * escala, 15 * escala, 0, 0, TAU);
     ctx.fill();
-
-    // Debrum na barra — uma linha só, pra dar acabamento sem sujar.
-    ctx.strokeStyle = rgba(tema.crista, 0.3);
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(-10, -6);
-    ctx.lineTo(10, -6);
-    ctx.stroke();
   }
 
-  _bracos(ctx, j, tema) {
-    ctx.fillStyle = tema.primeiroPlano;
-    const atacando = j.ataqueRestante > 0;
-    const t = atacando ? 1 - j.ataqueRestante / 0.22 : 0;
-    const balanço = j.noChao ? Math.sin(j.faseAndar + Math.PI) * 4 : -3;
+  _cauda(ctx, j, cores) {
+    const pts = this.cauda;
+    const n = pts.length;
 
-    // braço de trás
-    ctx.save();
-    ctx.globalAlpha = 0.75;
-    ctx.beginPath();
-    ctx.ellipse(-7, -20 + balanço * 0.3, 2.8, 7, -0.2, 0, TAU);
-    ctx.fill();
-    ctx.restore();
-
-    // braço da frente — durante o ataque acompanha o arco do golpe
-    ctx.beginPath();
-    if (atacando) {
-      const ang = lerp(-1.1, 0.9, easeOutCubic(t));
+    // Duas passadas: um brilho largo e difuso por baixo, o traço sólido em
+    // cima. Isso dá a impressão de matéria luminosa em vez de um fio.
+    for (const [larguraBase, cor, alfa] of [[6.5, cores.meio, 0.35], [3.6, cores.claro, 1]]) {
       ctx.save();
-      ctx.translate(7, -21);
-      ctx.rotate(ang);
-      ctx.ellipse(0, 5, 2.9, 8, 0, 0, TAU);
+      ctx.globalAlpha = alfa;
+      ctx.strokeStyle = cor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      // Espessura decrescente: desenhada em segmentos porque o canvas não
+      // tem traço de espessura variável.
+      for (let i = 0; i < n - 1; i++) {
+        const f = i / (n - 1);
+        ctx.lineWidth = larguraBase * (1 - f * 0.82);
+        ctx.beginPath();
+        ctx.moveTo(pts[i].x, pts[i].y);
+        ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Tufo na ponta.
+    const p = pts[n - 1];
+    ctx.fillStyle = cores.claro;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, 3.4, 2.6, 0, 0, TAU);
+    ctx.fill();
+  }
+
+  _pernas(ctx, j, cores) {
+    const noAr = !j.noChao;
+    const correndo = j.estado === ESTADOS.CORRENDO;
+    const amp = correndo ? clamp(Math.abs(j.vx) / 232, 0, 1) : 0;
+
+    ctx.strokeStyle = cores.meio;
+    ctx.lineCap = 'round';
+    // Grossas o bastante pra ler: com 3,2px as pernas sumiam em tamanho real
+    // e o personagem parecia flutuar sobre o chão em vez de pisar nele.
+    ctx.lineWidth = 4.2;
+
+    const perna = (dxQuadril, fase, atras) => {
+      ctx.save();
+      ctx.globalAlpha = atras ? 0.7 : 1;
+      ctx.strokeStyle = atras ? cores.sombra : cores.meio;
+
+      let joelhoX, joelhoY, peX, peY;
+      if (noAr) {
+        // No ar as pernas recolhem — silhueta compacta lê muito melhor em
+        // pulo do que pernas esticadas.
+        const recolhe = clamp01(0.4 - j.vy / 900);
+        joelhoX = dxQuadril + 3 * fase;
+        joelhoY = -9 + recolhe * 2;
+        peX = dxQuadril + 5 * fase;
+        peY = -3 - recolhe * 3;
+      } else {
+        // Ciclo de passada: o pé desenha uma elipse achatada, o joelho
+        // acompanha a meio caminho. Simples e suficiente nessa escala.
+        const s = Math.sin(fase), c = Math.cos(fase);
+        peX = dxQuadril + s * 7 * amp;
+        peY = -Math.max(0, c) * 5 * amp;
+        joelhoX = dxQuadril + s * 3.5 * amp;
+        joelhoY = -6 - Math.max(0, c) * 2 * amp;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(dxQuadril, -13);
+      ctx.quadraticCurveTo(joelhoX, joelhoY, peX, peY);
+      ctx.stroke();
+
+      // Pé: um ponto, não um sapato. Menos é mais nessa escala.
+      ctx.fillStyle = atras ? cores.sombra : cores.claro;
+      ctx.beginPath();
+      ctx.ellipse(peX, peY, 3, 2.2, 0, 0, TAU);
       ctx.fill();
       ctx.restore();
-    } else {
-      ctx.ellipse(8, -20 - balanço * 0.3, 2.9, 7, 0.18, 0, TAU);
-      ctx.fill();
-    }
+    };
+
+    perna(-3.5, j.faseAndar + Math.PI, true);
+    perna(3.5, j.faseAndar, false);
   }
 
-  _cabeca(ctx, j, tema) {
-    const flutuar = Math.sin(j.faseFlutuar * 2.1) * 0.7;
-    const cy = -37 + flutuar;
+  _corpo(ctx, j, cores, tema) {
+    const respiro = Math.sin(this.respiro * 1.9) * 0.5;
 
-    // capuz (parte do casaco, envolve a máscara)
-    ctx.fillStyle = misturarHex(tema.primeiroPlano, tema.terreno, 0.18);
+    // Tronco: gota invertida, ombros estreitos, quadril arredondado.
+    //
+    // O gradiente vai de BRANCO puro no alto até a cor de sombra embaixo, e
+    // não de `claro` a `meio` como antes: com pouca diferença entre as duas
+    // pontas o corpo virava um borrão cinza sem volume — parecia marshmallow.
+    // A faixa larga de valor é o que dá forma de corpo a uma silhueta chapada.
+    const g = ctx.createLinearGradient(0, -31, 0, -8);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.42, cores.claro);
+    g.addColorStop(1, cores.sombra);
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(-8, cy + 6);
-    ctx.bezierCurveTo(-10, cy - 6, -5, cy - 11, 1, cy - 11);
-    ctx.bezierCurveTo(7, cy - 11, 10, cy - 5, 9, cy + 6);
+    ctx.moveTo(0, -30 - respiro);
+    ctx.bezierCurveTo(-7, -28, -8.5, -20, -6.5, -12);
+    ctx.bezierCurveTo(-5, -8.5, 5, -8.5, 6.5, -12);
+    ctx.bezierCurveTo(8.5, -20, 7, -28, 0, -30 - respiro);
     ctx.closePath();
     ctx.fill();
 
-    // máscara pálida — a forma mais clara do personagem, o "rosto" que lê
-    ctx.fillStyle = misturarHex('#e8e2d0', tema.luz, 0.28);
+    // Luz de borda no lado das costas: separa o corpo do fundo escuro mesmo
+    // quando a silhueta encosta numa parede da mesma cor.
+    ctx.save();
+    ctx.strokeStyle = rgba('#ffffff', 0.5);
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.ellipse(1.5, cy, 6.2, 7, 0, 0, TAU);
-    ctx.fill();
+    ctx.moveTo(-6.4, -12.5);
+    ctx.bezierCurveTo(-8.4, -20, -7, -28, 0, -30 - respiro);
+    ctx.stroke();
+    ctx.restore();
 
-    // olhos — dois vazios escuros. Piscar fecha em fenda.
-    const abertura = this.piscar > 0 ? 0.18 : 1;
-    ctx.fillStyle = rgba(tema.ceuTopo, 0.9);
-    for (const dx of [-1.6, 4.2]) {
+    // Marcas de nervura de folha — o medidor de restauração vestido no corpo.
+    const f = this.floracao;
+    if (f > 0.02) {
+      ctx.save();
+      ctx.globalAlpha = 0.25 + f * 0.75;
+      ctx.strokeStyle = cores.marca;
+      ctx.lineWidth = 1;
+      ctx.lineCap = 'round';
+      // Nervura central.
       ctx.beginPath();
-      ctx.ellipse(dx, cy - 0.5, 1.5, 2.4 * abertura, 0, 0, TAU);
-      ctx.fill();
+      ctx.moveTo(0, -26);
+      ctx.lineTo(0, -13);
+      ctx.stroke();
+      // Nervuras laterais, abrindo de baixo pra cima conforme floresce.
+      const pares = Math.round(lerp(1, 4, f));
+      for (let i = 0; i < pares; i++) {
+        const y = -15 - i * 3.4;
+        const largura = lerp(1.5, 4.2, f) * (1 - i * 0.13);
+        for (const lado of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.quadraticCurveTo(lado * largura * 0.7, y - 0.4, lado * largura, y - 2);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
     }
   }
 
-  _broto(ctx, j, tema) {
-    const f = this.floracao;
-    const cy = -37 + Math.sin(j.faseFlutuar * 2.1) * 0.7;
-    const alturaCaule = lerp(4, 11, f);
+  _bracos(ctx, j, cores) {
+    const atacando = j.ataqueRestante > 0;
+    const t = atacando ? 1 - j.ataqueRestante / 0.22 : 0;
+    const balanco = j.noChao ? Math.sin(j.faseAndar + Math.PI) * 3 : -2;
 
-    ctx.strokeStyle = misturarHex(tema.borda, tema.crista, f);
-    ctx.lineWidth = 1.5;
     ctx.lineCap = 'round';
+    ctx.lineWidth = 2.8;
+
+    // Braço de trás.
+    ctx.strokeStyle = cores.sombra;
     ctx.beginPath();
-    ctx.moveTo(1, cy - 9);
-    ctx.quadraticCurveTo(1 + Math.sin(j.faseFlutuar * 1.4) * 2, cy - 9 - alturaCaule * 0.6,
-      3, cy - 9 - alturaCaule);
+    ctx.moveTo(-5, -25);
+    ctx.quadraticCurveTo(-8, -21 + balanco * 0.3, -7, -16 + balanco * 0.4);
     ctx.stroke();
 
-    if (f > 0.06) {
-      // Pétalas abrem em leque conforme a floração.
-      const n = 5;
-      ctx.fillStyle = tema.acento;
-      for (let i = 0; i < n; i++) {
-        const a = -Math.PI / 2 + (i - (n - 1) / 2) * lerp(0.1, 0.62, f);
-        const r = lerp(0.8, 3.4, f);
-        ctx.save();
-        ctx.translate(3, cy - 9 - alturaCaule);
-        ctx.rotate(a);
-        ctx.beginPath();
-        ctx.ellipse(0, -r * 0.9, r * 0.55, r, 0, 0, TAU);
-        ctx.fill();
-        ctx.restore();
-      }
+    // Braço da frente — durante o ataque acompanha o arco do golpe.
+    ctx.strokeStyle = cores.meio;
+    ctx.beginPath();
+    if (atacando) {
+      // Antecipação (recuo) nos primeiros 22%, depois o golpe.
+      const ang = t < 0.22
+        ? lerp(-0.4, -1.25, easeOutQuad(t / 0.22))
+        : lerp(-1.25, 1.05, easeOutCubic((t - 0.22) / 0.78));
+      ctx.save();
+      ctx.translate(5, -24);
+      ctx.rotate(ang);
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(1.5, 5, 1, 10);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      ctx.moveTo(5, -25);
+      ctx.quadraticCurveTo(8, -21 - balanco * 0.3, 7, -16 - balanco * 0.4);
+      ctx.stroke();
     }
+  }
+
+  _cabeca(ctx, j, cores, tema) {
+    const flutuar = Math.sin(this.respiro * 2.1) * 0.6;
+    const cy = CY_CABECA + flutuar;
+
+    this._orelhas(ctx, cy, cores);
+
+    // Crânio: quase circular, um pouco mais estreito no queixo.
+    const g = ctx.createRadialGradient(-2, cy - 3, 1, 0, cy, RAIO_CABECA * 1.5);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.5, cores.claro);
+    g.addColorStop(1, cores.meio);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(-RAIO_CABECA, cy - 1);
+    ctx.bezierCurveTo(-RAIO_CABECA, cy - 9, RAIO_CABECA, cy - 9, RAIO_CABECA, cy - 1);
+    ctx.bezierCurveTo(RAIO_CABECA, cy + 6.5, 2, cy + 9.5, 0, cy + 9.5);
+    ctx.bezierCurveTo(-2, cy + 9.5, -RAIO_CABECA, cy + 6.5, -RAIO_CABECA, cy - 1);
+    ctx.closePath();
+    ctx.fill();
+
+    this._olhos(ctx, cy, cores, j);
+  }
+
+  _orelhas(ctx, cy, cores) {
+    // Duas orelhas longas, varridas pra trás, ABERTAS EM V. A de trás é mais
+    // escura e menor — dá volume sem precisar de sombreado.
+    //
+    // Sobre o ângulo, que já saiu errado uma vez: o desenho olha para +x, e
+    // uma rotação θ leva o eixo local +y (onde a orelha é traçada) para
+    // (−sen θ, cos θ). Para a orelha subir e ir para TRÁS é preciso
+    // −sen θ < 0 e cos θ < 0, ou seja θ entre π/2 e π. Com θ ≈ −2,05 as duas
+    // apontavam para a FRENTE e, por ficarem quase no mesmo ângulo, se
+    // fundiam numa lâmina só.
+    const BASE_ANG = [2.12, 2.62];   // frente e trás — a diferença é o "V"
+    for (let i = 1; i >= 0; i--) {
+      const o = this.orelhas[i];
+      const atras = i === 1;
+      const comprimento = atras ? 18 : 23;
+      const largura = atras ? 3.0 : 3.8;
+      ctx.save();
+      ctx.translate(atras ? -5 : -0.5, cy - 5.5);
+      // `ang` negativo = mais varrida para trás, então SOMA em θ.
+      ctx.rotate(BASE_ANG[i] - o.ang * 0.5);
+      ctx.fillStyle = atras ? cores.sombra : cores.claro;
+      ctx.beginPath();
+      ctx.moveTo(-largura * 0.5, 0);
+      // Curva com uma leve barriga e ponta fina.
+      ctx.bezierCurveTo(
+        -largura, comprimento * 0.45,
+        -largura * 0.35, comprimento * 0.82,
+        0, comprimento
+      );
+      ctx.bezierCurveTo(
+        largura * 0.5, comprimento * 0.8,
+        largura, comprimento * 0.4,
+        largura * 0.5, 0
+      );
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  _olhos(ctx, cy, cores, j) {
+    // Olhos grandes e escuros com um ponto de luz — é o traço que mais
+    // carrega expressão, e o que mais lembra o Ori. Ficam adiantados na
+    // direção do olhar.
+    const abertura = this.piscar > 0 ? 0.12
+      : j.estado === ESTADOS.ATORDOADO ? 0.35
+      : j.estado === ESTADOS.MORTO ? 0.06
+      : j.estado === ESTADOS.INVESTIDA ? 0.72   // semicerrados na velocidade
+      : 1;
+
+    const olho = (dx, escala) => {
+      ctx.fillStyle = cores.escuro;
+      ctx.beginPath();
+      ctx.ellipse(dx, cy - 0.5, 3.1 * escala, 4.3 * escala * abertura, 0.06, 0, TAU);
+      ctx.fill();
+      if (abertura > 0.5) {
+        // Reflexo: fora de centro e pequeno, senão vira olho de desenho fofo.
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.ellipse(dx + 1 * escala, cy - 2 * escala, 0.95 * escala, 1.15 * escala, 0, 0, TAU);
+        ctx.fill();
+      }
+    };
+
+    olho(-2.6, 0.82);   // olho de trás: menor, dá perspectiva de 3/4
+    olho(3.4, 1);
   }
 
   _ataque(ctx, j, tema) {
     if (j.ataqueRestante <= 0) return;
     const t = 1 - j.ataqueRestante / 0.22;
-    const a = Math.sin(clamp01(t) * Math.PI);
+    if (t < 0.18) return;   // antecipação: nada visível ainda
+    const k = (t - 0.18) / 0.82;
+    const a = Math.sin(clamp01(k) * Math.PI);
+
     ctx.save();
-    ctx.translate(j.centroX + j.direcao * 22, j.centroY);
+    ctx.translate(j.centroX + j.direcao * 20, j.centroY - 4);
     ctx.scale(j.direcao, 1);
-    ctx.globalAlpha = a * 0.9;
-    // Arco fino, alongado — corte, não bola de luz.
-    ctx.strokeStyle = tema.crista;
-    ctx.lineWidth = lerp(6, 1.5, t);
+    ctx.globalAlpha = a * 0.95;
+    // Arco fino e alongado: um CORTE, não uma bola de luz.
+    ctx.strokeStyle = misturarHex('#ffffff', tema.crista, 0.5);
+    ctx.lineWidth = lerp(7, 1.2, k);
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(0, 0, 26, lerp(-1.5, -0.5, t), lerp(0.4, 1.5, t));
+    ctx.arc(0, 0, lerp(20, 30, k), lerp(-1.7, -0.7, k), lerp(0.3, 1.5, k));
     ctx.stroke();
     ctx.restore();
   }
 
-  /** Passe emissivo — só o que EMITE luz. Chamado por render.emissivo(). */
+  /* ---------------------------------------------------------------------
+     PASSE EMISSIVO — o personagem é a lanterna do jogo.
+     --------------------------------------------------------------------- */
+
   desenharLuz(ctx, j, tema) {
     if (!j.visivel) return;
-    const cy = j.pesY - 37;
+    const cy = j.pesY + CY_CABECA;
 
-    // Máscara: brilho fraco e constante — a presença do personagem no escuro.
-    luzRadial(ctx, j.centroX + 1.5 * j.direcao, cy, 26, tema.luz, 0.34 + j.brilho * 0.4);
+    // 1. Halo grande e fraco: é o que ILUMINA A CENA em volta dele. Sem
+    //    isso, andar num lugar escuro não muda nada e o mundo parece um
+    //    quadro de fundo, não um lugar em que se está.
+    const raioBase = lerp(120, 190, this.floracao);
+    luzRadial(ctx, j.centroX, j.centroY - 6, raioBase, tema.luz,
+      0.34 + this.floracao * 0.2 + j.brilho * 0.25);
 
-    // Broto florido: a luz cresce com a restauração do mundo.
+    // 2. Núcleo quente e pequeno: mantém o corpo nítido dentro do halo.
+    luzRadial(ctx, j.centroX, j.centroY - 10, 26, '#ffffff', 0.55);
+
+    // 3. Marcas acesas.
     if (this.floracao > 0.05) {
-      luzRadial(ctx, j.centroX + 3 * j.direcao, cy - 18, 34 * this.floracao,
-        tema.acento, this.floracao * 0.7);
+      luzRadial(ctx, j.centroX, j.pesY - 20, 30 * this.floracao,
+        tema.crista, this.floracao * 0.65);
     }
 
+    // 4. Ações.
     if (j.ataqueRestante > 0) {
-      const a = Math.sin((1 - j.ataqueRestante / 0.22) * Math.PI);
-      luzRadial(ctx, j.centroX + j.direcao * 30, j.centroY, 44, tema.crista, a * 0.8);
+      const t = 1 - j.ataqueRestante / 0.22;
+      const a = Math.sin(clamp01(t) * Math.PI);
+      luzRadial(ctx, j.centroX + j.direcao * 30, j.centroY - 4, 46,
+        misturarHex('#ffffff', tema.crista, 0.4), a * 0.9);
     }
-
     if (j.estado === ESTADOS.INVESTIDA) {
-      luzRadial(ctx, j.centroX, j.centroY, 40, tema.acento, 0.7);
+      luzRadial(ctx, j.centroX, j.centroY, 52, tema.acento, 0.8);
+      for (const r of this.rastro) {
+        const a = clamp01(r.t / 0.26);
+        luzRadial(ctx, r.x, r.y - 22, 26 * a, tema.luz, a * 0.5);
+      }
     }
 
+    // 5. O Canto: onda que se expande junto com o efeito real de restauração.
     if (j.cantoRestante > 0) {
       const p = j.progressoCanto;
       const raio = easeOutCubic(p) * j.raioCanto;
       const forca = Math.sin(p * Math.PI);
       ctx.save();
-      ctx.strokeStyle = rgba(tema.crista, forca * 0.85);
-      ctx.lineWidth = lerp(9, 1.5, p);
+      ctx.strokeStyle = rgba(tema.crista, forca * 0.9);
+      ctx.lineWidth = lerp(10, 1.5, p);
       ctx.beginPath();
       ctx.arc(j.centroX, j.centroY, raio, 0, TAU);
       ctx.stroke();
       ctx.restore();
-      luzRadial(ctx, j.centroX, j.centroY, raio * 0.7, tema.acento, forca * 0.5);
+      luzRadial(ctx, j.centroX, j.centroY, raio * 0.75, tema.acento, forca * 0.6);
     }
   }
 }
