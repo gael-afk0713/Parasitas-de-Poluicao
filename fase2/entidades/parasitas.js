@@ -212,8 +212,11 @@ export class Sombra {
     }
 
     this._fumaca(ctx, tema, cx, cy);
-    this._tentaculos(ctx, tema, cx, cy, ferida);
+    // Massa ANTES dos tentáculos: o halo do corpo cobria a base deles quando
+    // a ordem era a inversa, e a silhueta perdia exatamente o traço que a
+    // distingue de uma bolha.
     this._massa(ctx, tema, cx, cy, ferida);
+    this._tentaculos(ctx, tema, cx, cy, ferida);
 
     ctx.restore();
   }
@@ -250,16 +253,27 @@ export class Sombra {
 
       // Afina em 4 subsegmentos: o canvas não tem espessura variável, e
       // garra de espessura constante lê como antena de inseto.
-      let ax = ox, ay = oy;
-      ctx.strokeStyle = cor;
-      for (let k = 1; k <= 4; k++) {
-        const u = k / 4, iu = 1 - u;
-        const bx = iu * iu * ox + 2 * iu * u * mx + u * u * px;
-        const by = iu * iu * oy + 2 * iu * u * my + u * u * py;
-        ctx.lineWidth = lerp(this.raio * 0.5, 0.9, (k - 0.5) / 4);
-        ctx.beginPath();
-        ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-        ax = bx; ay = by;
+      //
+      // Duas passadas: primeiro um traço mais LARGO na cor do halo, depois o
+      // traço escuro por cima. Sem isso os tentáculos ficavam invisíveis —
+      // são escuros como o corpo, e o halo em volta da massa cobria a base
+      // deles; a criatura lia como um ovo com contorno em vez da silhueta
+      // ramificada que a define.
+      for (const passada of (ferida ? ['massa'] : ['halo', 'massa'])) {
+        let ax = ox, ay = oy;
+        const extra = passada === 'halo' ? 3.2 : 0;
+        ctx.strokeStyle = passada === 'halo'
+          ? rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.38)
+          : cor;
+        for (let k = 1; k <= 4; k++) {
+          const u = k / 4, iu = 1 - u;
+          const bx = iu * iu * ox + 2 * iu * u * mx + u * u * px;
+          const by = iu * iu * oy + 2 * iu * u * my + u * u * py;
+          ctx.lineWidth = lerp(this.raio * 0.5, 0.9, (k - 0.5) / 4) + extra;
+          ctx.beginPath();
+          ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+          ax = bx; ay = by;
+        }
       }
 
       // Fio de luz na borda externa: sem ele a criatura preta some contra a
@@ -287,26 +301,48 @@ export class Sombra {
     ctx.fillStyle = cor;
 
     const onda = (a, k) => Math.sin(a * 3 + this.t * 1.7 + k) * r * 0.12;
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 1.6);                                  // ponta do capuz
-    ctx.bezierCurveTo(r * 0.46 + onda(1, 0), -r * 1.38, r * 0.92 + onda(2, 1), -r * 0.7, r, -0.08 * r);
-    if (this.temManto) {
-      ctx.bezierCurveTo(r * 1.04, r * 0.54, r * 0.77, r, r * 0.54 + onda(3, 2), r * 1.3);
-      // Barra esfarrapada: dentes irregulares dissolvendo em fumaça.
-      for (let i = 3; i >= -3; i--) {
-        const x = i * r * 0.2;
-        ctx.lineTo(x, r * 1.3 + Math.sin(i * 2.1 + this.t * 2.2) * r * 0.27);
-        ctx.lineTo(x - r * 0.1, r * 0.92 + Math.sin(i * 1.7 + this.t) * r * 0.12);
+
+    // O caminho é montado uma vez e usado DUAS: primeiro como contorno
+    // (traço largo, cor de bruma) e depois como preenchimento.
+    //
+    // Sem esse contorno a criatura é um buraco preto sobre um mundo escuro:
+    // funciona quando ela passa na frente do terreno, e SOME quando está
+    // contra a própria silhueta do fundo — que é metade do tempo. Um inimigo
+    // que só aparece às vezes não é atmosfera, é dano injusto. O contorno
+    // resolve sem clarear a criatura: ela continua sendo um vazio, mas um
+    // vazio com borda.
+    const traçarCorpo = () => {
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 1.6);                                  // ponta do capuz
+      ctx.bezierCurveTo(r * 0.46 + onda(1, 0), -r * 1.38, r * 0.92 + onda(2, 1), -r * 0.7, r, -0.08 * r);
+      if (this.temManto) {
+        ctx.bezierCurveTo(r * 1.04, r * 0.54, r * 0.77, r, r * 0.54 + onda(3, 2), r * 1.3);
+        // Barra esfarrapada: dentes irregulares dissolvendo em fumaça.
+        for (let i = 3; i >= -3; i--) {
+          const x = i * r * 0.2;
+          ctx.lineTo(x, r * 1.3 + Math.sin(i * 2.1 + this.t * 2.2) * r * 0.27);
+          ctx.lineTo(x - r * 0.1, r * 0.92 + Math.sin(i * 1.7 + this.t) * r * 0.12);
+        }
+        ctx.bezierCurveTo(-r * 0.77, r, -r * 1.04, r * 0.54, -r, -0.08 * r);
+      } else {
+        // Sem manto: fundo arredondado. É o que separa o Espreita (que flutua)
+        // dos que andam — a silhueta conta como a criatura se move.
+        ctx.bezierCurveTo(r * 1.02, r * 0.6, r * 0.6, r * 1.05, 0, r * 1.05);
+        ctx.bezierCurveTo(-r * 0.6, r * 1.05, -r * 1.02, r * 0.6, -r, -0.08 * r);
       }
-      ctx.bezierCurveTo(-r * 0.77, r, -r * 1.04, r * 0.54, -r, -0.08 * r);
-    } else {
-      // Sem manto: fundo arredondado. É o que separa o Espreita (que flutua)
-      // dos que andam — a silhueta conta como a criatura se move.
-      ctx.bezierCurveTo(r * 1.02, r * 0.6, r * 0.6, r * 1.05, 0, r * 1.05);
-      ctx.bezierCurveTo(-r * 0.6, r * 1.05, -r * 1.02, r * 0.6, -r, -0.08 * r);
+      ctx.bezierCurveTo(-r * 0.92 + onda(2, 3), -r * 0.7, -r * 0.46 + onda(1, 4), -r * 1.38, 0, -r * 1.6);
+      ctx.closePath();
+    };
+
+    if (!ferida) {
+      // Halo de separação: mais claro que a criatura E que o fundo típico.
+      ctx.strokeStyle = rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.38);
+      ctx.lineWidth = 2.6;
+      ctx.lineJoin = 'round';
+      traçarCorpo();
+      ctx.stroke();
     }
-    ctx.bezierCurveTo(-r * 0.92 + onda(2, 3), -r * 0.7, -r * 0.46 + onda(1, 4), -r * 1.38, 0, -r * 1.6);
-    ctx.closePath();
+    traçarCorpo();
     ctx.fill();
 
     if (!ferida) {
