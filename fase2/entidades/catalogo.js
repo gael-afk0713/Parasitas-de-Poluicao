@@ -46,7 +46,7 @@ class Semente {
     const j = mundo.jogador;
     if (sobrepoe(this.caixa(), { x: j.x, y: j.y, largura: j.largura, altura: j.altura })) {
       this.ativada = true;
-      mundo.ativarSemente(this.chave);
+      mundo.ativarSemente(this.chave, undefined, this.x + 14, this.y + 14);
       mundo.emitir(this.x + 14, this.y + 14, 40, {
         velMin: 60, velMax: 300, g: -40, vidaMin: 0.8, vidaMax: 2,
         cor: mundo.tema.acento, brilha: true, arrasto: 0.5,

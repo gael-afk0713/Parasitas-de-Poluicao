@@ -15,6 +15,7 @@ import {
   desenharParallax, desenharPrimeiroPlano, anguloLuzArea, desenharHorizonte,
 } from './render/parallax.js';
 import { desenharParticulas, desenharNevoa } from './render/particulas.js';
+import { nomeArea } from './render/paleta.js';
 import { criarEntidade } from './entidades/catalogo.js';
 import { Hud } from './ui/hud.js';
 import { TelaMapa } from './ui/mapa.js';
@@ -319,12 +320,28 @@ function efeitoDeEvento(ev) {
     case 'lore':
       if (ev.texto) hud.anunciar('', ev.texto, 4.5);
       break;
-    case 'semente':
+    case 'semente': {
+      /* O momento central do jogo: uma sala inteira volta a ter cor. A cor
+         sobe sozinha em 2,6 s, mas sem um EVENTO na tela a virada acontecia
+         em silêncio visual — dava pra restaurar uma sala e nem perceber.
+         Três ondas de raios diferentes, escalonadas no tempo, varrem a sala
+         a partir da semente, e o nome restaurado da área é anunciado. */
+      const ox = ev.x ?? j.centroX, oy = ev.y ?? j.centroY;
+      const alcance = Math.max(mundo.sala?.largura ?? 900, mundo.sala?.altura ?? 700);
+      efeitos.ondaCanto(ox, oy, { raio: alcance * 0.55 });
+      setTimeout(() => efeitos.ondaCanto(ox, oy, { raio: alcance * 0.85 }), 220);
+      setTimeout(() => efeitos.ondaCanto(ox, oy, { raio: alcance * 1.15 }), 520);
+      mundo.emitir(ox, oy, 60, {
+        velMin: 40, velMax: 380, g: -60, vidaMin: 1.2, vidaMax: 2.8,
+        cor: tema.crista, brilha: true, arrasto: 0.6,
+      });
       render.piscar(tema.acento, 0.5);
       camera.sacudir(0.3);
       laco.definirEscalaTempo(0.35, 0.2);
       setTimeout(() => laco.definirEscalaTempo(1, 0.7), 900);
+      setTimeout(() => hud.anunciar(nomeArea(ev.area, 1), 'a raiz respondeu', 3.6), 1400);
       break;
+    }
   }
 }
 

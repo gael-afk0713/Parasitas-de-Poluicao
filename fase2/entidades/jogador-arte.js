@@ -181,6 +181,10 @@ export class ArteJogador {
 
     if (!j.visivel) return;
 
+    // O Canto vai ATRÁS do corpo: é uma onda saindo dele, não uma casca
+    // desenhada por cima.
+    this._canto(ctx, j, tema);
+
     // A cauda é desenhada em MUNDO (é onde ela é simulada), antes do corpo.
     this._cauda(ctx, j, cores);
 
@@ -573,6 +577,60 @@ export class ArteJogador {
 
     olho(-2.6, 0.82);   // olho de trás: menor, dá perspectiva de 3/4
     olho(3.4, 1);
+  }
+
+  /**
+   * O CANTO — a onda que restaura.
+   *
+   * Existia só no passe emissivo. O passe emissivo é multiplicado por
+   * `brilhoBloom`, que numa área poluída vale 0.22: a habilidade central do
+   * jogo, a que dá nome à mecânica inteira, saía com ~9% de alfa espalhados
+   * num borrão e literalmente não aparecia na tela. Aqui ela é desenhada na
+   * CENA, e o emissivo continua existindo só para o glow por cima.
+   *
+   * O anel não é um círculo perfeito: oito lóbulos lentos deformam o raio, e
+   * é isso que faz a onda ler como coisa viva em vez de efeito de shader.
+   */
+  _canto(ctx, j, tema) {
+    if (j.cantoRestante <= 0) return;
+    const p = clamp01(j.progressoCanto);
+    const raio = easeOutCubic(p) * j.raioCanto;
+    const forca = Math.sin(p * Math.PI);
+    const cx = j.centroX, cy = j.centroY;
+
+    const anel = (r, larg, alfa, cor) => {
+      if (r <= 1 || alfa <= 0.004) return;
+      ctx.beginPath();
+      const N = 44;
+      for (let i = 0; i <= N; i++) {
+        const a = (i / N) * TAU;
+        const rr = r * (1 + 0.045 * Math.sin(a * 8 + this.respiro * 1.4)
+          + 0.03 * Math.sin(a * 3 - this.respiro));
+        const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = rgba(cor, alfa);
+      ctx.lineWidth = larg;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    };
+
+    ctx.save();
+    // Miolo lavado: o que a onda já alcançou fica um tom mais claro. É a
+    // leitura de "isto aqui já foi tocado", e some junto com a onda.
+    const g = ctx.createRadialGradient(cx, cy, raio * 0.2, cx, cy, raio);
+    g.addColorStop(0, rgba(tema.crista, 0));
+    g.addColorStop(0.72, rgba(tema.crista, forca * 0.05));
+    g.addColorStop(1, rgba(tema.crista, forca * 0.16));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(cx, cy, raio, 0, TAU);
+    ctx.fill();
+
+    anel(raio, lerp(9, 2, p), forca * 0.85, misturarHex('#ffffff', tema.crista, 0.35));
+    anel(raio * 0.82, lerp(5, 1.2, p), forca * 0.4, tema.crista);
+    anel(raio * 0.6, lerp(3, 0.8, p), forca * 0.2, tema.crista);
+    ctx.restore();
   }
 
   /**

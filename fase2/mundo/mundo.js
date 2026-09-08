@@ -156,11 +156,18 @@ export class Mundo {
    * Ativa uma semente: a sala restaura ao longo de alguns segundos.
    * Não é instantâneo de propósito — o jogador precisa VER a cor subir.
    */
-  ativarSemente(chave, salaId = this.sala?.id) {
+  ativarSemente(chave, salaId = this.sala?.id, x = null, y = null) {
     if (this.sementesAtivadas.has(chave)) return false;
     this.sementesAtivadas.add(chave);
     this._restaurando = { sala: salaId, de: this.purezaDaSala(salaId), para: 1, t: 0, dur: 2.6 };
-    this.aoEvento?.({ tipo: 'semente', sala: salaId });
+    // A posição vai junto: quem desenha o efeito precisa saber DE ONDE a
+    // restauração sai. Sem isso a onda nasceria no jogador, e o momento é da
+    // semente, não dele.
+    this.aoEvento?.({
+      tipo: 'semente', sala: salaId,
+      x: x ?? this.jogador.centroX, y: y ?? this.jogador.centroY,
+      area: this.sala?.area,
+    });
     return true;
   }
 
