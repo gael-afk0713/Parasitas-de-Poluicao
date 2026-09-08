@@ -115,9 +115,12 @@ function quadro(alpha, dtReal) {
     for (const e of mundo.entidades) e.desenharFundo?.(ctx, tema, camera);
   });
 
-  // 7 · terreno
+  // 7 · terreno (inclui plataformas e perigos)
   render.camada(1, (ctx) => mundo.arteTerreno.desenhar(ctx, tema, camera));
-  render.emissivo(1, (ctx) => mundo.arteTerreno.desenharLuz(ctx, tema));
+  render.emissivo(1, (ctx) => {
+    mundo.arteTerreno.desenharLuz(ctx, tema);
+    mundo.arteTerreno.desenharLuzEspeciais(ctx, tema, camera, laco.tempo);
+  });
 
   // 8 · entidades + jogador
   render.camada(1, (ctx) => {
@@ -133,7 +136,11 @@ function quadro(alpha, dtReal) {
     }
   });
 
-  // 9-10 · névoa rasteira + partículas
+  // 9 · água — DEPOIS das entidades, de propósito: quem entra nela precisa
+  //     aparecer submerso, e isso só acontece com a lâmina por cima.
+  render.camada(1, (ctx) => mundo.arteTerreno.desenharAgua(ctx, tema, camera, laco.tempo));
+
+  // 10 · névoa rasteira + partículas
   desenharNevoa(render, mundo);
   desenharParticulas(render, mundo);
 

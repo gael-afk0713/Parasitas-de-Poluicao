@@ -22,6 +22,8 @@ import {
   TAU, clamp01, lerp, damp, rgba, misturarHex, easeOutCubic, easeOutBack, Rng, sobrepoe,
 } from '../core/mat.js';
 import { luzRadial } from '../render/renderizador.js';
+import { criarParasita } from './parasitas.js';
+import { criarChefe } from './chefes.js';
 
 /* ==========================================================================
    Coletáveis / interativos
@@ -794,15 +796,12 @@ export function criarEntidade(obj, mundo) {
     case 'portao': return new Portao(obj, def.portao || 'investida');
     case 'lapide': return new Lapide(obj, (def.lore || [])[obj.cx % Math.max(1, (def.lore || []).length)] || '');
 
-    // --- inimigos: `entidades/parasitas.js` os substitui quando existir
-    case 'parasita': return new ParasitaBase(obj);
-    case 'voador': { const p = new ParasitaBase(obj); p.vel = 30; return p; }
-    case 'cuspidor': { const p = new ParasitaBase(obj); p.vel = 20; p.vida = 3; return p; }
-    case 'rastejante': { const p = new ParasitaBase(obj); p.vel = 70; p.vida = 1; return p; }
-    case 'explosivo': { const p = new ParasitaBase(obj); p.vel = 95; p.vida = 1; return p; }
-    case 'tecelao': { const p = new ParasitaBase(obj); p.vel = 0; p.vida = 2; return p; }
+    // --- inimigos: o bestiário vive em `entidades/parasitas.js`
+    case 'parasita': case 'voador': case 'cuspidor':
+    case 'rastejante': case 'explosivo': case 'tecelao':
+      return criarParasita(obj.tipo, obj) ?? new ParasitaBase(obj);
 
-    case 'chefe': return null;   // `entidades/chefes.js` assume
+    case 'chefe': return criarChefe(def.chefe, obj, mundo);
     default: return null;
   }
 }

@@ -194,6 +194,25 @@ export class Projetil {
 export class ProjetilReto extends Projetil {
   constructor(op = {}) {
     super({ g: 0, velGiro: 0, ...op });
+    /**
+     * Rotação constante da velocidade, em rad/s. Zero = reto de verdade.
+     *
+     * Existe para o "anel girante" do Coração: um anel com vão, em que os
+     * projéteis curvam todos no mesmo sentido, faz o VÃO VIAJAR em volta do
+     * jogador. É o que impede a resposta da fase anterior (achar o vão e
+     * ficar parado nele) de continuar funcionando na fase seguinte — a fase 2
+     * recontextualiza a fase 1 em vez de só acelerar.
+     */
+    this.curvatura = op.curvatura ?? 0;
+  }
+
+  aoAntesDeMover(dt) {
+    if (!this.curvatura) return;
+    const c = Math.cos(this.curvatura * dt);
+    const s = Math.sin(this.curvatura * dt);
+    const vx = this.vx * c - this.vy * s;
+    const vy = this.vx * s + this.vy * c;
+    this.vx = vx; this.vy = vy;
   }
 }
 
