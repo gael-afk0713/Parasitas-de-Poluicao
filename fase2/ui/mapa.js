@@ -186,19 +186,29 @@ export class TelaMapa {
     // A sala atual "cresce" um pouco na entrada — dá o ponto de foco.
     const atual = this.mundo.sala?.id;
 
-    // 1 · ligações entre salas visitadas (desenhadas por baixo)
-    ctx.strokeStyle = rgba(tema.borda, 0.7);
-    ctx.lineWidth = 1.4;
+    /* 1 · CORREDORES entre salas visitadas (por baixo dos retângulos).
+       Ligar centro com centro — que era o que estava aqui — desenha
+       diagonais que atravessam salas sem relação nenhuma com elas: lê como
+       teia de aranha, não como planta de um lugar. Um corredor sai da PORTA
+       e chega na porta oposta da vizinha, que é onde a passagem realmente
+       fica. */
+    ctx.lineCap = 'round';
     for (const def of todasAsSalas()) {
       const p = layout.pos.get(def.id);
       if (!p || !this._visitada(def.id)) continue;
       const sala = carregarSala(def.id);
-      for (const destino of Object.values(sala.ligacoes)) {
-        const q = layout.pos.get(destino?.sala);
-        if (!q || !this._visitada(destino.sala)) continue;
+      for (const porta of sala.portas) {
+        const lig = sala.ligacoes[porta.tipo];
+        if (!lig || !this._visitada(lig.sala)) continue;
+        const q = layout.pos.get(lig.sala);
+        if (!q) continue;
+        const oposta = carregarSala(lig.sala).portas.find((pt) => pt.tipo === lig.porta);
+        if (!oposta) continue;
+        ctx.strokeStyle = rgba(tema.borda, 0.85);
+        ctx.lineWidth = Math.max(1.4, Math.min(5, 26 * escala));
         ctx.beginPath();
-        ctx.moveTo(offX + (p.x + p.w / 2) * escala, offY + (p.y + p.h / 2) * escala);
-        ctx.lineTo(offX + (q.x + q.w / 2) * escala, offY + (q.y + q.h / 2) * escala);
+        ctx.moveTo(offX + (p.x + porta.x) * escala, offY + (p.y + porta.y) * escala);
+        ctx.lineTo(offX + (q.x + oposta.x) * escala, offY + (q.y + oposta.y) * escala);
         ctx.stroke();
       }
     }
@@ -217,7 +227,9 @@ export class TelaMapa {
       const w = p.w * escala;
       const h = p.h * escala;
 
-      ctx.fillStyle = misturarHex(temaSala.terreno, temaSala.crista, 0.15 + pureza * 0.4);
+      // 0.15 deixava sala poluída quase invisível contra o fundo do mapa —
+      // e sala poluída é justamente a que o jogador precisa achar.
+      ctx.fillStyle = misturarHex(temaSala.terreno, temaSala.crista, 0.3 + pureza * 0.45);
       ctx.fillRect(x, y, w, h);
       ctx.strokeStyle = def.id === atual
         ? misturarHex('#ffffff', temaSala.crista, 0.4)
@@ -248,6 +260,34 @@ export class TelaMapa {
         ctx.stroke();
       }
     }
+
+    /* 2b · PORTAS PARA O DESCONHECIDO. Um toco saindo da sala visitada, com
+       um quadrado tracejado na ponta. É a promessa que faz o jogador abrir o
+       mapa de novo: "existe alguma coisa ali, e eu ainda não fui". Sem isso o
+       mapa só conta o que já aconteceu, e não puxa pra lugar nenhum. */
+    ctx.setLineDash([3, 3]);
+    for (const def of todasAsSalas()) {
+      const p = layout.pos.get(def.id);
+      if (!p || !this._visitada(def.id)) continue;
+      const sala = carregarSala(def.id);
+      for (const porta of sala.portas) {
+        const lig = sala.ligacoes[porta.tipo];
+        if (!lig || this._visitada(lig.sala)) continue;
+        const d = DESLOC[porta.tipo] ?? [0, 0];
+        const bx = offX + (p.x + porta.x) * escala;
+        const by = offY + (p.y + porta.y) * escala;
+        const comp = Math.max(10, Math.min(26, 90 * escala));
+        ctx.strokeStyle = rgba(tema.particula, 0.55);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + d[0] * comp, by + d[1] * comp);
+        ctx.stroke();
+        const s2 = comp * 0.42;
+        ctx.strokeRect(bx + d[0] * (comp + s2) - s2, by + d[1] * (comp + s2) - s2, s2 * 2, s2 * 2);
+      }
+    }
+    ctx.setLineDash([]);
 
     // 3 · o Guardião, na posição real dentro da sala
     if (atual && layout.pos.has(atual)) {

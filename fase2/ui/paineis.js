@@ -16,6 +16,8 @@
    o gênero quer. A tela aparece, diz o que aconteceu, e sai.
    ========================================================================= */
 
+import { nomeArea } from '../render/paleta.js';
+
 const TEXTOS_MORTE = [
   'A floresta te recolhe.',
   'A luz se apaga, e volta.',
@@ -94,7 +96,12 @@ export class Paineis {
   _preencherPausa() {
     const m = this.mundo;
     const def = (id, valor) => { const e = document.getElementById(id); if (e) e.textContent = valor; };
-    def('pausa-area', m.sala ? (m.sala.def.titulo || m.sala.id) : '—');
+    /* Só salas-marco têm `titulo`; nas outras isto caía no ID cru e o painel
+       mostrava "VARZEA-02" em caixa alta no lugar do nome do lugar. O nome da
+       ÁREA sempre existe e é o que o jogador reconhece. */
+    def('pausa-area', m.sala
+      ? (m.sala.def.titulo || nomeArea(m.sala.area, m.purezaDaArea(m.sala.area)))
+      : '—');
     def('pausa-restaurado', `${Math.round(m.purezaGlobal * 100)}%`);
     def('pausa-fragmentos', String(m.fragmentosColetados.size));
     def('pausa-habilidades', m.jogador.habilidades.size
