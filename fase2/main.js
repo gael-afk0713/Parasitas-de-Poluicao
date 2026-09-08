@@ -17,6 +17,7 @@ import { criarEntidade } from './entidades/catalogo.js';
 import { Hud } from './ui/hud.js';
 import { TelaMapa } from './ui/mapa.js';
 import { Audio } from './audio/audio.js';
+import { Save } from './sistemas/save.js';
 
 // Registram-se sozinhas ao serem importadas (ver `registrarSala`).
 // A ORDEM é a ordem narrativa, e importa: `validarRegistro` reclama de
@@ -59,6 +60,18 @@ if (problemas.length) console.warn('[fase2] Problemas no mapa:\n' + problemas.jo
 
 mundo.entrarNaSala('raizes-01');
 laco.iniciar();
+
+/* ----------------------------------------------------------------- save -- */
+// A restauração é assíncrona (o Firebase confirma a sessão pela rede), então o
+// jogo já começa jogável na sala inicial e o save TROCA a sala se houver
+// progresso. É o mesmo padrão da Fase 1 — nunca deixar a tela esperando a rede.
+const save = new Save(mundo);
+save.iniciar()
+  .then((restaurou) => {
+    save.ligarGatilhos();
+    if (restaurou) hud.anunciar('Continuando', save.estado, 2.8);
+  })
+  .catch(() => { /* `iniciar` já degrada sozinho; nada a fazer aqui */ });
 
 /* -------------------------------------------------------------- abertura -- */
 // O laço já roda por trás da tela de abertura (a cena aparece viva assim que
@@ -269,6 +282,6 @@ function efeitoDeEvento(ev) {
 /* ------------------------------------------------------------------ debug --- */
 
 if (new URLSearchParams(location.search).has('debug')) {
-  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, passo, quadro };
+  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, passo, quadro };
   console.info('[fase2] modo debug: window.__fase2 disponível');
 }

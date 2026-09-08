@@ -12,7 +12,8 @@
    de forma difícil de recuperar.
    ========================================================================= */
 
-import { clamp, clamp01, lerp } from '../core/mat.js';
+import { clamp, clamp01, lerp, damp } from '../core/mat.js';
+import { Musica } from './musica.js';
 
 /** Escala menor pentatônica — soa "natural"/melancólica em qualquer ordem,
  *  o que torna melodia aleatória aceitável sem compor nada. */
@@ -62,6 +63,16 @@ export class Audio {
     this.barrAmbiente.connect(this.mestre);
 
     this._montarDrone();
+
+    // Barramento próprio pra música, separado dos efeitos: assim dá pra
+    // abaixar a trilha sem abafar o retorno de acerto/dano, que é informação
+    // de jogo e não pode sumir.
+    this.barrMusica = this.ctx.createGain();
+    this.barrMusica.gain.value = 0.5;
+    this.barrMusica.connect(this.mestre);
+    this.musica = new Musica(this.ctx, this.barrMusica);
+    this.musica.iniciar();
+
     this.pronto = true;
   }
 
@@ -100,6 +111,7 @@ export class Audio {
 
   atualizar(dt, mundo) {
     if (!this.pronto || !this.ctx) return;
+    this._alimentarMusica(dt, mundo);
     this._purezaAlvo = mundo.tema?.pureza ?? this._purezaAlvo;
     this._pureza += (this._purezaAlvo - this._pureza) * Math.min(1, dt * 0.6);
 
@@ -118,6 +130,44 @@ export class Audio {
     if (this._proximaNota <= 0) {
       this._proximaNota = lerp(9, 2.6, this._pureza) * (0.6 + Math.random());
       if (this._pureza > 0.3 && Math.random() < this._pureza) this._sino();
+    }
+  }
+
+  /**
+   * Traduz o estado do jogo em estado musical.
+   *
+   * `intensidade` não é um interruptor de "combate ligado": é uma média
+   * suavizada da ameaça na tela. Interruptor faz a trilha piscar toda vez que
+   * um inimigo entra ou sai do alcance; média suave faz ela respirar junto com
+   * a situação, que é o que se quer.
+   */
+  _alimentarMusica(dt, mundo) {
+    if (!this.musica || !mundo.sala) return;
+    const j = mundo.jogador;
+
+    let ameaca = 0, chefe = false;
+    for (const e of mundo.entidades) {
+      if (e.morta || e.perigoso === false) continue;
+      if (e.ehChefe) { chefe = true; ameaca = 1; continue; }
+      const ex = e.centroX ?? e.x, ey = e.centroY ?? e.y;
+      const d = Math.hypot(j.centroX - ex, j.centroY - ey);
+      if (d < 420) ameaca += 1 - d / 420;
+    }
+    // Vida baixa também conta como tensão, mesmo sem inimigo perto.
+    ameaca += (1 - j.vida / Math.max(1, j.vidaMax)) * 0.5;
+
+    this._intensidade = damp(this._intensidade ?? 0, clamp01(ameaca / 2.2), 0.7, dt);
+    this.musica.definirEstado({
+      area: mundo.sala.area,
+      pureza: mundo.tema?.pureza ?? 0,
+      intensidade: this._intensidade,
+      chefe,
+    });
+  }
+
+  definirVolumeMusica(v) {
+    if (this.barrMusica) {
+      this.barrMusica.gain.setTargetAtTime(clamp01(v), this.ctx.currentTime, 0.2);
     }
   }
 

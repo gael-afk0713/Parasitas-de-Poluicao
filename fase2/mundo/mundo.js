@@ -304,12 +304,23 @@ export class Mundo {
 
   /* ------------------------------------------------------------------ save -- */
 
+  /**
+   * Estado completo, pronto pro Firestore.
+   *
+   * Precisa conter TUDO que é permanente, e o teste é simples: se um objeto
+   * consumido reaparecer depois de recarregar, faltou uma chave aqui. Foi o
+   * caso de `fragmentos`/`barreiras` na primeira versão — a pureza voltava
+   * certa, mas os fragmentos já coletados renasciam.
+   */
   paraSave() {
     return {
+      versao: 1,
       sala: this.sala?.id ?? null,
       jogador: this.jogador.paraSave(),
       pureza: Object.fromEntries(this.pureza),
       sementes: [...this.sementesAtivadas],
+      fragmentos: [...this.fragmentosColetados],
+      barreiras: [...this.barreirasQuebradas],
       checkpoint: this.checkpoint,
     };
   }
@@ -318,14 +329,22 @@ export class Mundo {
     if (!dados) return false;
     this.pureza = new Map(Object.entries(dados.pureza || {}));
     this.sementesAtivadas = new Set(dados.sementes || []);
+    this.fragmentosColetados = new Set(dados.fragmentos || []);
+    this.barreirasQuebradas = new Set(dados.barreiras || []);
     this.checkpoint = dados.checkpoint || this.checkpoint;
+
+    // Renasce no último ponto de salvamento, não onde parou: é o contrato do
+    // gênero, e evita restaurar o jogador no meio de uma queda ou dentro de
+    // um chefe.
     const destino = dados.checkpoint?.sala || dados.sala;
-    if (destino) {
-      this.entrarNaSala(destino, dados.checkpoint?.sala ? dados.checkpoint : null);
-      this.jogador.aplicarSave(dados.jogador);
-      return true;
-    }
-    return false;
+    if (!destino) return false;
+
+    // A vida máxima depende dos fragmentos, então tem que ser reaplicada
+    // ANTES de entrar na sala (a UI lê `vidaMax` no primeiro quadro).
+    this.jogador.aplicarSave(dados.jogador);
+    this.entrarNaSala(destino, dados.checkpoint?.sala ? dados.checkpoint : null);
+    this.jogador.aplicarSave(dados.jogador);   // `entrarNaSala` mexe em x/y
+    return true;
   }
 }
 
