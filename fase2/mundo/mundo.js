@@ -63,6 +63,7 @@ export class Mundo {
     this.checkpoint = { sala: null, x: 0, y: 0 };
 
     this.trocandoDeSala = false;
+    this._revivendo = false;
     this._purezaExibida = 0;   // suavizada, é a que vai pro tema
     this.tema = resolver('raizes', 0);
 
@@ -269,18 +270,32 @@ export class Mundo {
     this.arteJogador.atualizar(dtReal, this.jogador);
   }
 
+  /**
+   * Renascer no checkpoint.
+   *
+   * O guarda `_revivendo` NÃO é preciosismo: `atualizar` chama isto a cada
+   * passo enquanto o jogador está morto, e `Transicao.cortar` zera o próprio
+   * relógio a cada chamada. Com 120 passos por segundo zerando e um único
+   * `atualizar(dtReal)` por quadro avançando, o fade NUNCA chegava ao fim — o
+   * jogo travava de vez na tela escura depois de qualquer morte. É o mesmo
+   * padrão do `trocandoDeSala` em `_tentarPorta`, que já existia aqui do lado.
+   */
   reviverNoCheckpoint() {
+    if (this._revivendo) return;
+    this._revivendo = true;
     const cp = this.checkpoint;
     if (cp.sala && cp.sala !== this.sala?.id) {
       this._transicao(() => {
         this.entrarNaSala(cp.sala, { x: cp.x, y: cp.y });
         this.jogador.reviver(cp.x - this.jogador.largura / 2, cp.y - this.jogador.altura);
+        this._revivendo = false;
       });
     } else {
       const p = cp.sala ? cp : this.sala.inicio;
       this._transicao(() => {
         this.jogador.reviver(p.x - this.jogador.largura / 2, p.y - this.jogador.altura);
         this.camera.encaixar(this.jogador.centroX, this.jogador.centroY);
+        this._revivendo = false;
       });
     }
   }
