@@ -184,19 +184,82 @@ export class ArteJogador {
     // A cauda é desenhada em MUNDO (é onde ela é simulada), antes do corpo.
     this._cauda(ctx, j, cores);
 
+    const pose = this._pose(j);
+
     ctx.save();
     ctx.translate(j.centroX, j.pesY);
-    ctx.rotate(j.inclinacao);
+    ctx.rotate(j.inclinacao + pose.tombo);
     ctx.scale(j.direcao * j.esticar, j.achatar);
 
-    this._pernas(ctx, j, cores);
-    this._corpo(ctx, j, cores, tema);
-    this._bracos(ctx, j, cores);
-    this._cabeca(ctx, j, cores, tema);
+    this._pernas(ctx, j, cores, pose);
+    this._corpo(ctx, j, cores, tema, pose);
+    this._bracos(ctx, j, cores, pose);
+    this._cabeca(ctx, j, cores, tema, pose);
 
     ctx.restore();
 
     this._ataque(ctx, j, tema);
+  }
+
+  /**
+   * A POSE de cada estado.
+   *
+   * Sem isto, correr, pular, cair e ficar parado desenhavam praticamente a
+   * mesma figura — só o ciclo das pernas mudava, e num personagem de 44 px
+   * isso é invisível. Um jogo de plataforma se lê pela SILHUETA do estado: o
+   * jogador precisa saber que está subindo, caindo ou correndo pelo formato,
+   * não pelo que a física está fazendo por baixo.
+   *
+   * Os quatro parâmetros que mudam a silhueta, e o que cada um comunica:
+   *   tombo    inclinação do corpo inteiro — direção e urgência
+   *   cabecaY  cabeça mais alta (leve) ou enfiada nos ombros (impacto)
+   *   cabecaX  cabeça à frente = ímpeto; atrás = recuo/queda
+   *   encolhe  o quanto as pernas se recolhem
+   */
+  _pose(j) {
+    const p = { tombo: 0, cabecaX: 0, cabecaY: 0, encolhe: 0, bracos: 0 };
+    switch (j.estado) {
+      case ESTADOS.CORRENDO:
+        // Inclina PRA FRENTE. É a leitura mais forte de "estou indo".
+        p.tombo = 0.13;
+        p.cabecaX = 2.2; p.cabecaY = 0.8; p.bracos = 1;
+        break;
+      case ESTADOS.PULANDO:
+        // Arqueia pra trás e recolhe as pernas: corpo em vírgula subindo.
+        p.tombo = -0.1;
+        p.cabecaX = -1; p.cabecaY = -1.6; p.encolhe = 1; p.bracos = -0.7;
+        break;
+      case ESTADOS.CAINDO:
+        // Pernas descem e os braços sobem — silhueta oposta à do pulo.
+        p.tombo = 0.06;
+        p.cabecaX = 0.5; p.cabecaY = 1.2; p.encolhe = -0.5; p.bracos = -1.2;
+        break;
+      case ESTADOS.PLANEIO:
+        // Aberto, quase deitado no ar.
+        p.tombo = -0.22; p.cabecaY = -0.8; p.encolhe = 0.3; p.bracos = -1.6;
+        break;
+      case ESTADOS.INVESTIDA:
+        // Esticado na horizontal, cabeça bem à frente.
+        p.tombo = 0.3; p.cabecaX = 4; p.cabecaY = 2; p.encolhe = 1.3; p.bracos = 1.5;
+        break;
+      case ESTADOS.PAREDE:
+        p.tombo = -0.08; p.cabecaX = -1.5; p.encolhe = 0.6;
+        break;
+      case ESTADOS.ATORDOADO:
+        // Cabeça pra trás, corpo cedendo — leitura clara de "levei dano".
+        p.tombo = -0.26; p.cabecaX = -3; p.cabecaY = 1.5; p.bracos = -1.4;
+        break;
+      case ESTADOS.CANTO:
+        // Peito aberto, cabeça pra cima: postura de quem canta.
+        p.tombo = -0.06; p.cabecaY = -2.2; p.bracos = -1.8;
+        break;
+      case ESTADOS.MORTO:
+        p.tombo = -0.5; p.cabecaY = 3; p.encolhe = -1;
+        break;
+      default:
+        break;
+    }
+    return p;
   }
 
   /** Uma paleta derivada do tema — o personagem esfria junto com a área. */
@@ -254,7 +317,7 @@ export class ArteJogador {
     ctx.fill();
   }
 
-  _pernas(ctx, j, cores) {
+  _pernas(ctx, j, cores, pose = {}) {
     const noAr = !j.noChao;
     const correndo = j.estado === ESTADOS.CORRENDO;
     const amp = correndo ? clamp(Math.abs(j.vx) / 232, 0, 1) : 0;
@@ -273,8 +336,10 @@ export class ArteJogador {
       let joelhoX, joelhoY, peX, peY;
       if (noAr) {
         // No ar as pernas recolhem — silhueta compacta lê muito melhor em
-        // pulo do que pernas esticadas.
-        const recolhe = clamp01(0.4 - j.vy / 900);
+        // pulo do que pernas esticadas. `encolhe` da pose reforça a diferença
+        // entre SUBIR (recolhido) e CAIR (estendido), que é a leitura que o
+        // jogador usa pra saber em que parte do arco ele está.
+        const recolhe = clamp01(0.4 - j.vy / 900 + (pose.encolhe ?? 0) * 0.45);
         joelhoX = dxQuadril + 3 * fase;
         joelhoY = -9 + recolhe * 2;
         peX = dxQuadril + 5 * fase;
@@ -306,7 +371,7 @@ export class ArteJogador {
     perna(3.5, j.faseAndar, false);
   }
 
-  _corpo(ctx, j, cores, tema) {
+  _corpo(ctx, j, cores, tema, pose = {}) {
     const respiro = Math.sin(this.respiro * 1.9) * 0.5;
 
     // Tronco: gota invertida, ombros estreitos, quadril arredondado.
@@ -368,10 +433,11 @@ export class ArteJogador {
     }
   }
 
-  _bracos(ctx, j, cores) {
+  _bracos(ctx, j, cores, pose = {}) {
     const atacando = j.ataqueRestante > 0;
     const t = atacando ? 1 - j.ataqueRestante / 0.22 : 0;
-    const balanco = j.noChao ? Math.sin(j.faseAndar + Math.PI) * 3 : -2;
+    const balanco = (j.noChao ? Math.sin(j.faseAndar + Math.PI) * 3 : -2)
+      + (pose.bracos ?? 0) * 3.5;
 
     ctx.lineCap = 'round';
     ctx.lineWidth = 2.8;
@@ -405,10 +471,13 @@ export class ArteJogador {
     }
   }
 
-  _cabeca(ctx, j, cores, tema) {
+  _cabeca(ctx, j, cores, tema, pose = {}) {
     const flutuar = Math.sin(this.respiro * 2.1) * 0.6;
-    const cy = CY_CABECA + flutuar;
+    const cy = CY_CABECA + flutuar + (pose.cabecaY ?? 0);
+    const cxOff = pose.cabecaX ?? 0;
 
+    ctx.save();
+    ctx.translate(cxOff, 0);
     this._orelhas(ctx, cy, cores);
 
     // Crânio: quase circular, um pouco mais estreito no queixo.
@@ -426,6 +495,7 @@ export class ArteJogador {
     ctx.fill();
 
     this._olhos(ctx, cy, cores, j);
+    ctx.restore();
   }
 
   _orelhas(ctx, cy, cores) {
@@ -438,16 +508,25 @@ export class ArteJogador {
     // −sen θ < 0 e cos θ < 0, ou seja θ entre π/2 e π. Com θ ≈ −2,05 as duas
     // apontavam para a FRENTE e, por ficarem quase no mesmo ângulo, se
     // fundiam numa lâmina só.
-    const BASE_ANG = [2.12, 2.62];   // frente e trás — a diferença é o "V"
+    // Ângulos BEM separados. Com 2,12 e 2,62 as duas se sobrepunham quase
+    // inteiras e o resultado lia como uma lâmina só com dois tons — o
+    // personagem parecia ter um chifre, não orelhas. A separação precisa ser
+    // grande o bastante pra sobreviver a 44 px de altura na tela.
+    const BASE_ANG = [1.92, 2.78];
     for (let i = 1; i >= 0; i--) {
       const o = this.orelhas[i];
       const atras = i === 1;
-      const comprimento = atras ? 18 : 23;
-      const largura = atras ? 3.0 : 3.8;
+      const comprimento = atras ? 17 : 23;
+      const largura = atras ? 2.8 : 3.8;
       ctx.save();
-      ctx.translate(atras ? -5 : -0.5, cy - 5.5);
+      // Bases afastadas na horizontal também, não só no ângulo: é o que dá o
+      // "V" visto de três quartos em vez de duas linhas saindo do mesmo ponto.
+      ctx.translate(atras ? -6.5 : 1.5, cy - 5.5);
       // `ang` negativo = mais varrida para trás, então SOMA em θ.
-      ctx.rotate(BASE_ANG[i] - o.ang * 0.5);
+      // A orelha de trás varre um pouco MAIS que a da frente: a diferença de
+      // amplitude é o que faz o par parecer dois apêndices independentes em
+      // vez de uma peça rígida girando.
+      ctx.rotate(BASE_ANG[i] - o.ang * (atras ? 0.62 : 0.46));
       ctx.fillStyle = atras ? cores.sombra : cores.claro;
       ctx.beginPath();
       ctx.moveTo(-largura * 0.5, 0);
