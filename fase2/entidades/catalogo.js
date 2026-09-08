@@ -314,9 +314,51 @@ class Portao {
   }
 }
 
+/* Grade de células vivas da sala corrente.
+   Uma parede de barreira é feita de N entidades INDEPENDENTES. Se cada uma
+   desenha o próprio contorno aceso, uma parede 4×4 vira uma grade de
+   dezesseis carimbos idênticos — lê como papel de parede, não como matéria.
+   Aqui cada célula descobre quais vizinhas existem e só acende o contorno
+   onde a massa realmente TERMINA; por dentro as células se fundem numa
+   silhueta só. A grade é reconstruída ao trocar de sala e a célula se
+   remove dela ao começar a dissolver, então o contorno abre junto com o
+   buraco que o jogador acabou de fazer. */
+const _gradeBarreira = { sala: null, celulas: new Set() };
+function gradeBarreiras(mundo) {
+  if (_gradeBarreira.sala !== mundo.sala) {
+    _gradeBarreira.sala = mundo.sala;
+    _gradeBarreira.celulas = new Set();
+    for (const e of mundo.entidades) {
+      if (e instanceof Barreira) _gradeBarreira.celulas.add(e.chave);
+    }
+  }
+  return _gradeBarreira.celulas;
+}
+
+const VIZ_DIR = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+const VIZ_UNIT = VIZ_DIR.map(([x, y]) => { const l = Math.hypot(x, y); return [x / l, y / l]; });
+// Duas células ortogonais (centros a 32px, raio ~21) se cruzam a ±40° do
+// eixo — daí o limiar 0.72 em cosseno. Na diagonal os centros ficam a 45px
+// e mal se tocam: praticamente não escondem contorno nenhum.
+const VIZ_LIMIAR = [0.72, 0.96, 0.72, 0.96, 0.72, 0.96, 0.72, 0.96];
+const N_BORDA = 40;
+
+/* Deslocamento do centro de uma célula em relação ao centro do tile.
+   Sem isso os núcleos ficam alinhados e as nervuras entre vizinhas formam
+   um xadrez perfeito dentro da massa — a parede volta a denunciar a grade
+   mesmo com a silhueta já fundida. É função pura da célula, então cada
+   barreira sabe onde fica o centro da vizinha sem consultar ninguém. */
+const JITTER = 3.4;
+const deslocCelula = (cx, cy) => [
+  (hash2(cx, cy, 211) - 0.5) * 2 * JITTER,
+  (hash2(cx, cy, 307) - 0.5) * 2 * JITTER,
+];
+
 class Barreira {
   constructor(obj) {
     this.chave = `barreira:${obj.cx},${obj.cy}`;
+    this.cx = obj.cx; this.cy = obj.cy;
+    this.viz = 0;                 // bitmask de vizinhas vivas, em VIZ_DIR
     this.x = obj.x - 16; this.y = obj.y - 32;
     this.largura = 32; this.altura = 32;
     this.perigoso = false;
@@ -324,27 +366,40 @@ class Barreira {
     this.dissolvendo = 0;
     this.morta = false;
 
-    /* Variação por posição.
-       A primeira versão desenhava a MESMA forma em todo tile, e uma parede de
-       barreira virava uma grade de carimbos idênticos — lia como cenário de
-       tile map, não como matéria orgânica. Aqui cada célula sorteia (de forma
-       determinística, pela posição) raio, rotação, número de lóbulos e fase.
-       O raio passa de 15 para 19-23, MAIOR que o meio-tile: as células
-       vizinhas se sobrepõem e a parede vira uma massa só em vez de uma
-       fileira de bolhas encostadas. */
+    /* Variação por posição. Cada célula sorteia (determinístico, pela
+       posição) raio, rotação, número de lóbulos, fase e tom. O raio é 19-23,
+       MAIOR que o meio-tile: as vizinhas se sobrepõem e a parede vira uma
+       massa contínua em vez de uma fileira de bolhas encostadas. */
     const h1 = hash2(obj.cx, obj.cy, 61);
     const h2 = hash2(obj.cx, obj.cy, 97);
     const h3 = hash2(obj.cx, obj.cy, 131);
-    this.raio = lerp(19, 23, h1);
+    // Raio um pouco maior que antes pra compensar o jitter: mesmo com duas
+    // vizinhas se afastando ao máximo, as massas continuam se tocando.
+    this.raio = lerp(21, 25, h1);
+    [this.jx, this.jy] = deslocCelula(obj.cx, obj.cy);
     this.giro = h2 * TAU;
     this.lobulos = 3 + Math.floor(h3 * 4);
     this.fase = h2 * TAU;
     this.pulsoVel = lerp(0.8, 1.5, h3);
+    // Tom próprio: variação pequena o bastante pra ler como manchas de
+    // tecido, não como células distintas.
+    this.tom = lerp(0.46, 0.56, h3);
+    this._borda = new Float64Array(N_BORDA * 3);   // x, y, ângulo — reusado
   }
   caixa() { return { x: this.x, y: this.y, largura: this.largura, altura: this.altura }; }
 
   atualizar(dt, mundo) {
     this.t += dt;
+
+    // Quem está do lado — recalculado todo quadro porque vizinhas somem.
+    const grade = gradeBarreiras(mundo);
+    let m = 0;
+    for (let i = 0; i < 8; i++) {
+      const d = VIZ_DIR[i];
+      if (grade.has(`barreira:${this.cx + d[0]},${this.cy + d[1]}`)) m |= 1 << i;
+    }
+    this.viz = m;
+
     if (this.dissolvendo > 0) {
       this.dissolvendo += dt * 1.6;
       if (this.dissolvendo >= 1) this.morta = true;
@@ -359,6 +414,9 @@ class Barreira {
       const d = Math.hypot(j.centroX - (this.x + 16), j.centroY - (this.y + 16));
       if (d <= raioAtual) {
         this.dissolvendo = 0.001;
+        // Sai da grade agora: as vizinhas abrem o contorno no mesmo quadro
+        // em que o buraco aparece.
+        gradeBarreiras(mundo).delete(this.chave);
         mundo.emitir(this.x + 16, this.y + 16, 24, {
           velMin: 50, velMax: 220, g: -30, vidaMin: 0.6, vidaMax: 1.4,
           cor: mundo.tema.crista, brilha: true, arrasto: 0.5,
@@ -384,61 +442,158 @@ class Barreira {
     }
   }
 
+  /** Raio do lóbulo num ângulo de MUNDO. O giro entra na fase em vez de num
+   *  `ctx.rotate`, porque o ângulo amostrado precisa continuar valendo pra
+   *  decidir se aquela direção tem vizinha ou não. */
+  _raioEm(a) {
+    const g = this.giro + Math.sin(this.t * 0.3 + this.fase) * 0.06;
+    return this.raio * (
+      1 + 0.14 * Math.sin((a - g) * this.lobulos + this.t * 0.9 + this.fase)
+        + 0.07 * Math.sin((a - g) * (this.lobulos * 2 + 1) - this.t * 0.6));
+  }
+
+  /** 0 = borda exposta, 1 = escondida dentro de uma célula vizinha. */
+  _cobertura(a) {
+    if (!this.viz) return 0;
+    const ca = Math.cos(a), sa = Math.sin(a);
+    let c = 0;
+    for (let i = 0; i < 8; i++) {
+      if (!(this.viz & (1 << i))) continue;
+      const u = VIZ_UNIT[i];
+      const dot = ca * u[0] + sa * u[1];
+      const lim = VIZ_LIMIAR[i];
+      if (dot > lim) c = Math.max(c, (dot - lim) / (1 - lim));
+    }
+    return c;
+  }
+
+  /** Recalcula a borda em coordenadas de mundo (x, y, ângulo). */
+  _atualizarBorda() {
+    const pulso = (1 + clamp01(this.dissolvendo) * 0.35)
+      * (1 + Math.sin(this.t * this.pulsoVel + this.fase) * 0.05);
+    const cx = this.x + 16 + this.jx, cy = this.y + 16 + this.jy;
+    const b = this._borda;
+    for (let i = 0; i < N_BORDA; i++) {
+      const a = (i / N_BORDA) * TAU;
+      const r = this._raioEm(a) * pulso;
+      b[i * 3] = cx + Math.cos(a) * r;
+      b[i * 3 + 1] = cy + Math.sin(a) * r;
+      b[i * 3 + 2] = a;
+    }
+    return pulso;
+  }
+
+  _traçar(ctx) {
+    const b = this._borda;
+    ctx.beginPath();
+    ctx.moveTo(b[0], b[1]);
+    for (let i = 1; i < N_BORDA; i++) ctx.lineTo(b[i * 3], b[i * 3 + 1]);
+    ctx.closePath();
+  }
+
+  /* A MASSA vai no passe de FUNDO, e só o detalhe no passe normal. Se cada
+     célula desenhasse massa e detalhe de uma vez, a massa da vizinha —
+     desenhada depois — cobriria as nervuras desta, e a trama sumiria por
+     baixo da parede. Separando os dois passes, todas as massas assentam
+     primeiro e as nervuras correm por cima de todas elas. */
+  desenharFundo(ctx, tema) {
+    const d = clamp01(this.dissolvendo);
+    this._atualizarBorda();
+    ctx.save();
+    ctx.globalAlpha = 1 - d;
+    // Preenchimento chapado: com alfa 1 as vizinhas se sobrepõem sem emenda
+    // e a parede vira uma silhueta só. Era o gradiente radial (claro no
+    // centro) que fazia cada tile ler como uma flor carimbada.
+    this._traçar(ctx);
+    ctx.fillStyle = misturarHex(tema.primeiroPlano, tema.ceuTopo, this.tom);
+    ctx.fill();
+    ctx.restore();
+  }
+
   desenhar(ctx, tema) {
     const d = clamp01(this.dissolvendo);
-    const pulso = 1 + Math.sin(this.t * this.pulsoVel + this.fase) * 0.05;
+    const pulso = this._atualizarBorda();
+    const b = this._borda;
+    const cx = this.x + 16 + this.jx, cy = this.y + 16 + this.jy;
 
     ctx.save();
     ctx.globalAlpha = 1 - d;
-    ctx.translate(this.x + 16, this.y + 16);
-    ctx.rotate(this.giro + Math.sin(this.t * 0.3 + this.fase) * 0.06);
-    ctx.scale((1 + d * 0.35) * pulso, (1 + d * 0.35) * pulso);
 
-    // Massa de matéria corrompida. O preenchimento é ESCURO e só o contorno
-    // é aceso: assim uma parede inteira não vira um bloco de cor sólida, e
-    // as células vizinhas se leem como uma trama em vez de um chapado.
-    const g = ctx.createRadialGradient(0, 0, this.raio * 0.15, 0, 0, this.raio);
-    g.addColorStop(0, misturarHex(tema.primeiroPlano, tema.acento, 0.42));
-    g.addColorStop(1, misturarHex(tema.primeiroPlano, tema.ceuTopo, 0.5));
-    ctx.fillStyle = g;
-
+    // 2) NERVURAS até o centro de cada vizinha viva — a parede lê como uma
+    //    trama contínua em vez de bolhas encostadas.
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = rgba(tema.acento, 0.16);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    const N = 22;
-    for (let i = 0; i <= N; i++) {
-      const a = (i / N) * TAU;
-      const r = this.raio
-        * (1 + 0.14 * Math.sin(a * this.lobulos + this.t * 0.9 + this.fase)
-             + 0.07 * Math.sin(a * (this.lobulos * 2 + 1) - this.t * 0.6));
-      const px = Math.cos(a) * r, py = Math.sin(a) * r;
-      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    for (let i = 0; i < 8; i += 2) {                 // só as ortogonais
+      if (!(this.viz & (1 << i))) continue;
+      const d0 = VIZ_DIR[i];
+      const vx = this.cx + d0[0], vy = this.cy + d0[1];
+      // Nem toda ligação existe: uma trama com TODAS as arestas volta a ser
+      // uma grade, só que desenhada. O sorteio usa a célula de MENOR índice
+      // do par, então as duas pontas concordam sobre existir ou não.
+      const kx = Math.min(this.cx, vx), ky = Math.min(this.cy, vy);
+      if (hash2(kx, ky, 53 + (i >> 1) % 2) > 0.7) continue;
+      const [ox, oy] = deslocCelula(vx, vy);
+      const ax = this.x + 16 + d0[0] * 32 + ox, ay = this.y + 16 + d0[1] * 32 + oy;
+      // Cada lado desenha só a METADE até o encontro. As duas metades são
+      // calculadas do mesmo jeito pelas duas células, então emendam.
+      const mx = (cx + ax) / 2, my = (cy + ay) / 2;
+      const arco = (hash2(kx, ky, 17) - 0.5) * 9;
+      ctx.moveTo(cx, cy);
+      ctx.quadraticCurveTo((cx + mx) / 2 - (ay - cy) * 0.05 - arco * 0.5,
+        (cy + my) / 2 + (ax - cx) * 0.05 + arco * 0.5, mx, my);
     }
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.strokeStyle = rgba(tema.acento, 0.75);
-    ctx.lineWidth = 1.3;
     ctx.stroke();
 
-    // Nervura interna: dá matéria ao miolo sem clarear a massa.
-    ctx.strokeStyle = rgba(tema.acento, 0.3);
+    // 3) NÚCLEO: pequeno e escuro, com um ponto aceso. Dá escala à massa sem
+    //    virar miolo de flor.
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, 4.2 * pulso, 3.4 * pulso, this.giro, 0, TAU);
+    ctx.fillStyle = misturarHex(tema.primeiroPlano, tema.ceuTopo, 0.78);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(cx - 1.2, cy - 1.2, 1.3, 0, TAU);
+    ctx.fillStyle = rgba(tema.acento, 0.5);
+    ctx.fill();
+
+    // 4) CONTORNO: fraco na volta inteira (matéria no miolo) e forte só onde
+    //    não há vizinha. É esse trecho forte que desenha a borda da parede
+    //    inteira, em vez de dezesseis contornos concorrentes.
+    this._traçar(ctx);
+    ctx.strokeStyle = rgba(tema.acento, 0.13);
     ctx.lineWidth = 1;
-    for (let i = 0; i < this.lobulos; i++) {
-      const a = (i / this.lobulos) * TAU + this.fase;
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.quadraticCurveTo(
-        Math.cos(a + 0.4) * this.raio * 0.45, Math.sin(a + 0.4) * this.raio * 0.45,
-        Math.cos(a) * this.raio * 0.8, Math.sin(a) * this.raio * 0.8
-      );
-      ctx.stroke();
+    ctx.stroke();
+
+    ctx.strokeStyle = rgba(tema.acento, 0.8);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    let dentro = false;
+    for (let i = 0; i <= N_BORDA; i++) {
+      const k = (i % N_BORDA) * 3;
+      if (this._cobertura(b[k + 2]) < 0.35) {
+        if (dentro) ctx.lineTo(b[k], b[k + 1]);
+        else { ctx.moveTo(b[k], b[k + 1]); dentro = true; }
+      } else dentro = false;
     }
+    ctx.stroke();
+
     ctx.restore();
   }
 
   desenharLuz(ctx, tema) {
     const d = clamp01(this.dissolvendo);
-    luzRadial(ctx, this.x + 16, this.y + 16, d > 0 ? 70 * d : 26,
-      tema.acento, d > 0 ? 1 - d : 0.3 + Math.sin(this.t * 1.5) * 0.1);
+    if (d > 0) {
+      luzRadial(ctx, this.x + 16, this.y + 16, 70 * d, tema.acento, 1 - d);
+      return;
+    }
+    // Só a borda da parede acende. Dezesseis luzes iguais somadas viram um
+    // borrão chapado de magenta bem onde deveria haver massa escura.
+    let livres = 0;
+    for (let i = 0; i < 8; i += 2) if (!(this.viz & (1 << i))) livres++;
+    if (!livres) return;
+    luzRadial(ctx, this.x + 16, this.y + 16, 26, tema.acento,
+      0.06 + 0.05 * livres + Math.sin(this.t * 1.5 + this.fase) * 0.03);
   }
 }
 

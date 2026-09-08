@@ -66,8 +66,13 @@ tela.aoRedimensionar = (w, h) => camera.redimensionar(w, h);
 entrada.ligar();
 entrada.ligarToque(document.getElementById('toque-fase2'));
 
-const problemas = validarRegistro();
-if (problemas.length) console.warn('[fase2] Problemas no mapa:\n' + problemas.join('\n'));
+// `validarRegistro` devolve { problemas, avisos }: PROBLEMA quebra o jogo
+// (porta sem saída, sala inexistente, linha curta); AVISO é cheiro de autoria.
+// Canais diferentes de propósito — misturar os dois ensina a ignorar a saída
+// inteira, que é pior do que não ter verificador.
+const { problemas, avisos } = validarRegistro();
+if (problemas.length) console.error('[fase2] Problemas no mapa:\n' + problemas.join('\n'));
+if (avisos.length) console.warn('[fase2] Avisos de mapa:\n' + avisos.join('\n'));
 
 mundo.entrarNaSala('raizes-01');
 laco.iniciar();
@@ -166,6 +171,11 @@ function quadro(alpha, dtReal) {
     mundo.arteTerreno.desenharLuz(ctx, tema);
     mundo.arteTerreno.desenharLuzEspeciais(ctx, tema, camera, laco.tempo);
   });
+
+  // 7b · decoração de chão — depois do terreno, antes das entidades: ela
+  //      pertence ao cenário, não deve tapar inimigo nem jogador.
+  render.camada(1, (ctx) => mundo.decor.desenhar(ctx, tema));
+  render.emissivo(1, (ctx) => mundo.decor.desenharLuz(ctx, tema));
 
   // 8 · entidades + jogador
   render.camada(1, (ctx) => {

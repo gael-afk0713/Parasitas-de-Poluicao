@@ -18,6 +18,7 @@ import { clamp01, lerp, damp, sobrepoe, caixaDe } from '../core/mat.js';
 import { carregarSala, PORTA_OPOSTA } from './salas.js';
 import { AREAS, resolver } from '../render/paleta.js';
 import { ArteTerreno } from '../render/terreno-arte.js';
+import { Decor } from '../render/decor.js';
 import { Jogador } from '../entidades/jogador.js';
 import { ArteJogador } from '../entidades/jogador-arte.js';
 import { FRAGMENTOS_POR_VIDA } from '../entidades/catalogo.js';
@@ -43,6 +44,7 @@ export class Mundo {
 
     this.sala = null;
     this.arteTerreno = null;
+    this.decor = null;
     this.entidades = [];
     this.particulas = [];
 
@@ -75,6 +77,7 @@ export class Mundo {
     const sala = carregarSala(id);
     this.sala = sala;
     this.arteTerreno = new ArteTerreno(sala.terreno, sala.def.semente ?? 7);
+    this.decor = new Decor(sala.terreno, sala.area, sala.def.semente ?? 7);
     sala.visitada = true;
 
     if (!this.pureza.has(id)) this.pureza.set(id, 0);
