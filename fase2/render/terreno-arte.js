@@ -420,52 +420,93 @@ export class ArteTerreno {
     }
   }
 
-  _contorno(ctx, tema) {
+  /**
+   * Contorno com espessura variável — o que diferencia traço de caneta de
+   * traço de pincel. O canvas não tem espessura variável nativa, então o
+   * traçado é quebrado em segmentos.
+   *
+   * A versão anterior fazia `beginPath`/`stroke` POR SEGMENTO, na sala
+   * inteira, todo quadro. Com o Chaikin dobrando os pontos duas vezes, isso
+   * dava milhares de chamadas de desenho por quadro e sozinho custava ~9 ms
+   * numa sala grande — mais da metade do orçamento de 60 fps.
+   *
+   * Agora os segmentos são pré-agrupados em FAIXAS DE ESPESSURA, uma vez por
+   * sala, cada faixa virando um `Path2D`. Desenhar passa a ser um punhado de
+   * `stroke` em vez de milhares, e o resultado na tela é o mesmo: a espessura
+   * continua variando ao longo do traço, só que em degraus — indistinguível
+   * a olho, porque a variação já era de 1,4 a 3,4 px.
+   */
+  _faixasContorno() {
+    if (this._contornoPronto) return this._contornoPronto;
+
+    const N = 5;   // degraus de espessura
+    const faixas = Array.from({ length: N }, (_, i) => ({
+      largura: lerp(1.4, 3.4, i / (N - 1)),
+      alfa: lerp(0.55, 1, i / (N - 1)),
+      path: new Path2D(),
+      vazia: true,
+    }));
+
     for (const c of this.terreno.contornos()) {
       const pts = c.pontos;
-      ctx.lineJoin = 'round';
-      ctx.lineCap = 'round';
-      // Espessura variável ao longo do traço: é o que diferencia caneta de
-      // pincel. Desenhado em segmentos curtos porque o canvas não tem
-      // espessura variável nativa.
       for (let i = 0; i < pts.length; i++) {
         const a = pts[i], b = pts[(i + 1) % pts.length];
         const n = ruido1(i * 0.09, this.semente + 3);
-        ctx.strokeStyle = rgba(tema.borda, lerp(0.55, 1, n));
-        ctx.lineWidth = lerp(1.4, 3.4, n);
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
-        ctx.stroke();
+        const faixa = faixas[Math.min(N - 1, Math.floor(n * N))];
+        faixa.path.moveTo(a.x, a.y);
+        faixa.path.lineTo(b.x, b.y);
+        faixa.vazia = false;
       }
+    }
+
+    this._contornoPronto = faixas.filter((f) => !f.vazia);
+    return this._contornoPronto;
+  }
+
+  _contorno(ctx, tema) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (const f of this._faixasContorno()) {
+      ctx.strokeStyle = rgba(tema.borda, f.alfa);
+      ctx.lineWidth = f.largura;
+      ctx.stroke(f.path);
     }
   }
 
-  _cristas(ctx, tema) {
-    const faixas = this.terreno.arestasSuperiores(0.5);
-    const pureza = tema.pureza ?? 0;
-
-    for (const faixa of faixas) {
-      // luz de borda
-      ctx.strokeStyle = rgba(tema.crista, lerp(0.45, 0.9, pureza));
-      ctx.lineWidth = 2.6;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      caminhoDe(ctx, faixa);
-      ctx.stroke();
-
-      // segunda passada mais fina e mais clara, deslocada 1px pra cima —
-      // sugere um bisel de luz em vez de uma linha chapada
-      ctx.strokeStyle = rgba(misturarHex(tema.crista, '#ffffff', 0.4), lerp(0.15, 0.5, pureza));
-      ctx.lineWidth = 1;
-      ctx.save();
-      ctx.translate(0, -1.2);
-      caminhoDe(ctx, faixa);
-      ctx.stroke();
-      ctx.restore();
+  /** Todas as arestas pisáveis num `Path2D` só — construído uma vez por sala. */
+  _pathCristas() {
+    if (this._cristasPronto) return this._cristasPronto;
+    const p = new Path2D();
+    for (const faixa of this.terreno.arestasSuperiores(0.5)) {
+      p.moveTo(faixa[0].x, faixa[0].y);
+      for (let i = 1; i < faixa.length; i++) p.lineTo(faixa[i].x, faixa[i].y);
     }
+    this._cristasPronto = p;
+    return p;
+  }
 
-    this._musgo(ctx, tema, faixas, pureza);
+  _cristas(ctx, tema) {
+    const pureza = tema.pureza ?? 0;
+    const path = this._pathCristas();
+
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // luz de borda
+    ctx.strokeStyle = rgba(tema.crista, lerp(0.45, 0.9, pureza));
+    ctx.lineWidth = 2.6;
+    ctx.stroke(path);
+
+    // segunda passada mais fina e mais clara, deslocada 1px pra cima —
+    // sugere um bisel de luz em vez de uma linha chapada
+    ctx.save();
+    ctx.translate(0, -1.2);
+    ctx.strokeStyle = rgba(misturarHex(tema.crista, '#ffffff', 0.4), lerp(0.15, 0.5, pureza));
+    ctx.lineWidth = 1;
+    ctx.stroke(path);
+    ctx.restore();
+
+    this._musgo(ctx, tema, this.terreno.arestasSuperiores(0.5), pureza);
   }
 
   /**
@@ -487,8 +528,46 @@ export class ArteTerreno {
   _musgo(ctx, tema, faixas, pureza) {
     if (pureza < 0.02) return;
     const densidade = clamp01(pureza);
-    const corBase = rgba(tema.crista, lerp(0.25, 0.75, densidade));
+
+    // O musgo depende SÓ da pureza (a geometria dos tufos é determinística
+    // pela posição), então regenerá-lo a cada quadro é trabalho jogado fora.
+    // Quantizar a pureza em 24 degraus e guardar o `Path2D` de cada degrau
+    // torna a transição imperceptível — a pureza leva segundos pra subir — e
+    // troca centenas de `stroke` por quadro por três.
+    const degrau = Math.round(densidade * 23);
+    if (this._musgoPronto?.degrau !== degrau) {
+      this._musgoPronto = { degrau, ...this._construirMusgo(faixas, degrau / 23) };
+    }
+    const m = this._musgoPronto;
+
+    ctx.save();
     ctx.lineCap = 'round';
+    ctx.strokeStyle = rgba(tema.crista, lerp(0.25, 0.75, densidade));
+    for (const b of m.laminas) {
+      ctx.lineWidth = b.largura;
+      ctx.stroke(b.path);
+    }
+    if (m.temFlores) {
+      ctx.fillStyle = tema.acento;
+      ctx.fill(m.flores);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * Monta os `Path2D` do musgo para uma dada densidade.
+   * Mesma geometria de antes; só que gravada em caminhos agrupados por
+   * espessura de lâmina em vez de desenhada direto.
+   */
+  _construirMusgo(faixas, densidade) {
+    const NL = 3;
+    const laminas = Array.from({ length: NL }, (_, i) => ({
+      largura: lerp(1.5, 0.7, i / (NL - 1)),
+      path: new Path2D(),
+      vazia: true,
+    }));
+    const flores = new Path2D();
+    let temFlores = false;
 
     for (let f = 0; f < faixas.length; f++) {
       const faixa = faixas[f];
@@ -521,26 +600,24 @@ export class ArteTerreno {
 
           if (h > densidade * 0.9) continue;
 
-          const lâminas = 3 + Math.floor(h2 * 4);
+          const nLaminas = 3 + Math.floor(h2 * 4);
           const alturaTufo = lerp(5, 15, h) * densidade;
-          ctx.strokeStyle = corBase;
 
-          for (let k = 0; k < lâminas; k++) {
-            const kf = lâminas === 1 ? 0 : k / (lâminas - 1) - 0.5;   // -0.5..0.5
+          for (let k = 0; k < nLaminas; k++) {
+            const kf = nLaminas === 1 ? 0 : k / (nLaminas - 1) - 0.5;   // -0.5..0.5
             // Altura cai do meio pras pontas: dá forma de tufo, não de cerca.
             const alt = alturaTufo * (1 - Math.abs(kf) * 0.85) * lerp(0.7, 1.15, hash2(k, Math.round(bx), f));
             const raiz = { x: bx + tx * kf * 7, y: by + ty * kf * 7 };
             const curva = kf * 2.2 + (h - 0.5) * 0.9;
-            ctx.lineWidth = lerp(1.5, 0.7, Math.abs(kf) * 2);
-            ctx.beginPath();
-            ctx.moveTo(raiz.x, raiz.y);
-            ctx.quadraticCurveTo(
+            const balde = laminas[Math.min(NL - 1, Math.floor(Math.abs(kf) * 2 * NL))];
+            balde.path.moveTo(raiz.x, raiz.y);
+            balde.path.quadraticCurveTo(
               raiz.x + nx * alt * 0.55 + tx * curva * 2,
               raiz.y + ny * alt * 0.55 + ty * curva * 2,
               raiz.x + nx * alt + tx * curva * 5,
               raiz.y + ny * alt + ty * curva * 5
             );
-            ctx.stroke();
+            balde.vazia = false;
           }
 
           // Flor no topo de um tufo, esporádica e só em pureza alta — é a
@@ -548,15 +625,18 @@ export class ArteTerreno {
           // é rara.
           if (densidade > 0.6 && h < 0.13) {
             const alt = alturaTufo * 1.05;
-            ctx.fillStyle = tema.acento;
-            ctx.beginPath();
-            ctx.arc(bx + nx * alt, by + ny * alt, lerp(1.4, 2.4, h2), 0, TAU);
-            ctx.fill();
+            const r = lerp(1.4, 2.4, h2);
+            const fx = bx + nx * alt, fy = by + ny * alt;
+            flores.moveTo(fx + r, fy);
+            flores.arc(fx, fy, r, 0, TAU);
+            temFlores = true;
           }
         }
         percorrido += seg;
       }
     }
+
+    return { laminas: laminas.filter((b) => !b.vazia), flores, temFlores };
   }
 
   /** Passe emissivo: só a crista brilha, e só quando a área está viva. */

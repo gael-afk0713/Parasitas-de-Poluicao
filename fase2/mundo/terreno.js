@@ -103,6 +103,7 @@ export class Terreno {
     this.dados[cy * this.largura + cx] = tipo;
     this._contornos = null;   // invalida o cache do desenho
     this._path = null;
+    this._cacheArestas = null;
   }
 
   /** Existe algum tile do tipo em qualquer célula tocada pela caixa? */
@@ -373,6 +374,14 @@ export class Terreno {
    * @param {number} limiar  cos do ângulo máximo com a vertical (0.55 ≈ 56°)
    */
   arestasSuperiores(limiar = 0.55) {
+    // Cache: o resultado é estático por sala (só muda se `definir()` mexer no
+    // terreno), mas era recalculado TRÊS vezes por quadro — crista, musgo e o
+    // passe de luz — percorrendo todos os pontos de todos os contornos. Numa
+    // sala grande isso sozinho era uma fatia grossa do orçamento de 16,7 ms.
+    this._cacheArestas ??= new Map();
+    const emCache = this._cacheArestas.get(limiar);
+    if (emCache) return emCache;
+
     const saida = [];
     for (const c of this.contornos()) {
       const pts = c.pontos;
@@ -392,7 +401,9 @@ export class Terreno {
         }
       }
     }
-    return saida.filter((s) => s.length > 2);
+    const resultado = saida.filter((s) => s.length > 2);
+    this._cacheArestas.set(limiar, resultado);
+    return resultado;
   }
 }
 
