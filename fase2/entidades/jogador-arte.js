@@ -91,8 +91,10 @@ export class ArteJogador {
     // A cauda nasce na base das costas e vive em coordenadas de MUNDO —
     // simular no espaço local faria ela girar junto com o corpo ao virar,
     // que é exatamente o oposto de inércia.
+    // A âncora estava em `pesY - 16`, o meio da barriga: a cauda saía do
+    // PEITO, na horizontal, e lia como braço ou muleta. Base da coluna.
     const ancoraX = j.centroX - j.direcao * 6;
-    const ancoraY = j.pesY - 16;
+    const ancoraY = j.pesY - 11;
 
     if (!this.caudaIniciada) {
       for (const s of this.cauda) { s.x = ancoraX; s.y = ancoraY; }
@@ -108,18 +110,32 @@ export class ArteJogador {
       const rigidez = lerp(420, 120, f);
       const amort = lerp(18, 9, f);
 
+      /* CURVA DE REPOUSO. Antes eram mola sem comprimento de repouso + peso
+         340: o equilíbrio era "pendurada reta pra baixo" e qualquer
+         perturbação virava "esticada reta pra fora" — reta nos dois extremos,
+         e cauda em repouso NUNCA é reta. Um empuxo que cancela boa parte do
+         peso, mais viés pra cima e pra trás, dá um arco em C: sobe por trás e
+         cai na ponta. */
       s.vx += (alvoX - s.x) * rigidez * dt;
       s.vy += (alvoY - s.y) * rigidez * dt;
-      s.vy += 340 * dt;                 // peso próprio
-      s.vx -= j.vx * 0.85 * dt;         // arrasto contra o movimento do corpo
+      s.vy += (340 - lerp(300, 190, f)) * dt;
+      // `vx -= j.vx * k` não é arrasto, é aceleração proporcional à
+      // velocidade: fazia a cauda liderar ou atrasar de forma inconsistente.
+      // A inércia de verdade já vem da âncora se mover e a corrente atrasar.
       s.vy -= j.vy * 0.42 * dt;
       s.vx = damp(s.vx, 0, 1 / amort, dt);
       s.vy = damp(s.vy, 0, 1 / amort, dt);
       s.x += s.vx * dt;
       s.y += s.vy * dt;
 
+      // Viés: pra cima e pra trás, é o que fecha o C.
+      alvoY -= lerp(2.6, 0.8, f);
+      alvoX -= j.direcao * lerp(1.4, 0.4, f);
+
       // Trava de comprimento: cada elo não se afasta mais que L do anterior.
-      const L = 4.6;
+      // 4,6 dava vão máximo de 32 px — a cauda podia ficar mais comprida que
+      // o personagem inteiro.
+      const L = 3.2;
       const dx = s.x - alvoX, dy = s.y - alvoY;
       const d = Math.hypot(dx, dy);
       if (d > L) { s.x = alvoX + (dx / d) * L; s.y = alvoY + (dy / d) * L; }
@@ -292,33 +308,54 @@ export class ArteJogador {
     const pts = this.cauda;
     const n = pts.length;
 
-    // Duas passadas: um brilho largo e difuso por baixo, o traço sólido em
-    // cima. Isso dá a impressão de matéria luminosa em vez de um fio.
-    for (const [larguraBase, cor, alfa] of [[6.5, cores.meio, 0.35], [3.6, cores.claro, 1]]) {
-      ctx.save();
-      ctx.globalAlpha = alfa;
-      ctx.strokeStyle = cor;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      // Espessura decrescente: desenhada em segmentos porque o canvas não
-      // tem traço de espessura variável.
-      for (let i = 0; i < n - 1; i++) {
-        const f = i / (n - 1);
-        ctx.lineWidth = larguraBase * (1 - f * 0.82);
-        ctx.beginPath();
-        ctx.moveTo(pts[i].x, pts[i].y);
-        ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
-        ctx.stroke();
-      }
-      ctx.restore();
-    }
+    /* FORMA PREENCHIDA, não polilinha com `stroke`.
+       Desenhada em segmentos de espessura decrescente, cada junção deixava um
+       degrau visível — e a ponta terminava num tufo de 3,4 × 2,6, ou seja
+       CINCO vezes mais grossa que o traço que chegava nela. Era um pirulito.
+       Aqui a cauda é um contorno único, base 2,8 afinando até 0,3. */
+    // Fina e mais apagada que o corpo: em velocidade a cauda estica reta, e
+    // com base grossa e branca ela virava uma lâmina do tamanho do
+    // personagem, competindo com a cabeça pela atenção.
+    const perfil = (t) => 2.1 * Math.pow(1 - t, 0.7) + 0.25;
+    const normal = (i) => {
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const l = Math.hypot(dx, dy) || 1;
+      return [-dy / l, dx / l];
+    };
 
-    // Tufo na ponta.
-    const p = pts[n - 1];
-    ctx.fillStyle = cores.claro;
-    ctx.beginPath();
-    ctx.ellipse(p.x, p.y, 3.4, 2.6, 0, 0, TAU);
+    const traçar = (escala) => {
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const w = perfil(i / (n - 1)) * escala;
+        const [nx, ny] = normal(i);
+        const x = pts[i].x + nx * w, y = pts[i].y + ny * w;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      // Ponta em folha: alonga um pouco na direção do último segmento.
+      const u = pts[n - 1], v = pts[n - 2];
+      const dx = u.x - v.x, dy = u.y - v.y;
+      const l = Math.hypot(dx, dy) || 1;
+      ctx.lineTo(u.x + (dx / l) * 3.2, u.y + (dy / l) * 3.2);
+      for (let i = n - 1; i >= 0; i--) {
+        const w = perfil(i / (n - 1)) * escala;
+        const [nx, ny] = normal(i);
+        ctx.lineTo(pts[i].x - nx * w, pts[i].y - ny * w);
+      }
+      ctx.closePath();
+    };
+
+    // Brilho difuso por baixo, matéria sólida em cima.
+    ctx.save();
+    ctx.globalAlpha = 0.22;
+    ctx.fillStyle = cores.meio;
+    traçar(1.3);
     ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = misturarHex(cores.claro, cores.meio, 0.5);
+    traçar(1);
+    ctx.fill();
+    ctx.restore();
   }
 
   _pernas(ctx, j, cores, pose = {}) {
@@ -326,16 +363,18 @@ export class ArteJogador {
     const correndo = j.estado === ESTADOS.CORRENDO;
     const amp = correndo ? clamp(Math.abs(j.vx) / 232, 0, 1) : 0;
 
-    ctx.strokeStyle = cores.meio;
     ctx.lineCap = 'round';
-    // Grossas o bastante pra ler: com 3,2px as pernas sumiam em tamanho real
-    // e o personagem parecia flutuar sobre o chão em vez de pisar nele.
-    ctx.lineWidth = 4.2;
+    /* MEMBROS ESCUROS. Eram canos cinza-CLARO sobre um corpo claro: contraste
+       zero, nenhuma informação de forma. O truque que Ori, Rayman e Hollow
+       Knight compartilham é o oposto — torso e cabeça claros, membros finos e
+       ESCUROS. Trocar só a cor já muda o personagem inteiro. */
+    const pernaClara = misturarHex(cores.sombra, cores.escuro, 0.55);
+    const pernaEscura = misturarHex(cores.sombra, cores.escuro, 0.78);
 
     const perna = (dxQuadril, fase, atras) => {
       ctx.save();
-      ctx.globalAlpha = atras ? 0.7 : 1;
-      ctx.strokeStyle = atras ? cores.sombra : cores.meio;
+      ctx.globalAlpha = atras ? 0.8 : 1;
+      ctx.strokeStyle = atras ? pernaEscura : pernaClara;
 
       let joelhoX, joelhoY, peX, peY;
       if (noAr) {
@@ -358,21 +397,32 @@ export class ArteJogador {
         joelhoY = -6 - Math.max(0, c) * 2 * amp;
       }
 
+      // Coxa grossa, canela fina: espessura constante lê como macarrão.
+      ctx.lineWidth = 4.8;
       ctx.beginPath();
       ctx.moveTo(dxQuadril, -13);
-      ctx.quadraticCurveTo(joelhoX, joelhoY, peX, peY);
+      ctx.quadraticCurveTo((dxQuadril + joelhoX) / 2, (joelhoY - 13) / 2 - 2,
+        joelhoX, joelhoY);
+      ctx.stroke();
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(joelhoX, joelhoY);
+      ctx.quadraticCurveTo(joelhoX + (peX - joelhoX) * 0.4, joelhoY + (peY - joelhoY) * 0.6,
+        peX, peY);
       ctx.stroke();
 
-      // Pé: um ponto, não um sapato. Menos é mais nessa escala.
-      ctx.fillStyle = atras ? cores.sombra : cores.claro;
+      // Pé: gota apontando pra frente, não bola. Menos é mais nessa escala.
+      ctx.fillStyle = atras ? pernaEscura : pernaClara;
       ctx.beginPath();
-      ctx.ellipse(peX, peY, 3, 2.2, 0, 0, TAU);
+      ctx.ellipse(peX + 1, peY, 3.6, 1.7, 0, 0, TAU);
       ctx.fill();
       ctx.restore();
     };
 
-    perna(-3.5, j.faseAndar + Math.PI, true);
-    perna(3.5, j.faseAndar, false);
+    // Assimetria em repouso: dois pés em ±3,5, verticais e simétricos, é pose
+    // de soldado — o oposto de apelo. O de trás recua, o da frente adianta.
+    perna(-5.2, j.faseAndar + Math.PI, true);
+    perna(2.4, j.faseAndar, false);
   }
 
   _corpo(ctx, j, cores, tema, pose = {}) {
@@ -384,27 +434,60 @@ export class ArteJogador {
     // não de `claro` a `meio` como antes: com pouca diferença entre as duas
     // pontas o corpo virava um borrão cinza sem volume — parecia marshmallow.
     // A faixa larga de valor é o que dá forma de corpo a uma silhueta chapada.
-    const g = ctx.createLinearGradient(0, -31, 0, -8);
+    /* CINTURA. O tronco tinha meia-largura ~7,4 no MEIO da altura contra 9,5
+       da cabeça: duas formas de largura parecida empilhadas, tocando-se
+       justamente nos pontos mais largos das duas — a definição literal de
+       boneco de neve. Sem pinça não existe RITMO (grosso→fino→grosso), e é o
+       ritmo que faz uma forma parecer viva.
+
+       Peito 5,6 · cintura 3,9 · quadril 5,2 → peito 11,2 contra cabeça 21,
+       razão 0,53, que é a faixa do Ori. E o topo desceu de −30 pra −27, o que
+       abre uma fresta que o olho lê como pescoço. */
+    const g = ctx.createLinearGradient(0, -28, 0, -8);
     g.addColorStop(0, '#ffffff');
     g.addColorStop(0.42, cores.claro);
     g.addColorStop(1, cores.sombra);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(0, -30 - respiro);
-    ctx.bezierCurveTo(-7, -28, -8.5, -20, -6.5, -12);
-    ctx.bezierCurveTo(-5, -8.5, 5, -8.5, 6.5, -12);
-    ctx.bezierCurveTo(8.5, -20, 7, -28, 0, -30 - respiro);
+    ctx.moveTo(0, -27 - respiro);
+    ctx.bezierCurveTo(-2.4, -27, -5.6, -25.5, -5.6, -22);   // ombro
+    ctx.bezierCurveTo(-5.6, -19, -3.9, -18.5, -3.9, -17);   // cintura
+    ctx.bezierCurveTo(-3.9, -14.5, -5.2, -13, -5.2, -11);   // quadril
+    ctx.bezierCurveTo(-4.4, -8.6, 4.4, -8.6, 5.2, -11);
+    ctx.bezierCurveTo(5.2, -13, 3.9, -14.5, 3.9, -17);
+    ctx.bezierCurveTo(3.9, -18.5, 5.6, -19, 5.6, -22);
+    ctx.bezierCurveTo(5.6, -25.5, 2.4, -27, 0, -27 - respiro);
     ctx.closePath();
     ctx.fill();
 
-    // Luz de borda no lado das costas: separa o corpo do fundo escuro mesmo
-    // quando a silhueta encosta numa parede da mesma cor.
+    /* Luz de borda: era `#ffffff` a 0,5 num corpo QUE JÁ É BRANCO — pintava
+       branco sobre branco e não fazia nada. Na cor da luz da área ela vira
+       rebote do ambiente, integra o personagem à cena, e ainda muda de cor
+       quando o mundo restaura. */
     ctx.save();
-    ctx.strokeStyle = rgba('#ffffff', 0.5);
+    ctx.strokeStyle = rgba(tema.luz, 0.7);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-5.2, -11.5);
+    ctx.bezierCurveTo(-6.2, -18, -5.8, -25, 0, -27 - respiro);
+    ctx.stroke();
+    // Aresta escura do lado de dentro — o "core shadow" que faz a forma virar.
+    ctx.strokeStyle = rgba(cores.escuro, 0.25);
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(-6.4, -12.5);
-    ctx.bezierCurveTo(-8.4, -20, -7, -28, 0, -30 - respiro);
+    ctx.moveTo(5.2, -11.5);
+    ctx.bezierCurveTo(4.4, -18, 4.8, -25, 1.6, -26.6);
+    ctx.stroke();
+    ctx.restore();
+
+    // Sombra projetada da cabeça no peito: separa cabeça de corpo na hora.
+    ctx.save();
+    ctx.strokeStyle = rgba(cores.escuro, 0.32);
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-4.2, -25.6);
+    ctx.quadraticCurveTo(0, -23.2, 4.2, -25.6);
     ctx.stroke();
     ctx.restore();
 
@@ -446,15 +529,24 @@ export class ArteJogador {
     ctx.lineCap = 'round';
     ctx.lineWidth = 2.8;
 
+    /* Os braços iam de (±5,−25) a (±7,−16), e a borda do tronco naquela
+       altura é ±5,6: estavam desenhados DENTRO da silhueta do corpo e na cor
+       do corpo. Por isso o personagem parecia não ter braços — e por isso a
+       cauda era lida como braço. Precisa sobrar membro pra FORA da silhueta,
+       e escuro. */
+    const bracoClaro = misturarHex(cores.sombra, cores.escuro, 0.5);
+    const bracoEscuro = misturarHex(cores.sombra, cores.escuro, 0.72);
+    ctx.lineWidth = 1.8;
+
     // Braço de trás.
-    ctx.strokeStyle = cores.sombra;
+    ctx.strokeStyle = bracoEscuro;
     ctx.beginPath();
-    ctx.moveTo(-5, -25);
-    ctx.quadraticCurveTo(-8, -21 + balanco * 0.3, -7, -16 + balanco * 0.4);
+    ctx.moveTo(-5.5, -26.5);
+    ctx.quadraticCurveTo(-10, -22 + balanco * 0.3, -10.5, -18 + balanco * 0.4);
     ctx.stroke();
 
     // Braço da frente — durante o ataque acompanha o arco do golpe.
-    ctx.strokeStyle = cores.meio;
+    ctx.strokeStyle = bracoClaro;
     ctx.beginPath();
     if (atacando) {
       // Antecipação (recuo) nos primeiros 22%, depois o golpe.
@@ -469,8 +561,8 @@ export class ArteJogador {
       ctx.stroke();
       ctx.restore();
     } else {
-      ctx.moveTo(5, -25);
-      ctx.quadraticCurveTo(8, -21 - balanco * 0.3, 7, -16 - balanco * 0.4);
+      ctx.moveTo(5.5, -26.5);
+      ctx.quadraticCurveTo(10, -22 - balanco * 0.3, 10.5, -18 - balanco * 0.4);
       ctx.stroke();
     }
   }
@@ -484,19 +576,37 @@ export class ArteJogador {
     ctx.translate(cxOff, 0);
     this._orelhas(ctx, cy, cores);
 
-    // Crânio: quase circular, um pouco mais estreito no queixo.
-    const g = ctx.createRadialGradient(-2, cy - 3, 1, 0, cy, RAIO_CABECA * 1.5);
+    /* CRÂNIO EM GOTA INVERTIDA.
+       Media 19 × 18,5 — um círculo. Círculo com dois ovais escuros no meio é
+       emoji fantasma: não sobra expressão possível, e a forma não diz nem pra
+       que lado a criatura está olhando. Aqui o alto é largo (10,5 de
+       meia-largura em cy−4) e o queixo afina pra 4,5 em cy+8, empurrado 2 pra
+       FRENTE — vira crânio grande com focinho curto, e a direção do olhar sai
+       de graça da silhueta. */
+    const g = ctx.createRadialGradient(-2, cy - 4, 1, 0, cy, RAIO_CABECA * 1.5);
     g.addColorStop(0, '#ffffff');
     g.addColorStop(0.5, cores.claro);
     g.addColorStop(1, cores.meio);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(-RAIO_CABECA, cy - 1);
-    ctx.bezierCurveTo(-RAIO_CABECA, cy - 9, RAIO_CABECA, cy - 9, RAIO_CABECA, cy - 1);
-    ctx.bezierCurveTo(RAIO_CABECA, cy + 6.5, 2, cy + 9.5, 0, cy + 9.5);
-    ctx.bezierCurveTo(-2, cy + 9.5, -RAIO_CABECA, cy + 6.5, -RAIO_CABECA, cy - 1);
+    ctx.moveTo(-10.5, cy - 4);
+    ctx.bezierCurveTo(-10.5, cy - 12.5, 10.5, cy - 12.5, 10.5, cy - 4);
+    ctx.bezierCurveTo(10.5, cy + 2.5, 8, cy + 6.5, 6.5, cy + 8);
+    ctx.bezierCurveTo(4, cy + 10, -2.5, cy + 9.5, -5, cy + 6.5);
+    ctx.bezierCurveTo(-8.5, cy + 3.5, -10.5, cy + 1, -10.5, cy - 4);
     ctx.closePath();
     ctx.fill();
+
+    // Sombra própria sob a nuca: é a aresta escura que faz a bola virar
+    // volume. Sem nenhuma, o degradê sozinho lê como airbrush.
+    ctx.save();
+    ctx.strokeStyle = rgba(cores.escuro, 0.22);
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-9.6, cy - 2);
+    ctx.quadraticCurveTo(-8.6, cy + 4, -5, cy + 6.4);
+    ctx.stroke();
+    ctx.restore();
 
     this._olhos(ctx, cy, cores, j);
     ctx.restore();
@@ -516,7 +626,13 @@ export class ArteJogador {
     // inteiras e o resultado lia como uma lâmina só com dois tons — o
     // personagem parecia ter um chifre, não orelhas. A separação precisa ser
     // grande o bastante pra sobreviver a 44 px de altura na tela.
-    const BASE_ANG = [1.92, 2.78];
+    /* 1,92 e 2,78 davam 20° e 69° acima da horizontal: um leque de 49°, ou
+       seja uma pá deitada e uma antena em pé — não um PAR. Um par de
+       apêndices só lê como par quando são quase paralelos; o que separa os
+       dois é VALOR e profundidade, não ângulo. (A versão anterior a essa
+       tinha o problema oposto e se fundia numa lâmina só; a correção foi na
+       direção errada.) 2,30 e 2,55 = 42° e 56°, leque de 14°. */
+    const BASE_ANG = [2.30, 2.55];
     for (let i = 1; i >= 0; i--) {
       const o = this.orelhas[i];
       const atras = i === 1;
@@ -525,28 +641,47 @@ export class ArteJogador {
       ctx.save();
       // Bases afastadas na horizontal também, não só no ângulo: é o que dá o
       // "V" visto de três quartos em vez de duas linhas saindo do mesmo ponto.
-      ctx.translate(atras ? -6.5 : 1.5, cy - 5.5);
+      // A separação vem das bases e da altura, não do ângulo.
+      ctx.translate(atras ? -7.5 : 0.5, cy - (atras ? 6 : 7.5));
       // `ang` negativo = mais varrida para trás, então SOMA em θ.
       // A orelha de trás varre um pouco MAIS que a da frente: a diferença de
       // amplitude é o que faz o par parecer dois apêndices independentes em
       // vez de uma peça rígida girando.
       ctx.rotate(BASE_ANG[i] - o.ang * (atras ? 0.62 : 0.46));
-      ctx.fillStyle = atras ? cores.sombra : cores.claro;
+      // A de trás era `cores.sombra` — cinza médio, claro demais: lia como
+      // um SEGUNDO objeto brigando com a da frente em vez de profundidade.
+      ctx.fillStyle = atras
+        ? misturarHex(cores.sombra, cores.escuro, 0.62)
+        : cores.claro;
       ctx.beginPath();
       ctx.moveTo(-largura * 0.5, 0);
-      // Curva com uma leve barriga e ponta fina.
+      // Barriga de um lado e ponta CAÍDA: com os controles quase alinhados a
+      // orelha saía reta e lia como lâmina de faca.
       ctx.bezierCurveTo(
         -largura, comprimento * 0.45,
-        -largura * 0.35, comprimento * 0.82,
-        0, comprimento
+        -largura * 0.9, comprimento * 0.88,
+        -largura * 0.6, comprimento
       );
       ctx.bezierCurveTo(
-        largura * 0.5, comprimento * 0.8,
+        largura * 0.4, comprimento * 0.82,
         largura, comprimento * 0.4,
         largura * 0.5, 0
       );
       ctx.closePath();
       ctx.fill();
+      // Interior escuro na orelha da frente: sem isso ela é o maior elemento
+      // da silhueta e o menos desenhado — um plano branco chapado.
+      if (!atras) {
+        ctx.fillStyle = rgba(cores.escuro, 0.34);
+        ctx.beginPath();
+        ctx.moveTo(-largura * 0.22, comprimento * 0.1);
+        ctx.quadraticCurveTo(-largura * 0.5, comprimento * 0.6,
+          -largura * 0.3, comprimento * 0.8);
+        ctx.quadraticCurveTo(largura * 0.28, comprimento * 0.5,
+          largura * 0.24, comprimento * 0.1);
+        ctx.closePath();
+        ctx.fill();
+      }
       ctx.restore();
     }
   }
@@ -561,22 +696,46 @@ export class ArteJogador {
       : j.estado === ESTADOS.INVESTIDA ? 0.72   // semicerrados na velocidade
       : 1;
 
-    const olho = (dx, escala) => {
+    /* Os olhos estavam no MEIO EXATO da cabeça (cy − 0,5), redondos e com
+       rotação de 3°: as três coisas que, somadas, produzem exatamente uma
+       expressão — nenhuma. Sobem pro terço superior, ganham inclinação de
+       verdade e o de trás encolhe bem mais: diferença grande de tamanho é o
+       que vende três-quartos. */
+    const CY_OLHO = cy - 2.6;
+    const olho = (dx, escala, giro) => {
       ctx.fillStyle = cores.escuro;
       ctx.beginPath();
-      ctx.ellipse(dx, cy - 0.5, 3.1 * escala, 4.3 * escala * abertura, 0.06, 0, TAU);
+      ctx.ellipse(dx, CY_OLHO, 3.4 * escala, 5 * escala * abertura, giro, 0, TAU);
       ctx.fill();
-      if (abertura > 0.5) {
-        // Reflexo: fora de centro e pequeno, senão vira olho de desenho fofo.
+      if (abertura > 0.5 && escala > 0.8) {
+        // Reflexo só no olho da frente e pequeno, senão vira olho de desenho fofo.
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.ellipse(dx + 1 * escala, cy - 2 * escala, 0.95 * escala, 1.15 * escala, 0, 0, TAU);
+        ctx.ellipse(dx + 1.1, CY_OLHO - 0.6, 0.8, 0.9, 0, 0, TAU);
         ctx.fill();
       }
     };
 
-    olho(-2.6, 0.82);   // olho de trás: menor, dá perspectiva de 3/4
-    olho(3.4, 1);
+    // O VÃO entre as duas amêndoas é metade do reconhecimento do rosto: sem
+    // ele os dois viram uma máscara escura só, ainda mais com a sobrancelha
+    // logo acima.
+    olho(-3.4, 0.66, 0.22);   // olho de trás: bem menor, dá perspectiva de 3/4
+    olho(3.6, 1, -0.30);
+
+    /* SOBRANCELHA. Uma massa escura acompanhando o topo dos dois olhos. É a
+       mudança de uma linha que tira o rosto de "vazio" e põe um olhar nele —
+       sem ela não existe emoção possível num rosto de 19 px. */
+    if (abertura > 0.35) {
+      ctx.save();
+      ctx.strokeStyle = rgba(cores.escuro, 0.55);
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-5.6, CY_OLHO - 3.2);
+      ctx.quadraticCurveTo(0, CY_OLHO - 5.4, 6.4, CY_OLHO - 3.8);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   /**
