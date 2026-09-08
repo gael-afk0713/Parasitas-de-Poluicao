@@ -345,36 +345,65 @@ class MaeAfogada extends Chefe {
     ctx.save();
     if (morre > 0) { ctx.globalAlpha = 1 - morre; }
 
-    // Tentáculos longos varrendo — a assinatura dela.
-    ctx.strokeStyle = cor;
+    /* Ela mora dentro d'água escura, é quase preta e o passe da água ainda
+       passa POR CIMA dela. Sem contorno e sem auréola, o que se via era um
+       arbusto escuro entre os juncos: um chefe que mata sem nunca ter sido
+       visto. As duas coisas juntas resolvem os dois fundos — a auréola
+       escurece o que está atrás (aparece contra a água clara), o contorno
+       claro aparece contra o fundo escuro. */
+    const halo = rgba(misturarHex(tema.bruma, tema.acento, 0.25), 0.55);
+    const rAur = this.largura * 1.15;
+    const gAur = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, rAur);
+    gAur.addColorStop(0, rgba(tema.primeiroPlano, 0.6));
+    gAur.addColorStop(0.55, rgba(tema.primeiroPlano, 0.3));
+    gAur.addColorStop(1, rgba(tema.primeiroPlano, 0));
+    ctx.fillStyle = gAur;
+    ctx.fillRect(cx - rAur, cy - rAur, rAur * 2, rAur * 2);
+
+    // Tentáculos longos varrendo — a assinatura dela. Duas passadas: um
+    // traço mais largo na cor do halo e o traço escuro por cima.
     ctx.lineCap = 'round';
     for (const t of this.tentaculosLongos) {
       const a = t.ang + Math.sin(this.t * 0.9 + t.fase) * 0.3;
       const comp = t.comp * (1 + this.telegrafo * 0.3);
       const px = cx + Math.cos(a) * comp;
       const py = cy + Math.sin(a) * comp * 0.8;
-      let ax = cx, ay = cy;
-      for (let k = 1; k <= 5; k++) {
-        const u = k / 5;
-        const bx = lerp(cx, px, u) + Math.sin(u * 3 + this.t * 1.4 + t.fase) * 12 * u;
-        const by = lerp(cy, py, u);
-        ctx.lineWidth = lerp(13, 1.5, u);
-        ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-        ax = bx; ay = by;
+      for (const passada of (ferida ? ['massa'] : ['halo', 'massa'])) {
+        const extra = passada === 'halo' ? 3.4 : 0;
+        ctx.strokeStyle = passada === 'halo' ? halo : cor;
+        let ax = cx, ay = cy;
+        for (let k = 1; k <= 5; k++) {
+          const u = k / 5;
+          const bx = lerp(cx, px, u) + Math.sin(u * 3 + this.t * 1.4 + t.fase) * 12 * u;
+          const by = lerp(cy, py, u);
+          ctx.lineWidth = lerp(13, 1.5, u) + extra;
+          ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+          ax = bx; ay = by;
+        }
       }
     }
 
-    // Massa
-    ctx.fillStyle = cor;
-    ctx.beginPath();
-    for (let i = 0; i <= 26; i++) {
-      const a = (i / 26) * TAU;
-      const rr = r * (1 + 0.1 * Math.sin(a * 3 + this.t * 1.6) + 0.06 * Math.sin(a * 6 - this.t));
-      const px = cx + Math.cos(a) * rr;
-      const py = cy + Math.sin(a) * rr * 0.86;
-      i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+    // Massa — traçada uma vez e usada como contorno e como preenchimento.
+    const traçar = () => {
+      ctx.beginPath();
+      for (let i = 0; i <= 26; i++) {
+        const a = (i / 26) * TAU;
+        const rr = r * (1 + 0.1 * Math.sin(a * 3 + this.t * 1.6) + 0.06 * Math.sin(a * 6 - this.t));
+        const px = cx + Math.cos(a) * rr;
+        const py = cy + Math.sin(a) * rr * 0.86;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+    };
+    if (!ferida) {
+      ctx.strokeStyle = halo;
+      ctx.lineWidth = 3.2;
+      ctx.lineJoin = 'round';
+      traçar();
+      ctx.stroke();
     }
-    ctx.closePath();
+    ctx.fillStyle = cor;
+    traçar();
     ctx.fill();
 
     // Fendas: muitas, em arco largo. Numa criatura grande, poucos olhos
@@ -386,9 +415,11 @@ class MaeAfogada extends Chefe {
         const f = i / (n - 1);
         const dx = lerp(-r * 0.5, r * 0.5, f);
         const dy = -r * 0.34 + Math.abs(f - 0.5) * r * 0.3;
-        ctx.globalAlpha = (0.7 + 0.3 * Math.sin(this.t * 2.4 + i)) * (0.5 + this.telegrafo * 0.5);
+        // As fendas são o rosto dela e o único elemento claro de verdade —
+        // com alfa base 0.5 elas sumiam e o chefe ficava sem cara.
+        ctx.globalAlpha = (0.78 + 0.22 * Math.sin(this.t * 2.4 + i)) * (0.8 + this.telegrafo * 0.2);
         ctx.beginPath();
-        ctx.ellipse(cx + dx * this.dir, cy + dy, 1.6,
+        ctx.ellipse(cx + dx * this.dir, cy + dy, 2.3,
           lerp(9, 4, Math.abs(f - 0.5) * 2) * (1 + this.telegrafo * 0.6), 0, 0, TAU);
         ctx.fill();
       }
@@ -563,8 +594,12 @@ class Maquina extends Chefe {
     const ferida = this.piscarDano > 0;
     const cx = this.centroX, cy = this.centroY;
     const w = this.largura, h = this.altura;
-    const corpo = ferida ? '#ffffff' : misturarHex(tema.terreno, tema.primeiroPlano, 0.55);
-    const metal = ferida ? '#ffffff' : misturarHex(tema.borda, tema.terreno, 0.4);
+    /* O chassi era `terreno` misturado com `primeiroPlano` — ou seja, MAIS
+       escuro que o chão em que a coisa se apoia. Um chefe preto sobre chão
+       preto vira um vulto sem forma: dava pra ver a chama e nada mais. Metal
+       reflete; ele tem que ser mais claro que a terra, não menos. */
+    const corpo = ferida ? '#ffffff' : misturarHex(tema.terreno, tema.borda, 0.6);
+    const metal = ferida ? '#ffffff' : misturarHex(tema.borda, tema.crista, 0.35);
 
     ctx.save();
     if (morre > 0) ctx.globalAlpha = 1 - morre;
@@ -573,22 +608,47 @@ class Maquina extends Chefe {
     // Balanço da caldeira: mais forte quanto maior a pressão.
     ctx.rotate(Math.sin(this.t * 9) * 0.02 * this.pressao);
 
+    // Fumaça saindo da chaminé — a coisa está ACESA, e é o que se vê de
+    // longe antes de qualquer detalhe do chassi.
+    if (!ferida) {
+      for (let i = 0; i < 4; i++) {
+        const f = ((this.t * 0.42 + i / 4) % 1);
+        ctx.globalAlpha = (1 - f) * (0.22 + this.pressao * 0.3);
+        ctx.fillStyle = misturarHex(tema.bruma, tema.primeiroPlano, 0.35);
+        ctx.beginPath();
+        ctx.arc(-w * 0.22 + Math.sin(this.t * 0.8 + i * 2) * f * 16,
+          -h * 0.86 - f * h * 1.1, 5 + f * 20, 0, TAU);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+
     // Chassi
+    const traçarChassi = () => {
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.46, h * 0.38);
+      ctx.lineTo(-w * 0.4, -h * 0.2);
+      ctx.quadraticCurveTo(-w * 0.34, -h * 0.44, -w * 0.1, -h * 0.46);
+      ctx.lineTo(w * 0.28, -h * 0.44);
+      ctx.quadraticCurveTo(w * 0.46, -h * 0.36, w * 0.46, -h * 0.05);
+      ctx.lineTo(w * 0.42, h * 0.38);
+      ctx.closePath();
+    };
     ctx.fillStyle = corpo;
-    ctx.beginPath();
-    ctx.moveTo(-w * 0.46, h * 0.38);
-    ctx.lineTo(-w * 0.4, -h * 0.2);
-    ctx.quadraticCurveTo(-w * 0.34, -h * 0.44, -w * 0.1, -h * 0.46);
-    ctx.lineTo(w * 0.28, -h * 0.44);
-    ctx.quadraticCurveTo(w * 0.46, -h * 0.36, w * 0.46, -h * 0.05);
-    ctx.lineTo(w * 0.42, h * 0.38);
-    ctx.closePath();
+    traçarChassi();
     ctx.fill();
+    if (!ferida) {
+      ctx.strokeStyle = rgba(misturarHex(tema.crista, tema.luz, 0.3), 0.5);
+      ctx.lineWidth = 2;
+      ctx.lineJoin = 'round';
+      traçarChassi();
+      ctx.stroke();
+    }
 
     // Chaminé — a citação direta da Fase 1.
     ctx.fillStyle = metal;
-    ctx.fillRect(-w * 0.3, -h * 0.78, w * 0.16, h * 0.36);
-    ctx.fillRect(-w * 0.34, -h * 0.82, w * 0.24, h * 0.08);
+    ctx.fillRect(-w * 0.3, -h * 0.86, w * 0.16, h * 0.44);
+    ctx.fillRect(-w * 0.34, -h * 0.92, w * 0.24, h * 0.09);
 
     // Rodas girando: a coisa está VIVA e funcionando, é o que assusta.
     for (const rx of [-w * 0.26, w * 0.06, w * 0.32]) {
