@@ -19,6 +19,7 @@ await import('./mundo/salas-varzea.js');
 try { await import('./mundo/salas-clareira.js'); } catch { /* ainda não existe */ }
 try { await import('./mundo/salas-dossel.js'); } catch { /* ainda não existe */ }
 try { await import('./mundo/salas-coracao.js'); } catch { /* ainda não existe */ }
+await import('./mundo/salas-ramos.js');
 
 const SALA_INICIAL = 'raizes-01';
 

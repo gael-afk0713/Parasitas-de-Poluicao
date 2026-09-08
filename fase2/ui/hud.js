@@ -77,8 +77,72 @@ export class Hud {
 
     this._vida(ctx, tema, dt);
     this._habilidades(ctx, tema);
+    this._barraChefe(ctx, tema, dt);
     this._anuncio(ctx, tema, dt);
     if (this.pausado) this._pausa(ctx, tema);
+  }
+
+  /**
+   * Barra de vida do chefe. Aparece sozinha quando há um chefe na sala e some
+   * quando ele morre — sem HUD permanente.
+   *
+   * Duas camadas de barra: a da frente cai na hora e a de trás cai com atraso
+   * de meio segundo, deixando um rastro claro. É como o jogador VÊ quanto dano
+   * um golpe fez, o que é a informação que ele precisa para decidir se o
+   * padrão que arriscou valeu a pena.
+   */
+  _barraChefe(ctx, tema, dt) {
+    const chefe = this.mundo.entidades.find((e) => e.ehChefe && !e.morta);
+    if (chefe) {
+      this._chefeVisivel = chefe;
+      this._chefeAlfa = Math.min(1, (this._chefeAlfa ?? 0) + dt * 1.6);
+      const alvo = Math.max(0, chefe.fracaoVida);
+      this._chefeFracao = alvo;
+      // Rastro: acompanha para BAIXO devagar, mas acompanha para cima na hora
+      // (transição de fase pode curar, e barra que sobe devagar confunde).
+      this._chefeRastro = this._chefeRastro == null ? alvo
+        : (alvo > this._chefeRastro ? alvo : damp(this._chefeRastro, alvo, 0.35, dt));
+    } else {
+      this._chefeAlfa = Math.max(0, (this._chefeAlfa ?? 0) - dt * 2.2);
+      if (this._chefeAlfa <= 0) { this._chefeVisivel = null; this._chefeRastro = null; return; }
+    }
+    const alfa = this._chefeAlfa ?? 0;
+    if (alfa <= 0.01 || !this._chefeVisivel) return;
+
+    const w = Math.min(this.larguraCss * 0.56, 520);
+    const x = (this.larguraCss - w) / 2;
+    const y = this.alturaCss - 54;
+    const h = 7;
+
+    ctx.save();
+    ctx.globalAlpha = alfa;
+
+    ctx.font = '600 11px "JetBrains Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = rgba(tema.particula, 0.9);
+    ctx.fillText((this._chefeVisivel.nomeChefe || '').toUpperCase(), this.larguraCss / 2, y - 10);
+
+    ctx.fillStyle = rgba(tema.ceuTopo, 0.75);
+    ctx.fillRect(x, y, w, h);
+    ctx.fillStyle = rgba(tema.rust ?? '#8a4a2f', 0.55);
+    ctx.fillRect(x, y, w * (this._chefeRastro ?? 0), h);
+    ctx.fillStyle = tema.crista;
+    ctx.fillRect(x, y, w * (this._chefeFracao ?? 0), h);
+    ctx.strokeStyle = rgba(tema.borda, 0.9);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+
+    // Marcas nos limiares de fase: o jogador vê quanto falta para a luta
+    // mudar, e isso transforma "estou perdendo" em "estou chegando lá".
+    ctx.strokeStyle = rgba(tema.ceuTopo, 0.9);
+    for (const l of this._chefeVisivel.limiaresFase ?? []) {
+      ctx.beginPath();
+      ctx.moveTo(x + w * l, y);
+      ctx.lineTo(x + w * l, y + h);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   _vida(ctx, tema, dt) {

@@ -15,6 +15,7 @@ import { desenharParallax, desenharPrimeiroPlano } from './render/parallax.js';
 import { desenharParticulas, desenharNevoa } from './render/particulas.js';
 import { criarEntidade } from './entidades/catalogo.js';
 import { Hud } from './ui/hud.js';
+import { TelaMapa } from './ui/mapa.js';
 import { Audio } from './audio/audio.js';
 
 // Registram-se sozinhas ao serem importadas (ver `registrarSala`).
@@ -27,6 +28,7 @@ import './mundo/salas-varzea.js';
 import './mundo/salas-clareira.js';
 import './mundo/salas-dossel.js';
 import './mundo/salas-coracao.js';
+import './mundo/salas-ramos.js';   // ramos, atalhos e trancas por habilidade
 
 /* ---------------------------------------------------------------- montagem -- */
 
@@ -41,6 +43,7 @@ const audio = new Audio();
 const laco = new Laco(passo, quadro);
 const mundo = new Mundo(camera, laco, render);
 const hud = new Hud(document.getElementById('hud-fase2'), mundo);
+const mapa = new TelaMapa(mundo);
 
 mundo.fabricaEntidade = criarEntidade;
 mundo._transicao = (cb) => transicao.cortar(cb, 0.3);
@@ -91,11 +94,14 @@ if (movimentoReduzido) {
 function passo(dt) {
   entrada.atualizar(dt);
 
+  // Mapa: Tab alterna. Enquanto aberto o mundo congela — em jogo de
+  // atmosfera, consultar o mapa é uma pausa narrativa, não um risco.
+  if (entrada.acabouDePressionar('mapa')) mapa.alternar();
   if (entrada.acabouDePressionar('pausa')) {
-    laco.pausado = !laco.pausado;
-    hud.definirPausa(laco.pausado);
+    if (mapa.aberta) mapa.fechar();
+    else { laco.pausado = !laco.pausado; hud.definirPausa(laco.pausado); }
   }
-  if (laco.pausado) return;
+  if (laco.pausado || mapa.aberta) return;
 
   mundo.atualizar(dt, entrada);
 }
@@ -163,7 +169,12 @@ function quadro(alpha, dtReal) {
   render.finalizar(dtReal);
 
   transicao.desenhar(tela.ctx, tela.largura, tela.altura);
+  mapa.atualizar(dtReal);
   hud.desenhar(dtReal, tema);
+  if (mapa.visivel) {
+    const ctxHud = hud.ctx;
+    if (ctxHud) mapa.desenhar(ctxHud, hud.larguraCss, hud.alturaCss, tema);
+  }
 }
 
 /* ------------------------------------------------------------------ efeitos -- */
@@ -224,6 +235,28 @@ function efeitoDeEvento(ev) {
     case 'canto':
       render.piscar(tema.crista, 0.22);
       break;
+    case 'fragmento':
+      hud.anunciar(
+        ev.subiuVida ? 'Vitalidade' : 'Fragmento',
+        ev.subiuVida ? 'a vida máxima cresceu' : `faltam ${ev.faltam} para o próximo`,
+        2.6
+      );
+      render.piscar(tema.crista, 0.3);
+      break;
+    case 'chefeFase':
+      render.sacudirCor(0.8);
+      break;
+    case 'chefeMorto':
+      hud.anunciar(ev.nome, 'silenciado', 4);
+      laco.definirEscalaTempo(0.25, 0.2);
+      setTimeout(() => laco.definirEscalaTempo(1, 1.4), 1600);
+      break;
+    case 'portaoTrancado':
+      hud.anunciar('Trancado', 'algo que você ainda não sabe fazer', 2.2);
+      break;
+    case 'lore':
+      if (ev.texto) hud.anunciar('', ev.texto, 4.5);
+      break;
     case 'semente':
       render.piscar(tema.acento, 0.5);
       camera.sacudir(0.3);
@@ -236,6 +269,6 @@ function efeitoDeEvento(ev) {
 /* ------------------------------------------------------------------ debug --- */
 
 if (new URLSearchParams(location.search).has('debug')) {
-  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio };
+  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, passo, quadro };
   console.info('[fase2] modo debug: window.__fase2 disponível');
 }
