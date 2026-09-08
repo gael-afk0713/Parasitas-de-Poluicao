@@ -1046,21 +1046,40 @@ const CAMADAS = {
   ],
 
   /* --- CÂNION: as ruínas da fábrica da Fase 1 ---------------------------- */
+  /* --- CLAREIRA: uma FERIDA DENTRO DA FLORESTA -------------------------
+     A composição anterior era só indústria — chaminé, torre, esteira, cabo —
+     e desenhava uma `massa lado:'cima'`, ou seja, literalmente um TETO. O
+     resultado era um interior de fábrica: nem clareira, nem floresta.
+
+     O nome da área diz o que ela é. Uma clareira é um BURACO na mata, e só
+     lê como buraco se a mata estiver visível em volta. Então:
+       · planos DISTANTES = troncos queimados, a floresta que sobrou em pé;
+       · planos MÉDIOS e PRÓXIMOS = as ruínas, que ficam DENTRO do buraco.
+     A linha do chão distante desceu de 0.70 para ~1.05: em 0.70 ela tapava
+     metade da tela e o céu virava uma faixa. ---------------------------- */
   clareira: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
-      { f: 'massa', lado: 'baixo', rel: 0.70, amp: 150, escala: 0.0009, semente: 201, passo: 18, picos: 0.8 },
-      { f: 'massa', lado: 'cima', rel: 0.02, amp: 90, escala: 0.0011, semente: 203, passo: 18 },
+      // A borda da mata no horizonte: baixa, densa, quase dissolvida na bruma.
+      { f: 'troncosColossais', rel: 1.04, passo: 110, dens: 0.9,
+        largMin: 4, largMax: 11, semente: 201, altura: [0.26, 0.40] },
+      { f: 'massa', lado: 'baixo', rel: 1.10, amp: 70, escala: 0.0009, semente: 203,
+        passo: 18, picos: 0.5 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
-      { f: 'massa', lado: 'baixo', rel: 0.78, amp: 110, escala: 0.0015, semente: 207, passo: 16, picos: 0.9 },
-      { f: 'chamines', rel: 0.78, passo: 230, dens: 0.55, altMin: 90, altMax: 250,
+      { f: 'troncosColossais', rel: 1.06, passo: 165, dens: 0.78,
+        largMin: 7, largMax: 18, semente: 207, altura: [0.38, 0.58] },
+      // As chaminés começam a aparecer ENTRE as árvores, não no lugar delas.
+      { f: 'chamines', rel: 1.02, passo: 320, dens: 0.4, altMin: 120, altMax: 300,
         escalaLarg: 0.6, torcao: 0.2, semente: 211 },
-      { f: 'fumaca', rel: 0.55, passo: 300, dens: 0.4, semente: 213 },
+      { f: 'fumaca', rel: 0.62, passo: 300, dens: 0.4, semente: 213 },
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
-      { f: 'massa', lado: 'baixo', rel: 0.88, amp: 92, escala: 0.0022, semente: 217, passo: 14, picos: 0.7 },
-      { f: 'torres', rel: 0.88, passo: 340, dens: 0.6, altMin: 110, altMax: 260, escalaLarg: 0.75, semente: 223 },
-      { f: 'chamines', rel: 0.88, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
+      { f: 'troncosColossais', rel: 1.08, passo: 300, dens: 0.5,
+        largMin: 12, largMax: 28, semente: 215, altura: [0.55, 0.8] },
+      { f: 'massa', lado: 'baixo', rel: 1.06, amp: 82, escala: 0.0022, semente: 217,
+        passo: 14, picos: 0.7 },
+      { f: 'torres', rel: 1.02, passo: 340, dens: 0.6, altMin: 110, altMax: 260, escalaLarg: 0.75, semente: 223 },
+      { f: 'chamines', rel: 1.02, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
         escalaLarg: 0.8, torcao: 0.22, semente: 227 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
