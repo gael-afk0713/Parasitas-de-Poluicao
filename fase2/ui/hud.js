@@ -47,7 +47,10 @@ export class Hud {
     /* O título de sala-marco É o nome da área, e a área muda de nome quando
        é restaurada. Anunciar "A Clareira Queimada" numa clareira já coberta
        de verde desmente o que está na tela. */
-    const pureza = mundo?.tema?.pureza ?? 0;
+    // A pureza vem da SALA, não de `mundo.tema`: no instante em que a sala é
+    // anunciada o tema ainda é o da sala anterior, e entrar numa área suja
+    // logo depois de uma restaurada anunciava o nome restaurado.
+    const pureza = mundo?.purezaDaSala?.(sala.id) ?? 0;
     const nome = nomeArea(sala.area, 0);
     const titulo = sala.titulo === nome ? nomeArea(sala.area, pureza) : sala.titulo;
     this.anunciar(titulo, null, 3.4);

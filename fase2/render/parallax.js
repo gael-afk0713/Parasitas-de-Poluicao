@@ -756,13 +756,34 @@ function troncosColossais(ctx, a, s) {
         );
         ctx.stroke();
       }
-      // Folhagem: só existe de verdade quando a área revive.
+      /* Folhagem: só existe de verdade quando a área revive.
+         Era UMA elipse — e uma elipse lisa em cima de um tronco fino é um
+         pirulito, não uma copa; no Coração restaurado a paisagem inteira
+         virava um campo de cogumelos. Agora são cinco a sete lobos num
+         caminho SÓ (com `fill` nonzero eles se fundem sem costura, o que um
+         fill por lobo não daria com alfa < 1), achatados por uma
+         transformação em vez de lobo a lobo — assim continua sendo um path
+         só e o contorno da massa fica irregular. */
       if (vivo > 0.45) {
         ctx.globalAlpha = (vivo - 0.45) * 1.2;
+        const rc = rBase * lerp(1.5, 3.0, vivo);
+        ctx.save();
+        ctx.translate(px + inclina, topo - rBase * 0.4);
+        ctx.scale(1, 0.7);
         ctx.beginPath();
-        ctx.ellipse(px + inclina, topo - rBase * 0.9,
-          rBase * lerp(1.6, 3.4, vivo), rBase * lerp(1, 2.1, vivo), 0, 0, TAU);
+        const nLobos = 5 + Math.floor(hash2(x, s.semente + 11, 307) * 3);
+        for (let i = 0; i < nLobos; i++) {
+          const hl = hash2(x + i * 29, s.semente + 13, 311);
+          const hl2 = hash2(x - i * 7, s.semente + 17, 313);
+          const ang = (i / nLobos) * TAU + hl * 0.8;
+          const dist = rc * lerp(0.22, 0.78, hl2);
+          const rr = rc * lerp(0.40, 0.76, hl);
+          const lx = Math.cos(ang) * dist, ly = Math.sin(ang) * dist - rc * 0.15;
+          ctx.moveTo(lx + rr, ly);
+          ctx.arc(lx, ly, rr, 0, TAU);
+        }
         ctx.fill();
+        ctx.restore();
         ctx.globalAlpha = 1;
       }
     }
@@ -1280,9 +1301,13 @@ export function desenharRaios(render, sala, mundo) {
       const x = l.x + Math.sin(ang) * queda;
       // Três feixes de larguras diferentes: um feixe só tem borda dura de
       // trapézio e denuncia o truque; três sobrepostos dão penumbra.
-      feixeLuz(ctx, x, yBoca, comp, 230, ang, t.luz, inten * 0.20);
-      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.21);
-      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.24);
+      // Antes da correção da boca, todo feixe passava por `inten * 0.45` por
+      // não declarar `feixe`. Ao tirar esse fator, manter os mesmos números
+      // aqui triplicava a luz — e numa área restaurada, com brilhoBloom 0.85,
+      // o feixe estourava num borrão branco sem forma nenhuma.
+      feixeLuz(ctx, x, yBoca, comp, 230, ang, t.luz, inten * 0.11);
+      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.12);
+      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.15);
       poeiraNoFeixe(ctx, t, x, yBoca, comp, 210, ang, inten, tempo, i);
     }
     ctx.globalCompositeOperation = 'source-over';
@@ -1294,8 +1319,12 @@ export function desenharRaios(render, sala, mundo) {
     for (const l of luzes) {
       const inten = l.intensidade ?? 1;
       const x = l.x + Math.sin(ang) * (l.y - yBoca);
-      feixeLuz(ctx, x, yBoca, comp, 44, ang, t.luz, inten * 0.26);
-      feixeLuz(ctx, x, yBoca, comp * 0.6, 16, ang, t.luz, inten * 0.30);
+      // O passe emissivo ainda passa pelo bloom, que multiplica por
+      // brilhoBloom (0.85 no Coração restaurado): o que entra aqui tem que
+      // ser bem mais fraco do que parece necessário olhando só este trecho.
+      const g = lerp(1, 0.5, clamp01(t.brilhoBloom ?? 0.4));
+      feixeLuz(ctx, x, yBoca, comp, 44, ang, t.luz, inten * 0.13 * g);
+      feixeLuz(ctx, x, yBoca, comp * 0.6, 16, ang, t.luz, inten * 0.16 * g);
     }
   });
 }

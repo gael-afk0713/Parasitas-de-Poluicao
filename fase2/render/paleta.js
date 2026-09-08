@@ -265,7 +265,12 @@ export const AREAS = {
       primeiroPlano: '#050b08',
       luz: '#e8f4e0', luzAmbiente: '#2a4238',
       particula: '#d8ecdc', acento: '#8fe0b8',
-      densidadeBruma: 0.40, vinheta: 0.46, saturacao: 0.90, brilhoBloom: 0.85,
+      /* brilhoBloom era 0.85. Com `luz` e `bruma` quase brancas nesta paleta,
+         o buffer emissivo já entra claríssimo, e o bloom transformava o feixe
+         de luz num borrão branco sem forma no meio do quadro — a única tela
+         do jogo em que dava pra ver estouro. 0.50 mantém o amanhecer sem
+         apagar o desenho. */
+      densidadeBruma: 0.40, vinheta: 0.46, saturacao: 0.90, brilhoBloom: 0.50,
     },
   },
 };
