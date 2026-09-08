@@ -18,6 +18,7 @@ import { Hud } from './ui/hud.js';
 import { TelaMapa } from './ui/mapa.js';
 import { Audio } from './audio/audio.js';
 import { Save } from './sistemas/save.js';
+import { Efeitos } from './render/efeitos.js';
 
 // Registram-se sozinhas ao serem importadas (ver `registrarSala`).
 // A ORDEM é a ordem narrativa, e importa: `validarRegistro` reclama de
@@ -45,11 +46,17 @@ const laco = new Laco(passo, quadro);
 const mundo = new Mundo(camera, laco, render);
 const hud = new Hud(document.getElementById('hud-fase2'), mundo);
 const mapa = new TelaMapa(mundo);
+const efeitos = new Efeitos();
 
 mundo.fabricaEntidade = criarEntidade;
 mundo._transicao = (cb) => transicao.cortar(cb, 0.3);
 mundo.aoEvento = (ev) => { efeitoDeEvento(ev); audio.aoEvento(ev, mundo); };
-mundo.aoTrocarSala = (sala) => { hud.anunciarSala(sala, mundo); audio.trocarAmbiente(sala, mundo); };
+mundo.aoTrocarSala = (sala) => {
+  efeitos.limpar();   // efeito de outra sala aparecendo na nova é o bug mais
+                      // óbvio possível, e o mais fácil de esquecer
+  hud.anunciarSala(sala, mundo);
+  audio.trocarAmbiente(sala, mundo);
+};
 
 tela.aoRedimensionar = (w, h) => camera.redimensionar(w, h);
 entrada.ligar();
@@ -164,6 +171,10 @@ function quadro(alpha, dtReal) {
     }
   });
 
+  // 8b · efeitos de impacto, na frente das entidades
+  render.camada(1, (ctx) => efeitos.desenhar(ctx, tema, camera));
+  render.emissivo(1, (ctx) => efeitos.desenharLuz(ctx, tema, camera));
+
   // 9 · água — DEPOIS das entidades, de propósito: quem entra nela precisa
   //     aparecer submerso, e isso só acontece com a lâmina por cima.
   render.camada(1, (ctx) => mundo.arteTerreno.desenharAgua(ctx, tema, camera, laco.tempo));
@@ -181,7 +192,11 @@ function quadro(alpha, dtReal) {
   // 12 · composição
   render.finalizar(dtReal);
 
+  // Efeitos colados na tela (vinheta de dano), antes da transição.
+  render.camadaTela((ctx, t, w, h) => efeitos.desenharTela(ctx, t, w, h));
+
   transicao.desenhar(tela.ctx, tela.largura, tela.altura);
+  efeitos.atualizar(dtReal);
   mapa.atualizar(dtReal);
   hud.desenhar(dtReal, tema);
   if (mapa.visivel) {
@@ -210,11 +225,12 @@ function efeitoDeEvento(ev) {
       setTimeout(() => laco.definirEscalaTempo(1, 0.8), 800);
       break;
     case 'aterrissar': {
-      const n = Math.round(4 + ev.impacto * 14);
-      mundo.emitir(ev.x, ev.y, n, {
-        angulo: 0, espalhamento: Math.PI * 2, velMin: 20, velMax: 60 + ev.impacto * 190,
-        g: 420, vidaMin: 0.2, vidaMax: 0.55, cor: tema.particula,
-      });
+      efeitos.aterrissagem(ev.x, ev.y, ev.impacto);
+      // Em área restaurada o impacto levanta FOLHAS além da poeira — o mesmo
+      // gesto conta coisas diferentes conforme o mundo revive.
+      if ((tema.pureza ?? 0) > 0.35 && ev.impacto > 0.2) {
+        efeitos.folhas(ev.x, ev.y, { n: Math.round(3 + ev.impacto * 7) });
+      }
       if (ev.impacto > 0.45) { camera.sacudir(ev.impacto * 0.3); camera.recuar(0, ev.impacto * 7); }
       break;
     }
@@ -226,26 +242,31 @@ function efeitoDeEvento(ev) {
       camera.recuar(-ev.direcao * 9, 0);
       break;
     case 'acerto':
-      mundo.emitir(j.centroX + ev.direcao * 34, j.centroY, 14, {
-        angulo: ev.direcao > 0 ? 0 : Math.PI, espalhamento: 1.5,
-        velMin: 90, velMax: 300, g: 260, cor: tema.crista, brilha: true,
-      });
+      efeitos.impacto(j.centroX + ev.direcao * 34, j.centroY - 4, ev.direcao);
       break;
     case 'dano':
       render.piscar('#ff5a4a', 0.42);
       render.sacudirCor(0.9);
       camera.sacudir(0.6);
       laco.congelar(0.09);
-      mundo.emitir(j.centroX, j.centroY, 18, {
-        velMin: 60, velMax: 240, g: 380, cor: '#c8503a', brilha: true,
-      });
+      efeitos.vinhetaDano();
+      efeitos.faiscas(j.centroX, j.centroY, { n: 16, cor: 'rust', forca: 1.2 });
       break;
     case 'morte':
+      efeitos.dissolucao(j.centroX, j.centroY);
+      efeitos.vinhetaDano({ forca: 1.4, dur: 1.6 });
       render.piscar('#ffffff', 0.7);
       laco.congelar(0.16);
       camera.sacudir(1);
       break;
+    case 'inimigoMorto':
+      efeitos.dissolucao(ev.x, ev.y, { escala: 0.6 });
+      break;
+    case 'barreiraQuebrada':
+      efeitos.anelChoque(ev.x, ev.y, { raio: 46, cor: 'crista' });
+      break;
     case 'canto':
+      efeitos.ondaCanto(j.centroX, j.centroY, { raio: ev.raio ?? 190 });
       render.piscar(tema.crista, 0.22);
       break;
     case 'fragmento':
@@ -282,6 +303,6 @@ function efeitoDeEvento(ev) {
 /* ------------------------------------------------------------------ debug --- */
 
 if (new URLSearchParams(location.search).has('debug')) {
-  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, passo, quadro };
+  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, efeitos, passo, quadro };
   console.info('[fase2] modo debug: window.__fase2 disponível');
 }

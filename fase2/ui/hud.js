@@ -150,6 +150,25 @@ export class Hud {
     this._vidaExibida = damp(this._vidaExibida, j.vida, 0.12, dt);
 
     const x0 = 30, y0 = 30, r = 8, gap = 23;
+
+    // Acima de 12 pontos as máscaras atravessariam a tela inteira. O jogo não
+    // deve chegar lá pelo caminho normal (fragmentos sobem devagar), mas um
+    // save adulterado ou um teste chegam — e HUD que estoura a tela é pior que
+    // HUD feio. Acima do limite, vira contador.
+    const LIMITE_ICONES = 12;
+    if (j.vidaMax > LIMITE_ICONES) {
+      ctx.font = '700 15px "JetBrains Mono", monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = misturarHex('#e8e2d0', tema.luz, 0.3);
+      ctx.fillText(`${j.vida}`, x0 - 4, y0);
+      const w = ctx.measureText(`${j.vida}`).width;
+      ctx.font = '400 11px "JetBrains Mono", monospace';
+      ctx.fillStyle = rgba(tema.particula, 0.7);
+      ctx.fillText(`/ ${j.vidaMax}`, x0 - 4 + w + 6, y0 + 1);
+      return;
+    }
+
     for (let i = 0; i < j.vidaMax; i++) {
       const cheio = i < j.vida;
       const x = x0 + i * gap;
