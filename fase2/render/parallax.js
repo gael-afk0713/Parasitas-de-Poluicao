@@ -426,15 +426,22 @@ function agua(ctx, a, s) {
   const alt = s.altura ?? 260;
   const t = a.tempo;
 
+  /* A lâmina d'água ESPELHA o céu. É a única coisa na Várzea que devolve a
+     luz do horizonte, e é o que dá nome à área — sem esse brilho na
+     superfície, a água some no mesmo verde de tudo e o alagado vira só mais
+     um chão. O degradê cai depressa: dois terços da altura já são o fundo
+     escuro, senão a mancha clara sobe demais e lê como neblina. */
+  const espelho = misturarHex(a.tema.bruma, a.tema.luz, 0.42);
   const g = ctx.createLinearGradient(0, y, 0, y + alt);
-  g.addColorStop(0, misturarHex(a.cor, a.tema.luz, 0.20));
-  g.addColorStop(0.25, a.cor);
+  g.addColorStop(0, misturarHex(a.cor, espelho, 0.72));
+  g.addColorStop(0.09, misturarHex(a.cor, espelho, 0.34));
+  g.addColorStop(0.3, a.cor);
   g.addColorStop(1, a.corBase);
   ctx.fillStyle = g;
   ctx.fillRect(a.x0, y, a.x1 - a.x0, alt);
 
   // linha de superfície
-  ctx.strokeStyle = rgba(misturarHex(a.tema.luz, a.cor, 0.35), 0.30);
+  ctx.strokeStyle = rgba(misturarHex(a.tema.luz, espelho, 0.35), 0.55);
   ctx.lineWidth = 1.6;
   ctx.beginPath();
   for (let x = a.x0; x <= a.x1; x += 18) {
@@ -453,7 +460,7 @@ function agua(ctx, a, s) {
       const hx = hash2((yy / passo) | 0, i, s.semente);
       const larg = lerp(50, 230, hx) * (1 - prof * 0.5);
       const px = a.x0 + ((hx * (a.x1 - a.x0) + Math.sin(t * 0.3 + hx * TAU) * 30) % (a.x1 - a.x0));
-      ctx.globalAlpha = (1 - prof) * 0.10 * lerp(0.4, 1, hx);
+      ctx.globalAlpha = (1 - prof) * 0.17 * lerp(0.4, 1, hx);
       ctx.fillRect(px, yy + Math.sin(t * 0.7 + hx * TAU) * 2, larg, lerp(1.2, 3.4, hx));
     }
   }
@@ -1014,34 +1021,40 @@ const CAMADAS = {
     ] },
   ],
 
-  /* --- VÁRZEA: juncos, troncos submersos, lâmina d'água ------------------ */
+  /* --- VÁRZEA: juncos, troncos submersos, lâmina d'água ------------------
+     Todos os `rel` daqui subiram 0.20 de uma vez. A âncora do parallax é o
+     meio da sala, mas depois que `abrirCeu` passou a acrescentar 12 fileiras
+     de céu no topo, o chão de verdade ficou bem abaixo desse meio: a lâmina
+     d'água caía em ~94% da altura da tela, ou seja, fora do quadro. A área
+     que dá nome à fase não mostrava água nenhuma, e a faixa do meio da tela
+     ficava vazia. -------------------------------------------------------- */
   varzea: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.21, formas: [
-      { f: 'massa', lado: 'baixo', rel: 0.72, amp: 96, escala: 0.0009, semente: 101, passo: 18 },
+      { f: 'massa', lado: 'baixo', rel: 0.52, amp: 96, escala: 0.0009, semente: 101, passo: 18 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.13, formas: [
-      { f: 'massa', lado: 'baixo', rel: 0.80, amp: 86, escala: 0.0016, semente: 103, passo: 16 },
-      { f: 'troncos', rel: 0.78, passo: 340, dens: 0.6, compMin: 90, compMax: 200, semente: 107 },
-      { f: 'juncos', rel: 0.80, passo: 70, dens: 0.7, compMin: 34, compMax: 90, escalaLarg: 0.6, semente: 109 },
+      { f: 'massa', lado: 'baixo', rel: 0.60, amp: 86, escala: 0.0016, semente: 103, passo: 16 },
+      { f: 'troncos', rel: 0.58, passo: 340, dens: 0.6, compMin: 90, compMax: 200, semente: 107 },
+      { f: 'juncos', rel: 0.60, passo: 70, dens: 0.7, compMin: 34, compMax: 90, escalaLarg: 0.6, semente: 109 },
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
-      { f: 'massa', lado: 'baixo', rel: 0.86, amp: 74, escala: 0.0024, semente: 113, passo: 14 },
-      { f: 'juncos', rel: 0.86, passo: 84, dens: 0.78, compMin: 56, compMax: 150, escalaLarg: 0.8, semente: 127 },
+      { f: 'massa', lado: 'baixo', rel: 0.66, amp: 74, escala: 0.0024, semente: 113, passo: 14 },
+      { f: 'juncos', rel: 0.66, passo: 84, dens: 0.78, compMin: 56, compMax: 150, escalaLarg: 0.8, semente: 127 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
-      { f: 'agua', rel: 0.90, altura: 420, semente: 131 },
-      { f: 'troncos', rel: 0.90, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
+      { f: 'agua', rel: 0.70, altura: 420, semente: 131 },
+      { f: 'troncos', rel: 0.70, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
-      { f: 'massa', lado: 'baixo', rel: 1.02, amp: 66, escala: 0.0034, semente: 139, passo: 12 },
-      { f: 'juncos', rel: 1.02, passo: 96, dens: 0.8, compMin: 90, compMax: 250, semente: 149 },
+      { f: 'massa', lado: 'baixo', rel: 0.82, amp: 66, escala: 0.0034, semente: 139, passo: 12 },
+      { f: 'juncos', rel: 0.82, passo: 96, dens: 0.8, compMin: 90, compMax: 250, semente: 149 },
     ] },
     { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
-      { f: 'massa', lado: 'baixo', rel: 1.12, amp: 60, escala: 0.0046, semente: 151, passo: 11 },
-      { f: 'troncos', rel: 1.10, passo: 520, dens: 0.5, compMin: 200, compMax: 380, semente: 157 },
+      { f: 'massa', lado: 'baixo', rel: 0.92, amp: 60, escala: 0.0046, semente: 151, passo: 11 },
+      { f: 'troncos', rel: 0.90, passo: 520, dens: 0.5, compMin: 200, compMax: 380, semente: 157 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
-      { f: 'juncos', rel: 1.26, passo: 140, dens: 0.6, compMin: 180, compMax: 420, escalaLarg: 1.6, semente: 163 },
+      { f: 'juncos', rel: 1.06, passo: 140, dens: 0.6, compMin: 180, compMax: 420, escalaLarg: 1.6, semente: 163 },
     ] },
   ],
 

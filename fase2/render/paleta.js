@@ -134,15 +134,22 @@ export const AREAS = {
     nomeRestaurado: 'Várzea Clara',
     ordem: 2,
     poluido: {
-      ceuTopo: '#141811', ceuBase: '#3c4436',
-      bruma: '#525c48',
-      distante: '#161a15', medio: '#111511', proximo: '#0b0e0b',
+      /* Tudo aqui era o MESMO verde-oliva, do zênite ao primeiro plano, com
+         densidadeBruma 0.68 puxando as camadas todas pro mesmo #525c48: a
+         tela inteira virava uma chapa de cor só e a área não tinha nem
+         profundidade nem clima. Agora o céu abre num azul-esverdeado frio no
+         alto e amarela na linha do horizonte (ar podre visto contra a luz),
+         enquanto o chão fica no oliva escuro. A distância entre esses dois
+         extremos é o que faz cada silhueta ter contra o que se recortar. */
+      ceuTopo: '#101a1c', ceuBase: '#59583a',
+      bruma: '#5e6446',
+      distante: '#171d18', medio: '#111511', proximo: '#0a0d0a',
       terreno: '#0d100d', terrenoFundo: '#060806',
-      borda: '#242a20', crista: '#3d452f',
+      borda: '#242a20', crista: '#4a5535',
       primeiroPlano: '#030503',
-      luz: '#7e8a45', luzAmbiente: '#1a1f18',
-      particula: '#565c46', acento: '#5e6a2c',
-      densidadeBruma: 0.68, vinheta: 0.76, saturacao: 0.42, brilhoBloom: 0.24,
+      luz: '#a09a4c', luzAmbiente: '#1a1f18',
+      particula: '#565c46', acento: '#6d7a30',
+      densidadeBruma: 0.56, vinheta: 0.76, saturacao: 0.42, brilhoBloom: 0.26,
     },
     restaurado: {
       ceuTopo: '#07182a', ceuBase: '#17475f',
