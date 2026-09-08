@@ -71,6 +71,13 @@ const CHAVES_NUM = ['densidadeBruma', 'vinheta', 'saturacao', 'brilhoBloom'];
      mantém o jogo sombrio (pedido do autor) e ainda dá o salto emocional,
      porque o salto vem de contraste e cor, não de brilho geral.
 
+   · O CÉU É A COISA MAIS CLARA DA CENA, sempre. O jogo é AO AR LIVRE, e ao ar
+     livre o fundo é claro e o que está na frente vira silhueta. Com o céu
+     quase preto — como já esteve — a floresta não tem contra o que se
+     recortar e tudo lê como caverna, mesmo de teto aberto. O jogo continua
+     sombrio porque o que sobe é o CONTRASTE, não o brilho: terreno, primeiro
+     plano e as cores de vida seguem escuros.
+
    · SATURAÇÃO É RECURSO ESCASSO. Quase tudo fica entre cinza-azulado e
      quase-preto; a cor saturada aparece só na fonte de luz e no acento.
      É o que segura a leitura de silhueta e o que faz o pouco verde que
@@ -94,8 +101,8 @@ export const AREAS = {
     nomeRestaurado: 'Sub-bosque Vivo',
     ordem: 1,
     poluido: {
-      ceuTopo: '#06090e', ceuBase: '#0f141c',
-      bruma: '#191f28',
+      ceuTopo: '#141a22', ceuBase: '#3d4650',
+      bruma: '#515c68',
       distante: '#141a23', medio: '#0f141b', proximo: '#0a0e14',
       terreno: '#0c1016', terrenoFundo: '#05070b',
       borda: '#222933', crista: '#39404a',
@@ -105,8 +112,8 @@ export const AREAS = {
       densidadeBruma: 0.60, vinheta: 0.78, saturacao: 0.38, brilhoBloom: 0.22,
     },
     restaurado: {
-      ceuTopo: '#040c11', ceuBase: '#0c1f27',
-      bruma: '#153239',
+      ceuTopo: '#071820', ceuBase: '#17414a',
+      bruma: '#2a6b6a',
       distante: '#112e37', medio: '#0c2229', proximo: '#07161c',
       terreno: '#09181e', terrenoFundo: '#040d11',
       borda: '#1e4846', crista: '#5fc9a8',
@@ -127,8 +134,8 @@ export const AREAS = {
     nomeRestaurado: 'Várzea Clara',
     ordem: 2,
     poluido: {
-      ceuTopo: '#070a0b', ceuBase: '#121614',
-      bruma: '#1c211b',
+      ceuTopo: '#141811', ceuBase: '#3c4436',
+      bruma: '#525c48',
       distante: '#161a15', medio: '#111511', proximo: '#0b0e0b',
       terreno: '#0d100d', terrenoFundo: '#060806',
       borda: '#242a20', crista: '#3d452f',
@@ -138,8 +145,8 @@ export const AREAS = {
       densidadeBruma: 0.68, vinheta: 0.76, saturacao: 0.42, brilhoBloom: 0.24,
     },
     restaurado: {
-      ceuTopo: '#04101a', ceuBase: '#0c2836',
-      bruma: '#17414f',
+      ceuTopo: '#07182a', ceuBase: '#17475f',
+      bruma: '#2a6d80',
       distante: '#133a48', medio: '#0e2b37', proximo: '#081c26',
       terreno: '#0a1e28', terrenoFundo: '#040f16',
       borda: '#1e4f58', crista: '#68d4e8',
@@ -162,8 +169,8 @@ export const AREAS = {
     nomeRestaurado: 'A Clareira Coberta',
     ordem: 3,
     poluido: {
-      ceuTopo: '#0d0805', ceuBase: '#1e1109',
-      bruma: '#2b1a0e',
+      ceuTopo: '#1c1208', ceuBase: '#4a2f16',
+      bruma: '#63421f',
       distante: '#21140a', medio: '#180e07', proximo: '#100904',
       terreno: '#120c07', terrenoFundo: '#080502',
       borda: '#37220f', crista: '#6b3a22',
@@ -173,8 +180,8 @@ export const AREAS = {
       densidadeBruma: 0.56, vinheta: 0.80, saturacao: 0.60, brilhoBloom: 0.36,
     },
     restaurado: {
-      ceuTopo: '#0a0f0a', ceuBase: '#1c2413',
-      bruma: '#2c3618',
+      ceuTopo: '#131a10', ceuBase: '#3a4820',
+      bruma: '#556a2c',
       distante: '#232c14', medio: '#1a2110', proximo: '#11160a',
       terreno: '#121809', terrenoFundo: '#080c05',
       borda: '#31461c', crista: '#8fbf5a',
@@ -197,8 +204,8 @@ export const AREAS = {
     nomeRestaurado: 'Dossel Aceso',
     ordem: 4,
     poluido: {
-      ceuTopo: '#0e1013', ceuBase: '#1f2226',
-      bruma: '#2c2f33',
+      ceuTopo: '#1e2126', ceuBase: '#4e545c',
+      bruma: '#6a7079',
       distante: '#24272b', medio: '#1a1c20', proximo: '#111316',
       terreno: '#121417', terrenoFundo: '#08090b',
       borda: '#2a2e33', crista: '#454a51',
@@ -208,8 +215,8 @@ export const AREAS = {
       densidadeBruma: 0.74, vinheta: 0.66, saturacao: 0.18, brilhoBloom: 0.30,
     },
     restaurado: {
-      ceuTopo: '#080f0a', ceuBase: '#1a2a12',
-      bruma: '#2c4018',
+      ceuTopo: '#0e1c10', ceuBase: '#33501e',
+      bruma: '#4d7030',
       distante: '#243516', medio: '#1a2810', proximo: '#111b0a',
       terreno: '#101a09', terrenoFundo: '#070d04',
       borda: '#2e4a18', crista: '#b8d94a',
@@ -232,8 +239,8 @@ export const AREAS = {
     nomeRestaurado: 'O Coração Desperto',
     ordem: 5,
     poluido: {
-      ceuTopo: '#07040d', ceuBase: '#160a22',
-      bruma: '#231034',
+      ceuTopo: '#120a1e', ceuBase: '#331550',
+      bruma: '#46206b',
       distante: '#1b0c29', medio: '#14081e', proximo: '#0d0514',
       terreno: '#100718', terrenoFundo: '#07030d',
       borda: '#2e1444', crista: '#5f2280',
@@ -243,8 +250,8 @@ export const AREAS = {
       densidadeBruma: 0.54, vinheta: 0.84, saturacao: 0.85, brilhoBloom: 0.56,
     },
     restaurado: {
-      ceuTopo: '#0a1410', ceuBase: '#20362c',
-      bruma: '#375046',
+      ceuTopo: '#33223f', ceuBase: '#f0b096',
+      bruma: '#f7cdb2',
       distante: '#2b4239', medio: '#1e302a', proximo: '#14211d',
       terreno: '#141f1b', terrenoFundo: '#0a110e',
       borda: '#33564a', crista: '#c8e8d0',

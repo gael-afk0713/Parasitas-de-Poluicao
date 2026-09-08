@@ -92,8 +92,29 @@ export class ArteTerreno {
    * @returns {{cx0:number, cx1:number, cy:number}[]}
    */
   _faixas(camera, tipo) {
+    // Cache por quadro: `_faixas` é chamado 5 vezes por quadro (plataforma,
+    // perigo, água e os passes de luz dos três) e a varredura é O(tiles
+    // visíveis). Numa sala alagada isso era metade do custo do quadro.
+    // A chave inclui a área visível arredondada — a câmera mexeu, refaz.
     const t = this.terreno;
     const a = camera.areaVisivel(t.tile * 2);
+    // Um mapa POR TIPO sob a mesma chave de área: com um cache de entrada só,
+    // as chamadas alternadas (plataforma → perigo → água) se derrubariam
+    // mutuamente e o cache nunca acertaria.
+    const chaveArea = `${a.x | 0}|${a.y | 0}|${a.largura | 0}|${a.altura | 0}`;
+    if (this._cacheFaixas?.chaveArea !== chaveArea) {
+      this._cacheFaixas = { chaveArea, porTipo: new Map() };
+    }
+    const cache = this._cacheFaixas.porTipo;
+    if (cache.has(tipo)) return cache.get(tipo);
+
+    const valor = this._calcularFaixas(a, tipo);
+    cache.set(tipo, valor);
+    return valor;
+  }
+
+  _calcularFaixas(a, tipo) {
+    const t = this.terreno;
     const cx0 = Math.max(0, Math.floor(a.x / t.tile));
     const cx1 = Math.min(t.largura - 1, Math.ceil((a.x + a.largura) / t.tile));
     const cy0 = Math.max(0, Math.floor(a.y / t.tile));
@@ -315,22 +336,29 @@ export class ArteTerreno {
     }
     ctx.restore();
 
+    // UM gradiente por FAIXA, não por tile.
+    //
+    // `luzRadial` cria um `createRadialGradient` a cada chamada, e um tile de
+    // 32px é uma unidade cara demais pra isso: uma sala alagada tem centenas,
+    // e o passe de luz sozinho custava ~10 ms por quadro. Uma faixa de água de
+    // 20 tiles vira um gradiente esticado em vez de 20 redondos — e fica
+    // melhor, porque a luz de uma lâmina d'água é contínua, não pontilhada.
     for (const f of this._faixas(camera, PERIGO)) {
-      for (let cx = f.cx0; cx <= f.cx1; cx++) {
-        // Brilho fraco e constante na ponta: o jogador enxerga o espinho
-        // antes de a silhueta ficar legível, o que é a diferença entre
-        // "morri sem ver" e "eu que errei".
-        luzRadial(ctx, cx * t.tile + t.tile / 2, f.cy * t.tile + t.tile / 2,
-          t.tile * 0.9, tema.acento, 0.34);
-      }
+      const meio = ((f.cx0 + f.cx1 + 1) / 2) * t.tile;
+      const largura = (f.cx1 - f.cx0 + 1) * t.tile;
+      // Brilho fraco e constante: o jogador enxerga o espinho antes de a
+      // silhueta ficar legível — a diferença entre "morri sem ver" e "eu errei".
+      luzRadial(ctx, meio, f.cy * t.tile + t.tile / 2,
+        Math.max(t.tile, largura * 0.6), tema.acento, 0.34);
     }
+
     for (const f of this._faixas(camera, AGUA)) {
-      if (t.em(f.cx0, f.cy - 1) === AGUA) continue;
+      if (t.em(f.cx0, f.cy - 1) === AGUA) continue;   // só a superfície
       const y = f.cy * t.tile;
-      for (let cx = f.cx0; cx <= f.cx1; cx++) {
-        const cintila = 0.2 + 0.18 * Math.sin(cx * 0.7 + tempo * 1.3);
-        luzRadial(ctx, cx * t.tile + t.tile / 2, y, t.tile * 1.1, tema.crista, cintila);
-      }
+      const meio = ((f.cx0 + f.cx1 + 1) / 2) * t.tile;
+      const largura = (f.cx1 - f.cx0 + 1) * t.tile;
+      const cintila = 0.2 + 0.14 * Math.sin(f.cx0 * 0.7 + tempo * 1.3);
+      luzRadial(ctx, meio, y, Math.max(t.tile, largura * 0.55), tema.crista, cintila);
     }
   }
 

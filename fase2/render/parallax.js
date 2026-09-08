@@ -666,11 +666,23 @@ function fumaca(ctx, a, s) {
 }
 
 /** Tronco colossal vertical com raízes-contraforte (a árvore-mãe). */
+/**
+ * @param {object} s
+ * @param {[number,number]} [s.altura]  faixa de altura do tronco, em fração da
+ *   viewport. Sem isso todo tronco sobe 1,5 viewport acima da base — ou seja,
+ *   vai do chão ao topo da tela SEMPRE.
+ *
+ *   Isso é certo pro plano bem próximo (o tronco que emoldura a cena) e errado
+ *   pra todo o resto: com todos os planos indo até o topo, o céu nunca
+ *   aparece e a floresta ao ar livre lê como corredor fechado. Numa floresta
+ *   de verdade a copa distante TERMINA, e é ver onde ela termina que dá a
+ *   sensação de espaço aberto.
+ */
 function troncosColossais(ctx, a, s) {
   const passo = s.passo ?? 340;
   const x0 = Math.floor(a.x0 / passo) * passo;
   const yb = yDe(a, s.rel);
-  const topo = yb - a.vh * 1.5;
+  const faixaAltura = s.altura ?? [1.5, 1.5];
 
   for (let x = x0; x <= a.x1; x += passo) {
     const h = hash2(x, s.semente, 263);
@@ -678,18 +690,75 @@ function troncosColossais(ctx, a, s) {
     const h2 = hash2(x, s.semente + 1, 269);
     const px = x + (h2 - 0.5) * passo * 0.7;
     const rBase = lerp(s.largMin ?? 26, s.largMax ?? 90, h2);
+    // Altura própria por tronco: uma fileira de troncos de mesma altura lê
+    // como cerca, não como floresta.
+    const topo = yb - a.vh * lerp(faixaAltura[0], faixaAltura[1], hash2(x, s.semente + 3, 277));
+
+    // AFILAMENTO. O tronco era um retângulo entre os contrafortes e o topo, e
+    // um retângulo lê como pilar de concreto — foi exatamente o que a cena
+    // parecia quando o céu abriu e os topos ficaram visíveis. Árvore afina
+    // conforme sobe, e é esse afilamento que o olho usa pra dizer "isso é um
+    // tronco". Quanto mais alta, mais fina fica a ponta.
+    const alturaTronco = Math.max(1, yb - topo);
+    const afina = lerp(0.62, 0.24, clamp01(alturaTronco / (a.vh * 1.4)));
+    const rTopo = rBase * afina;
+    // Inclinação leve e própria: floresta de troncos perfeitamente verticais
+    // lê como grade.
+    const inclina = (hash2(x, s.semente + 5, 281) - 0.5) * rBase * 1.1;
 
     ctx.fillStyle = a.cor;
     ctx.beginPath();
     ctx.moveTo(px - rBase * 1.9, yb + 80);
-    // contraforte esquerdo → corpo → contraforte direito
+    // contraforte esquerdo → corpo afilando → contraforte direito
     ctx.quadraticCurveTo(px - rBase * 1.15, yb - rBase * 0.7, px - rBase * 0.86, yb - rBase * 2.2);
-    ctx.lineTo(px - rBase * 0.62, topo);
-    ctx.lineTo(px + rBase * 0.62, topo);
-    ctx.lineTo(px + rBase * 0.86, yb - rBase * 2.2);
+    ctx.quadraticCurveTo(
+      px - rBase * 0.7 + inclina * 0.4, (yb + topo) * 0.5,
+      px - rTopo + inclina, topo
+    );
+    ctx.lineTo(px + rTopo + inclina, topo);
+    ctx.quadraticCurveTo(
+      px + rBase * 0.7 + inclina * 0.4, (yb + topo) * 0.5,
+      px + rBase * 0.86, yb - rBase * 2.2
+    );
     ctx.quadraticCurveTo(px + rBase * 1.15, yb - rBase * 0.7, px + rBase * 1.9, yb + 80);
     ctx.closePath();
     ctx.fill();
+
+    // COPA. Só quando o topo cabe na tela — um tronco que sai pelo alto do
+    // quadro não precisa de copa, e desenhar uma fora da vista é custo puro.
+    // Galhos nus na área morta; conforme a pureza sobe, a copa engrossa.
+    // `yDe(a, 0)` é o topo da viewport neste plano; a folga de 0,15 deixa
+    // desenhar copas que estão um pouco acima da borda e ainda são vistas.
+    if (topo > yDe(a, 0) - a.vh * 0.15) {
+      const vivo = 0.2 + (a.pureza ?? 0) * 0.8;
+      ctx.strokeStyle = a.cor;
+      ctx.lineCap = 'round';
+      const nGalhos = 3 + Math.floor(hash2(x, s.semente + 7, 283) * 3);
+      for (let i = 0; i < nGalhos; i++) {
+        const hg = hash2(x + i * 17, s.semente + 9, 293);
+        // Abrem para os dois lados, subindo — silhueta de árvore morta.
+        const ang = lerp(-2.5, -0.65, (i + hg * 0.6) / nGalhos);
+        const comp = rBase * lerp(2.2, 5.5, hg) * lerp(1, 1.5, vivo);
+        const bx = px + inclina, by = topo + rBase * 0.3;
+        ctx.lineWidth = Math.max(1, rBase * lerp(0.34, 0.12, hg));
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.quadraticCurveTo(
+          bx + Math.cos(ang) * comp * 0.5, by + Math.sin(ang) * comp * 0.35,
+          bx + Math.cos(ang) * comp, by + Math.sin(ang) * comp
+        );
+        ctx.stroke();
+      }
+      // Folhagem: só existe de verdade quando a área revive.
+      if (vivo > 0.45) {
+        ctx.globalAlpha = (vivo - 0.45) * 1.2;
+        ctx.beginPath();
+        ctx.ellipse(px + inclina, topo - rBase * 0.9,
+          rBase * lerp(1.6, 3.4, vivo), rBase * lerp(1, 2.1, vivo), 0, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
 
     // sulcos de casca: verticais, levemente tortos
     ctx.strokeStyle = rgba(ajustarBrilho(a.cor, -0.14), 0.6);
@@ -900,25 +969,25 @@ const CAMADAS = {
      de vultos finos, perto são poucos troncos grossos que emolduram a tela. */
   raizes: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.21, formas: [
-      { f: 'massa', lado: 'baixo', rel: 1.00, amp: 70, escala: 0.0011, semente: 19, passo: 18 },
+      { f: 'massa', lado: 'baixo', rel: 1.16, amp: 44, escala: 0.0011, semente: 19, passo: 18 },
       { f: 'troncosColossais', rel: 1.02, passo: 120, dens: 0.92,
-        largMin: 5, largMax: 13, semente: 11 },
+        largMin: 5, largMax: 13, semente: 11, altura: [0.30, 0.46] },
     ] },
     { p: 0.095, d: 0.88, cor: 'distante', brilho: 0.13, formas: [
       { f: 'troncosColossais', rel: 1.04, passo: 170, dens: 0.82,
-        largMin: 8, largMax: 20, semente: 23 },
+        largMin: 8, largMax: 20, semente: 23, altura: [0.42, 0.62] },
       { f: 'galhos', rel: 0.20, passo: 260, dens: 0.55, escalaLarg: 0.45, semente: 29 },
-      { f: 'massa', lado: 'baixo', rel: 1.05, amp: 74, escala: 0.0017, semente: 31, passo: 15 },
+      { f: 'massa', lado: 'baixo', rel: 1.18, amp: 56, escala: 0.0017, semente: 31, passo: 15 },
     ] },
     { p: 0.17, d: 0.73, cor: 'medio', brilho: 0.04, formas: [
       { f: 'troncosColossais', rel: 1.06, passo: 250, dens: 0.7,
-        largMin: 13, largMax: 32, semente: 37 },
+        largMin: 13, largMax: 32, semente: 37, altura: [0.58, 0.85] },
       { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
     ] },
     { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.10, formas: [
       { f: 'troncosColossais', rel: 1.08, passo: 340, dens: 0.62,
-        largMin: 18, largMax: 44, semente: 43 },
+        largMin: 18, largMax: 44, semente: 43, altura: [0.8, 1.15] },
       // Raízes aéreas descendo do alto: a assinatura do sub-bosque, e o que
       // impede a faixa vertical de virar só "cerca de postes".
       { f: 'raizes', rel: -0.02, passo: 230, dens: 0.55, compMin: 160, compMax: 420,
@@ -927,7 +996,7 @@ const CAMADAS = {
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'troncosColossais', rel: 1.12, passo: 460, dens: 0.55,
-        largMin: 26, largMax: 62, semente: 59 },
+        largMin: 26, largMax: 62, semente: 59, altura: [1.1, 1.5] },
       { f: 'massa', lado: 'baixo', rel: 1.10, amp: 70, escala: 0.0036, semente: 61,
         passo: 11, picos: 0.35 },
     ] },
@@ -939,7 +1008,7 @@ const CAMADAS = {
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'troncosColossais', rel: 1.30, passo: 620, dens: 0.42,
-        largMin: 40, largMax: 96, semente: 73 },
+        largMin: 40, largMax: 96, semente: 73, altura: [1.6, 2.1] },
       { f: 'massa', lado: 'baixo', rel: 1.28, amp: 62, escala: 0.0062, semente: 79,
         passo: 10, picos: 0.35 },
     ] },
@@ -1254,9 +1323,24 @@ export function desenharParallax(render, sala, mundo) {
    ela já está quase transparente, e ao sair pro canto volta a ser sólida.
    ========================================================================= */
 
-/** 1 nas bordas da tela, ~0 no centro — a máscara que protege o jogador. */
-function opacidadeDeBorda(sxCentro, largura) {
-  const t = Math.abs(sxCentro / (largura * 0.5));
+/**
+ * A máscara que impede o primeiro plano de tapar o jogador.
+ *
+ * Media a distância até o CENTRO DA TELA, o que quase sempre dá no mesmo —
+ * menos exatamente quando não dá: nas bordas do mapa a câmera para de rolar e
+ * o jogador desliza para o canto do quadro, que é justamente onde a máscara
+ * deixa o primeiro plano 100% opaco. O personagem sumia atrás de um tronco no
+ * primeiro segundo do jogo, na sala inicial.
+ *
+ * Agora a referência é a posição real do jogador. O contrato passa a ser o que
+ * sempre deveria ter sido: nada do primeiro plano cobre o Guardião, esteja ele
+ * onde estiver no quadro.
+ *
+ * @param {number} dx  distância horizontal entre o elemento e o jogador
+ * @param {number} largura  largura da viewport, em mundo
+ */
+function opacidadeDeBorda(dx, largura) {
+  const t = Math.abs(dx / (largura * 0.5));
   const k = clamp01((t - 0.30) / 0.42);
   return k * k * (3 - 2 * k);
 }
@@ -1284,7 +1368,11 @@ export function desenharPrimeiroPlano(render, mundo) {
     const vw = camera.largura / camera.zoom;
     const vh = camera.altura / camera.zoom;
     const esq = camera.viewX * P;
-    const centroTela = esq + vw * 0.5;
+    // Referência da máscara: o JOGADOR, não o centro do quadro. Nas bordas do
+    // mapa a câmera para de rolar e ele desliza pro canto — que era onde o
+    // primeiro plano ficava opaco e o cobria.
+    const j = mundo.jogador;
+    const refX = (j ? j.centroX : camera.viewX + vw * 0.5) * P;
     const yBase = sala.altura * 0.5 + vh * 0.5;
     const yTopo = sala.altura * 0.5 - vh * 0.5;
 
@@ -1293,13 +1381,13 @@ export function desenharPrimeiroPlano(render, mundo) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    desenharMolduraBase(ctx, molde.base, esq, vw, vh, yBase, centroTela, tempo, t);
-    desenharMolduraTopo(ctx, molde.topo, esq, vw, vh, yTopo, centroTela, tempo, t);
+    desenharMolduraBase(ctx, molde.base, esq, vw, vh, yBase, refX, tempo, t);
+    desenharMolduraTopo(ctx, molde.topo, esq, vw, vh, yTopo, refX, tempo, t);
     ctx.globalAlpha = 1;
   });
 }
 
-function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, centroTela, tempo, tema) {
+function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, refX, tempo, tema) {
   const passo = 430;
   const x0 = Math.floor((esq - passo) / passo) * passo;
   for (let x = x0; x <= esq + vw + passo; x += passo) {
@@ -1308,7 +1396,7 @@ function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, centroTela, tempo, t
     const h2 = hash2(x, 821, 5);
     const h3 = hash2(x, 823, 5);
     const px = x + (h2 - 0.5) * passo * 0.75;
-    const alfa = opacidadeDeBorda(px - centroTela, vw);
+    const alfa = opacidadeDeBorda(px - refX, vw);
     if (alfa < 0.02) continue;
     ctx.globalAlpha = alfa;
 
@@ -1388,7 +1476,7 @@ function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, centroTela, tempo, t
   ctx.globalAlpha = 1;
 }
 
-function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, centroTela, tempo, tema) {
+function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
   const passo = 300;
   const x0 = Math.floor((esq - passo) / passo) * passo;
   for (let x = x0; x <= esq + vw + passo; x += passo) {
@@ -1399,7 +1487,7 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, centroTela, tempo, t
     const px = x + (h2 - 0.5) * passo * 0.8;
     // O topo cobre menos o jogador (ele fica no terço inferior), então a
     // máscara de centro pode ser bem mais suave aqui.
-    const alfa = lerp(0.45, 1, opacidadeDeBorda(px - centroTela, vw));
+    const alfa = lerp(0.45, 1, opacidadeDeBorda(px - refX, vw));
     ctx.globalAlpha = alfa;
 
     switch (tipo) {

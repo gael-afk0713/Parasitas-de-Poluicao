@@ -308,19 +308,67 @@ export class Renderizador {
   sacudirCor(valor = 0.5) { this.aberracao = Math.max(this.aberracao, valor); }
 
   /**
-   * Gradiente de céu — primeiro pass de todo frame.
-   * Recebe a câmera pra deslocar levemente conforme a altura: o céu "gira"
-   * de leve numa escalada vertical, o que dá noção de subida.
+   * O céu — primeiro pass de todo frame.
+   *
+   * O jogo se passa AO AR LIVRE, e ao ar livre o céu é a coisa mais clara da
+   * cena, mesmo à noite, mesmo sob fumaça. É isso que faz silhueta de árvore
+   * ler como silhueta em vez de virar mais uma mancha escura entre outras.
+   * Um gradiente escuro de cima a baixo, como era antes, é céu de caverna.
+   *
+   * Três camadas:
+   *   1. gradiente base, escurecendo pra cima (o zênite é sempre o mais escuro)
+   *   2. CLARÃO DE HORIZONTE — a faixa mais clara da tela inteira, logo acima
+   *      da linha das copas. É o que dá profundidade e diz "há mundo além"
+   *   3. faixas de fumaça derivando devagar, porque esta floresta está doente
+   *      e o céu precisa contar isso antes de qualquer texto
    */
-  desenharCeu(alturaMundo = 2000) {
+  desenharCeu(alturaMundo = 2000, tempo = 0) {
     this.camadaTela((ctx, tema, w, h) => {
-      const desloc = clamp01(this.camera.viewY / Math.max(1, alturaMundo)) * 0.22;
-      const g = ctx.createLinearGradient(0, -h * desloc, 0, h * (1 + desloc));
+      // Quanto do mundo já foi escalado. Perto do chão o horizonte fica baixo
+      // na tela; subindo, ele desce — dá a sensação de altitude ganha.
+      const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo - this.tela.altura));
+      const yHorizonte = h * lerp(0.58, 0.92, alturaRel);
+
+      // 1 · base
+      const g = ctx.createLinearGradient(0, 0, 0, h);
       g.addColorStop(0, tema.ceuTopo);
-      g.addColorStop(0.55, misturarHex(tema.ceuTopo, tema.ceuBase, 0.72));
+      g.addColorStop(0.45, misturarHex(tema.ceuTopo, tema.ceuBase, 0.6));
       g.addColorStop(1, tema.ceuBase);
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
+
+      // 2 · clarão de horizonte
+      const clarao = ctx.createLinearGradient(0, yHorizonte - h * 0.42, 0, yHorizonte + h * 0.1);
+      clarao.addColorStop(0, rgba(tema.bruma, 0));
+      clarao.addColorStop(0.72, rgba(misturarHex(tema.bruma, tema.luz, 0.28), 0.55));
+      clarao.addColorStop(1, rgba(misturarHex(tema.bruma, tema.luz, 0.4), 0.75));
+      ctx.fillStyle = clarao;
+      ctx.fillRect(0, 0, w, h);
+
+      // 3 · fumaça em faixas
+      // Alongadas e quase horizontais: nuvem redonda lê como algodão, faixa
+      // esticada lê como poluição parada no ar. Derivam devagar e em
+      // velocidades diferentes, senão a camada inteira desliza como um bloco.
+      ctx.save();
+      for (let i = 0; i < 5; i++) {
+        const f = i / 4;
+        const y = yHorizonte - h * lerp(0.05, 0.5, f) + Math.sin(tempo * 0.06 + i) * 6;
+        const deriva = (tempo * lerp(3, 9, f) + i * 260) % (w * 2) - w * 0.5;
+        const larguraFaixa = w * lerp(0.5, 1.1, ((i * 37) % 10) / 10);
+        const alturaFaixa = h * lerp(0.02, 0.055, f);
+        const alfa = lerp(0.16, 0.05, f) * (1 - (tema.pureza ?? 0) * 0.55);
+        const gf = ctx.createRadialGradient(
+          deriva + larguraFaixa / 2, y, 0,
+          deriva + larguraFaixa / 2, y, larguraFaixa / 2
+        );
+        gf.addColorStop(0, rgba(tema.bruma, alfa));
+        gf.addColorStop(1, rgba(tema.bruma, 0));
+        ctx.fillStyle = gf;
+        ctx.beginPath();
+        ctx.ellipse(deriva + larguraFaixa / 2, y, larguraFaixa / 2, alturaFaixa, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     });
   }
 

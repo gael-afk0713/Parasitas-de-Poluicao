@@ -175,12 +175,21 @@ serve para medir o nível de acabamento, nunca para chegar perto do visual
 dele. Se algo estiver ficando parecido demais com uma das referências, está
 errado pelo mesmo motivo que estaria errado se estivesse tosco.
 
-- **O lugar é uma FLORESTA destruída e poluída**, restaurada aos poucos. Não
-  é caverna, não é fábrica, não é masmorra. O teste rápido: se a silhueta de
-  fundo não tiver linhas verticais repetidas em várias profundidades
-  (troncos), não está lendo como floresta. Já aconteceu uma vez de a cena
-  virar gruta por causa de estalactites no primeiro plano — o primeiro plano
-  é o que mais define o lugar, porque é o mais perto e o mais escuro.
+- **O lugar é uma FLORESTA destruída e poluída, AO AR LIVRE.** Não é caverna,
+  não é subterrâneo, não é masmorra. Isto já foi errado duas vezes:
+  - primeiro por estalactites no primeiro plano — o plano mais próximo é o
+    que mais define o lugar, porque é o mais perto e o mais escuro;
+  - depois porque **todas as 30 salas tinham teto fechado** (`####` nos quatro
+    lados). Teto fechado é a estrutura de caverna do Hollow Knight; com ele o
+    céu nunca aparece e a cena lê como corredor por mais árvore que se
+    desenhe. Hoje o parser abre o céu sozinho (ver `abrirCeu` em
+    `mundo/salas.js`); `ceuAberto: false` na definição mantém a sala fechada,
+    e é só pra interior de verdade.
+  - Três testes rápidos: **(a)** o céu aparece e é a coisa mais CLARA da tela;
+    **(b)** dá pra ver onde as copas distantes TERMINAM (copa que sai pelo
+    topo do quadro fecha a cena de novo); **(c)** há espaço vazio grande — a
+    referência é GRIS, personagem pequeno num lugar imenso, não corredor
+    cheio.
 - **O Guardião é inspirado no Ori**: criatura-espírito pequena, PÁLIDA E
   LUMINOSA, olhos grandes e escuros, duas orelhas longas varridas para trás
   em V, cauda com inércia. Ele é a principal fonte de luz móvel do jogo.

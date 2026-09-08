@@ -322,6 +322,7 @@ export class Mundo {
       fragmentos: [...this.fragmentosColetados],
       barreiras: [...this.barreirasQuebradas],
       checkpoint: this.checkpoint,
+      dicas: this.dicasVistas ?? [],
     };
   }
 
@@ -332,6 +333,7 @@ export class Mundo {
     this.fragmentosColetados = new Set(dados.fragmentos || []);
     this.barreirasQuebradas = new Set(dados.barreiras || []);
     this.checkpoint = dados.checkpoint || this.checkpoint;
+    this.dicasVistas = dados.dicas || [];
 
     // Renasce no último ponto de salvamento, não onde parou: é o contrato do
     // gênero, e evita restaurar o jogador no meio de uma queda ou dentro de

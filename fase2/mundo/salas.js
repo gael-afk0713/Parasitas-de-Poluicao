@@ -47,6 +47,48 @@ const ANCORADOS_NO_CHAO = new Set([
 /** Até onde procurar chão abaixo do ponto do mapa, em tiles. */
 const ALCANCE_ENCOSTE = 24;
 
+/* -------------------------------------------------------------------------
+   CÉU ABERTO
+   -------------------------------------------------------------------------
+   Este jogo se passa numa FLORESTA, ao ar livre — não num subterrâneo.
+
+   Só que todas as salas nasceram emolduradas por `####` nos quatro lados, o
+   que é a estrutura de caverna do Hollow Knight, não a de um jogo de céu
+   aberto. Com teto fechado o céu nunca aparece, o parallax não tem para onde
+   recuar, e a sensação é sempre de estar DENTRO de alguma coisa. O contrário
+   do que a referência pede: espaço vazio grande, verticais finas sumindo na
+   distância, personagem pequeno num lugar imenso.
+
+   Corrigir isso nos 23 mapas à mão daria certo hoje e voltaria a dar errado
+   na próxima sala escrita, então a abertura acontece AQUI, no parser:
+
+   · a fileira de teto vira vazio;
+   · são acrescentadas ALTURA_CEU fileiras de espaço vazio por cima.
+
+   O espaço extra não é decorativo — é o que impede o jogador de encostar no
+   limite invisível do mundo. `Terreno.em()` continua tratando fora-do-mapa
+   como sólido (é a rede de segurança que impede sair voando da sala), mas com
+   12 fileiras de folga o salto duplo, que sobe ~6 tiles, nunca chega lá.
+
+   Salas com porta PRA CIMA mantêm o teto: elas continuam pra dentro de outra
+   sala, e abrir o céu ali mostraria vazio no lugar da passagem.
+   ------------------------------------------------------------------------- */
+const ALTURA_CEU = 12;
+
+function abrirCeu(linhas) {
+  if (!linhas.length) return linhas;
+  // Porta pra cima em qualquer lugar do mapa = a sala continua para cima.
+  if (linhas.some((l) => l.includes('¨'))) return linhas;
+
+  const largura = linhas[0].length;
+  const topo = linhas[0];
+  // Preserva qualquer coisa que não seja parede na fileira de topo (uma porta
+  // lateral encostada no canto, por exemplo).
+  const topoAberto = [...topo].map((ch) => (ch === '#' || ch === 'X' ? '.' : ch)).join('');
+  const ceu = Array.from({ length: ALTURA_CEU }, () => '.'.repeat(largura));
+  return [...ceu, topoAberto, ...linhas.slice(1)];
+}
+
 /**
  * char → tipo de entidade. Tudo aqui vira VAZIO no terreno.
  *
@@ -124,7 +166,11 @@ export class Sala {
     this.titulo = def.titulo || null;
     this.ligacoes = def.ligacoes || {};
 
-    const linhas = normalizarMapa(def.mapa);
+    // `ceuAberto: false` na definição mantém a sala fechada (interior de
+    // verdade: dentro de uma chaminé, dentro do Coração).
+    const linhas = def.ceuAberto === false
+      ? normalizarMapa(def.mapa)
+      : abrirCeu(normalizarMapa(def.mapa));
     this.objetos = [];
 
     // Extrai objetos e substitui por vazio ANTES de montar o terreno.

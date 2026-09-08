@@ -20,6 +20,7 @@ import { Audio } from './audio/audio.js';
 import { Save } from './sistemas/save.js';
 import { Efeitos } from './render/efeitos.js';
 import { Paineis } from './ui/paineis.js';
+import { Tutor } from './ui/tutor.js';
 
 // Registram-se sozinhas ao serem importadas (ver `registrarSala`).
 // A ORDEM é a ordem narrativa, e importa: `validarRegistro` reclama de
@@ -48,11 +49,12 @@ const mundo = new Mundo(camera, laco, render);
 const hud = new Hud(document.getElementById('hud-fase2'), mundo);
 const mapa = new TelaMapa(mundo);
 const efeitos = new Efeitos();
+const tutor = new Tutor(mundo, hud);
 let paineis = null;   // criado depois do `save`, de quem depende
 
 mundo.fabricaEntidade = criarEntidade;
 mundo._transicao = (cb) => transicao.cortar(cb, 0.3);
-mundo.aoEvento = (ev) => { efeitoDeEvento(ev); audio.aoEvento(ev, mundo); };
+mundo.aoEvento = (ev) => { efeitoDeEvento(ev); audio.aoEvento(ev, mundo); tutor.aoEvento(ev); };
 mundo.aoTrocarSala = (sala) => {
   efeitos.limpar();   // efeito de outra sala aparecendo na nova é o bug mais
                       // óbvio possível, e o mais fácil de esquecer
@@ -79,6 +81,10 @@ paineis = new Paineis(mundo, laco, { aoSalvar: (motivo) => save.salvar(motivo) }
 save.iniciar()
   .then((restaurou) => {
     save.ligarGatilhos();
+    tutor.aplicarSave(mundo.dicasVistas);
+    // O mundo guarda a lista no save; o tutor é quem sabe o conteúdo dela.
+    // Este gancho mantém as duas em dia sem o mundo precisar conhecer o tutor.
+    Object.defineProperty(mundo, 'dicasVistas', { get: () => tutor.paraSave(), configurable: true });
     if (restaurou) hud.anunciar('Continuando', save.estado, 2.8);
   })
   .catch(() => { /* `iniciar` já degrada sozinho; nada a fazer aqui */ });
@@ -127,6 +133,7 @@ function passo(dt) {
   if (laco.pausado || mapa.aberta || paineis?.bloqueiaJogo) return;
 
   mundo.atualizar(dt, entrada);
+  tutor.atualizar(dt);
 }
 
 /* ------------------------------------------------------------------ quadro -- */
@@ -143,7 +150,7 @@ function quadro(alpha, dtReal) {
   render.iniciarFrame(tema, camera);
 
   // 1 · céu
-  render.desenharCeu(sala.altura);
+  render.desenharCeu(sala.altura, laco.tempo);
 
   // 2-5 · parallax + luz volumétrica
   desenharParallax(render, sala, mundo);
@@ -310,6 +317,6 @@ function efeitoDeEvento(ev) {
 /* ------------------------------------------------------------------ debug --- */
 
 if (new URLSearchParams(location.search).has('debug')) {
-  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, efeitos, paineis, passo, quadro };
+  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, efeitos, paineis, tutor, passo, quadro };
   console.info('[fase2] modo debug: window.__fase2 disponível');
 }
