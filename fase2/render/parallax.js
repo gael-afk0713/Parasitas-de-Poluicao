@@ -707,24 +707,61 @@ function troncosColossais(ctx, a, s) {
     // conforme sobe, e é esse afilamento que o olho usa pra dizer "isso é um
     // tronco". Quanto mais alta, mais fina fica a ponta.
     const alturaTronco = Math.max(1, yb - topo);
-    const afina = lerp(0.62, 0.24, clamp01(alturaTronco / (a.vh * 1.4)));
+    // Piso no afilamento: sem ele um tronco alto vira agulha, e a curva
+    // nova transformava a agulha numa lâmina inclinada.
+    const afina = lerp(0.62, 0.36, clamp01(alturaTronco / (a.vh * 1.4)));
     const rTopo = rBase * afina;
     // Inclinação leve e própria: floresta de troncos perfeitamente verticais
     // lê como grade.
     const inclina = (hash2(x, s.semente + 5, 281) - 0.5) * rBase * 1.1;
+    /* CURVA DO EIXO. O tronco era um afilamento reto entre os contrafortes e
+       o topo: todo tronco da tela tinha exatamente o mesmo eixo vertical, e
+       uma floresta de eixos paralelos lê como cerca de postes por mais que a
+       espessura varie. Um desvio no MEIO dá a cada árvore um gesto próprio,
+       que é o que o olho usa pra dizer "isto cresceu" em vez de "isto foi
+       desenhado". */
+    // Tronco grosso entorta menos que tronco fino — e é o grosso que fica
+    // perto da câmera, onde uma curva exagerada denuncia na hora.
+    const curva = (hash2(x, s.semente + 23, 331) - 0.5) * rBase * 2.4
+      / (1 + rBase / 34);
+    const yMeio = yb - alturaTronco * 0.52;
+    const rMeio = lerp(rBase * 0.86, rTopo, 0.45);
+    /** Eixo do tronco em `t` (0 = base, 1 = topo). */
+    const eixo = (t) => px + curva * Math.sin(t * Math.PI) + inclina * t * t;
+    const xMeio = eixo(0.52);
 
     ctx.fillStyle = a.cor;
     ctx.beginPath();
     ctx.moveTo(px - rBase * 1.9, yb + 80);
-    // contraforte esquerdo → corpo afilando → contraforte direito
+    // contraforte esquerdo → meio desviado → topo
     ctx.quadraticCurveTo(px - rBase * 1.15, yb - rBase * 0.7, px - rBase * 0.86, yb - rBase * 2.2);
     ctx.quadraticCurveTo(
-      px - rBase * 0.7 + inclina * 0.4, (yb + topo) * 0.5,
+      px - rBase * 0.8 + curva * 0.5, yb - alturaTronco * 0.26,
+      xMeio - rMeio, yMeio
+    );
+    ctx.quadraticCurveTo(
+      xMeio - rMeio * 0.9 + curva * 0.3, yb - alturaTronco * 0.78,
       px - rTopo + inclina, topo
     );
-    ctx.lineTo(px + rTopo + inclina, topo);
+    /* TOPO QUEBRADO. Uma em cada três termina em lasca em vez de ponta lisa —
+       é o detalhe que diz "esta árvore morreu de pé" sem textura nenhuma. */
+    if (hash2(x, s.semente + 29, 337) < 0.34) {
+      const lasca = rTopo * 1.25;
+      for (let k = 0; k <= 6; k++) {
+        const t = k / 6;
+        const hk = hash2(x + k * 11, s.semente + 31, 341);
+        ctx.lineTo(px - rTopo + inclina + rTopo * 2 * t,
+          topo - lasca * (k % 2 === 0 ? 0.35 + hk * 0.65 : hk * 0.3));
+      }
+    } else {
+      ctx.lineTo(px + rTopo + inclina, topo);
+    }
     ctx.quadraticCurveTo(
-      px + rBase * 0.7 + inclina * 0.4, (yb + topo) * 0.5,
+      xMeio + rMeio * 0.9 + curva * 0.3, yb - alturaTronco * 0.78,
+      xMeio + rMeio, yMeio
+    );
+    ctx.quadraticCurveTo(
+      px + rBase * 0.8 + curva * 0.5, yb - alturaTronco * 0.26,
       px + rBase * 0.86, yb - rBase * 2.2
     );
     ctx.quadraticCurveTo(px + rBase * 1.15, yb - rBase * 0.7, px + rBase * 1.9, yb + 80);
@@ -738,23 +775,73 @@ function troncosColossais(ctx, a, s) {
     // desenhar copas que estão um pouco acima da borda e ainda são vistas.
     if (topo > yDe(a, 0) - a.vh * 0.15) {
       const vivo = 0.2 + (a.pureza ?? 0) * 0.8;
-      ctx.strokeStyle = a.cor;
-      ctx.lineCap = 'round';
-      const nGalhos = 3 + Math.floor(hash2(x, s.semente + 7, 283) * 3);
+      /* GALHOS.
+         A versão anterior era um leque de traços de espessura CONSTANTE,
+         todos saindo do mesmo ponto no topo, com ângulos igualmente
+         espaçados. Isso desenha um Y de palitos — e como toda árvore usava a
+         mesma fórmula, a floresta virava o mesmo carimbo repetido em quinze
+         tamanhos. Era o que mais fazia a cena parecer clip-art.
+
+         Três mudanças, cada uma resolvendo um pedaço:
+         1. o galho AFINA (é uma fita, não um traço) — espessura constante lê
+            como antena de inseto;
+         2. os galhos nascem espalhados pelo terço de cima do tronco, não
+            todos no mesmo ponto;
+         3. cada galho se BIFURCA uma vez — galho seco sem ramificação é
+            palito, e é a ramificação que diz "árvore". */
+      const nGalhos = 4 + Math.floor(hash2(x, s.semente + 7, 283) * 4);
+      // Viés lateral por árvore: algumas cresceram tortas pro mesmo lado.
+      const vies = (hash2(x, s.semente + 37, 347) - 0.5) * 1.1;
+      ctx.fillStyle = a.cor;
+
+      const fitaGalho = (bx, by, ang, comp, larg, nivel) => {
+        const N = 6;
+        // Galho seco cai com o próprio peso: curva pra baixo na ponta.
+        const arco = 0.5 + nivel * 0.35;
+        const ponto = (t) => {
+          const aa = ang + arco * t * t * 0.55;
+          return [bx + Math.cos(aa) * comp * t, by + Math.sin(aa) * comp * t];
+        };
+        ctx.beginPath();
+        for (let k = 0; k <= N; k++) {
+          const t = k / N;
+          const g = ponto(t);
+          const w = larg * Math.pow(1 - t, 0.75);
+          k === 0 ? ctx.moveTo(g[0] - w, g[1]) : ctx.lineTo(g[0] - w, g[1]);
+        }
+        for (let k = N; k >= 0; k--) {
+          const t = k / N;
+          const g = ponto(t);
+          const w = larg * Math.pow(1 - t, 0.75);
+          ctx.lineTo(g[0] + w, g[1]);
+        }
+        ctx.closePath();
+        ctx.fill();
+        return ponto;
+      };
+
       for (let i = 0; i < nGalhos; i++) {
         const hg = hash2(x + i * 17, s.semente + 9, 293);
-        // Abrem para os dois lados, subindo — silhueta de árvore morta.
-        const ang = lerp(-2.5, -0.65, (i + hg * 0.6) / nGalhos);
-        const comp = rBase * lerp(2.2, 5.5, hg) * lerp(1, 1.5, vivo);
-        const bx = px + inclina, by = topo + rBase * 0.3;
-        ctx.lineWidth = Math.max(1, rBase * lerp(0.34, 0.12, hg));
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.quadraticCurveTo(
-          bx + Math.cos(ang) * comp * 0.5, by + Math.sin(ang) * comp * 0.35,
-          bx + Math.cos(ang) * comp, by + Math.sin(ang) * comp
-        );
-        ctx.stroke();
+        const hg2 = hash2(x - i * 23, s.semente + 19, 317);
+        // Inserção espalhada pelo terço de cima; os de baixo são maiores, que
+        // é como uma árvore fica mais larga sob a copa.
+        const u = i / Math.max(1, nGalhos - 1);
+        const desce = alturaTronco * 0.3 * (u * u) * (0.5 + hg2);
+        const by = topo + rBase * 0.25 + desce;
+        const bx = eixo(clamp01((yb - by) / alturaTronco)) + inclina * 0.6;
+        // Lado alternado com jitter — leque simétrico é o que fazia o Y.
+        const lado = (i % 2 === 0 ? -1 : 1);
+        const ang = -Math.PI / 2 + lado * lerp(0.5, 1.35, hg) + vies;
+        const comp = rBase * lerp(2.4, 6.2, hg2) * (1 + desce / alturaTronco)
+          * lerp(1, 1.45, vivo);
+        const larg = Math.max(0.7, rBase * lerp(0.22, 0.1, hg));
+        const ponto = fitaGalho(bx, by, ang, comp, larg, 0);
+        if (hg2 > 0.3) {                       // bifurcação a ~55% do galho
+          const fg = ponto(0.55);
+          const dir = hg > 0.5 ? 1 : -1;
+          fitaGalho(fg[0], fg[1], ang + dir * lerp(0.4, 0.85, hg2),
+            comp * 0.5, larg * 0.55, 1);
+        }
       }
       /* Folhagem: só existe de verdade quando a área revive.
          Era UMA elipse — e uma elipse lisa em cima de um tronco fino é um

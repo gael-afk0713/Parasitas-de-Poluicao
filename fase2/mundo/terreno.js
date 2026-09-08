@@ -98,6 +98,11 @@ export class Terreno {
     return this.emGrade(cx, cy) && ehBloqueante(this.dados[cy * this.largura + cx]);
   }
 
+  /** `_solidoVisual` em coordenadas de PIXEL. */
+  _solidoVisualPx(x, y) {
+    return this._solidoVisual(Math.floor(x / this.tile), Math.floor(y / this.tile));
+  }
+
   definir(cx, cy, tipo) {
     if (!this.emGrade(cx, cy)) return;
     this.dados[cy * this.largura + cx] = tipo;
@@ -390,10 +395,27 @@ export class Terreno {
         const a = pts[i], b = pts[(i + 1) % pts.length];
         const dx = b.x - a.x, dy = b.y - a.y;
         const len = Math.hypot(dx, dy) || 1;
-        // Normal apontando pra fora do sólido; em y-para-baixo, com a
-        // orientação escolhida acima, "pra cima" é normal.y < -limiar.
-        const ny = -dx / len;
-        if (ny < -limiar) {
+
+        /* "Face pisável" era decidido pelo SENTIDO do contorno (`ny = -dx/len`
+           e um limiar). Isso só funciona se todo laço estiver enrolado no
+           mesmo sentido — e não está: o encadeador de arestas resolve
+           junções diagonais escolhendo a curva mais fechada à direita, o que
+           inverte a orientação de alguns laços (as saliências pequenas e
+           soltas, tipicamente). Nesses, a regra apontava para a face de
+           BAIXO: musgo, luz de crista e a decoração de chão apareciam
+           pendurados sob a plataforma, de cabeça pra baixo. Bug real, visível
+           em qualquer sala com repuxo de 1 tile.
+
+           A geometria não depende de orientação nenhuma: uma face é pisável
+           se a aresta é quase horizontal, tem VAZIO em cima e SÓLIDO embaixo.
+           A sonda usa um quarto de tile porque o contorno é suavizado e
+           deslocado por ruído — perto demais da borda cairia no tile errado. */
+        if (Math.abs(dx) / len < limiar) { atual = null; continue; }
+        const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+        const sonda = this.tile * 0.25;
+        const pisavel = !this._solidoVisualPx(mx, my - sonda)
+          && this._solidoVisualPx(mx, my + sonda);
+        if (pisavel) {
           if (!atual) { atual = [a]; saida.push(atual); }
           atual.push(b);
         } else {

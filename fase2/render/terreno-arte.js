@@ -161,20 +161,48 @@ export class ArteTerreno {
       const x1 = (f.cx1 + 1) * t.tile;
       const y = f.cy * t.tile;
       const largura = x1 - x0;
-      const espessura = t.tile * 0.34;
       const s = this.semente + f.cy * 31 + f.cx0;
 
-      // Corpo: viga levemente arqueada, como um galho apoiado nas pontas.
+      /* DOIS TIPOS DE PLATAFORMA.
+         Antes havia um só, e a sala inteira era a mesma barra arredondada
+         repetida cinco, seis vezes: o elemento mais presente da tela era
+         também o mais igual a si mesmo, e barra arredondada idêntica lê como
+         elemento de interface, não como coisa do mundo.
+
+         Agora cada faixa sorteia (pela posição, então nunca muda) entre um
+         TRONCO CAÍDO — corpo cilíndrico, tampas de corte nas pontas, sulcos
+         de casca ao longo — e uma LAJE de pedra — corpo angular, quebrado nas
+         pontas, trinca atravessando. A regra de leitura continua a mesma nos
+         dois: a face de cima é a coisa mais clara da cena depois do próprio
+         Guardião, porque é nela que o jogador pisa. */
+      const ehTronco = hash2(f.cx0, f.cy, s + 5) < 0.55;
+      const espessura = t.tile * (ehTronco ? 0.46 : 0.4);
+
       const arco = Math.min(4, largura * 0.012);
+      const topoY = (px) => y + 1 + arco * Math.sin(((px - x0) / largura) * Math.PI);
       ctx.beginPath();
       ctx.moveTo(x0, y + 1);
       ctx.quadraticCurveTo((x0 + x1) / 2, y + 1 + arco, x1, y + 1);
-      // Barra de baixo irregular: dentes curtos e desiguais.
-      const passos = Math.max(2, Math.round(largura / 11));
-      for (let i = passos; i >= 0; i--) {
-        const px = x0 + (largura * i) / passos;
-        const n = hash2(Math.round(px), f.cy, s);
-        ctx.lineTo(px, y + espessura * lerp(0.55, 1.15, n) + arco * 0.6);
+      if (ehTronco) {
+        // Barriga do tronco: uma curva cheia, e as pontas descem arredondadas
+        // — é a curva que faz ler como cilindro em vez de tábua.
+        ctx.quadraticCurveTo(x1 + espessura * 0.5, y + espessura * 0.5,
+          x1 - espessura * 0.35, y + espessura);
+        const passos = Math.max(2, Math.round(largura / 26));
+        for (let i = passos; i >= 0; i--) {
+          const px = x0 + (largura * i) / passos;
+          const n = hash2(Math.round(px), f.cy, s);
+          ctx.lineTo(px, y + espessura * lerp(0.92, 1.06, n) + arco * 0.6);
+        }
+        ctx.quadraticCurveTo(x0 - espessura * 0.5, y + espessura * 0.5, x0, y + 1);
+      } else {
+        // Laje: quebrada embaixo, com dentes maiores e desiguais.
+        const passos = Math.max(2, Math.round(largura / 15));
+        for (let i = passos; i >= 0; i--) {
+          const px = x0 + (largura * i) / passos;
+          const n = hash2(Math.round(px), f.cy, s);
+          ctx.lineTo(px, y + espessura * lerp(0.45, 1.35, n * n) + arco * 0.6);
+        }
       }
       ctx.closePath();
       // O corpo é bem mais claro que o terreno (0.45 de mistura, não 0.18):
@@ -182,9 +210,49 @@ export class ArteTerreno {
       // no momento em que o jogador precisa dela para calcular um pulo.
       const g = ctx.createLinearGradient(0, y, 0, y + espessura);
       g.addColorStop(0, misturarHex(tema.terreno, tema.crista, 0.45));
+      g.addColorStop(ehTronco ? 0.34 : 0.5, misturarHex(tema.terreno, tema.borda, 0.5));
       g.addColorStop(1, misturarHex(tema.terrenoFundo, tema.borda, 0.35));
       ctx.fillStyle = g;
       ctx.fill();
+
+      if (ehTronco) {
+        // Sulcos de casca: duas linhas longas acompanhando a curva do corpo.
+        ctx.strokeStyle = rgba(tema.terrenoFundo, 0.5);
+        ctx.lineWidth = 1;
+        for (const k of [0.42, 0.68]) {
+          ctx.beginPath();
+          for (let px = x0 + 4; px <= x1 - 4; px += 9) {
+            const n = hash2(Math.round(px), f.cy + k * 10, s + 3);
+            const yy = topoY(px) + espessura * k + (n - 0.5) * 1.6;
+            px === x0 + 4 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
+          }
+          ctx.stroke();
+        }
+        // Tampas de corte: o anel na ponta é o que diz "isto foi cortado".
+        for (const [px, sinal] of [[x0 + 2.5, -1], [x1 - 2.5, 1]]) {
+          ctx.fillStyle = misturarHex(tema.terreno, tema.borda, 0.55);
+          ctx.beginPath();
+          ctx.ellipse(px, y + espessura * 0.52, espessura * 0.24, espessura * 0.5, 0, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = rgba(tema.crista, 0.35);
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.ellipse(px + sinal * 0.6, y + espessura * 0.52,
+            espessura * 0.12, espessura * 0.26, 0, 0, TAU);
+          ctx.stroke();
+        }
+      } else {
+        // Trinca: uma só, atravessando a laje na diagonal.
+        const hc = hash2(f.cx0, f.cy, s + 11);
+        const cx0 = x0 + largura * lerp(0.25, 0.7, hc);
+        ctx.strokeStyle = rgba(tema.terrenoFundo, 0.6);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(cx0, y + 2);
+        ctx.lineTo(cx0 + (hc - 0.5) * 10, y + espessura * 0.55);
+        ctx.lineTo(cx0 + (hc - 0.5) * 4, y + espessura * 0.95);
+        ctx.stroke();
+      }
 
       // Face de cima: a linha que o jogador realmente pisa. É o elemento mais
       // claro de toda a cena depois do próprio Guardião — legibilidade de
@@ -210,13 +278,6 @@ export class ArteTerreno {
       ctx.stroke();
       ctx.restore();
 
-      // Amarração nas pontas: dois nós que ancoram a viga visualmente.
-      ctx.fillStyle = misturarHex(tema.borda, tema.terreno, 0.4);
-      for (const px of [x0 + 2, x1 - 2]) {
-        ctx.beginPath();
-        ctx.ellipse(px, y + espessura * 0.4, 3, espessura * 0.5, 0, 0, TAU);
-        ctx.fill();
-      }
 
       // Vegetação pendurada quando a área revive.
       if (pureza > 0.25) {
