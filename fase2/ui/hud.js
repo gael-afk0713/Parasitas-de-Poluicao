@@ -11,6 +11,7 @@
    ========================================================================= */
 
 import { TAU, clamp01, lerp, damp, rgba, misturarHex, easeOutCubic, easeOutBack } from '../core/mat.js';
+import { nomeArea } from '../render/paleta.js';
 
 const NOMES_HABILIDADE = {
   saltoDuplo: 'Salto Duplo',
@@ -43,7 +44,13 @@ export class Hud {
 
   anunciarSala(sala, mundo) {
     if (!sala.titulo) return;
-    this.anunciar(sala.titulo, null, 3.4);
+    /* O título de sala-marco É o nome da área, e a área muda de nome quando
+       é restaurada. Anunciar "A Clareira Queimada" numa clareira já coberta
+       de verde desmente o que está na tela. */
+    const pureza = mundo?.tema?.pureza ?? 0;
+    const nome = nomeArea(sala.area, 0);
+    const titulo = sala.titulo === nome ? nomeArea(sala.area, pureza) : sala.titulo;
+    this.anunciar(titulo, null, 3.4);
   }
 
   anunciarHabilidade(id) {

@@ -63,6 +63,15 @@ export class ArteTerreno {
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = 5;
     ctx.stroke(path);
+
+    // --- 3b. crosta iluminada -------------------------------------------
+    // DEPOIS da oclusão, de propósito. A luz vem do céu: bate na face de
+    // cima e não entra na parede. Como só as arestas PISÁVEIS entram aqui,
+    // a distinção sai de graça — parede e teto continuam escuros.
+    //
+    // Sem isso o miolo da rocha é preto liso: a silhueta lê, o material não.
+    // A escada de larguras faz o degradê que um `stroke` sozinho não faz.
+    this._crosta(ctx, tema);
     ctx.restore();
 
     // --- 4. contorno ---------------------------------------------------
@@ -560,6 +569,29 @@ export class ArteTerreno {
     }
     this._cristasPronto = p;
     return p;
+  }
+
+  /**
+   * A camada de terra iluminada logo abaixo da superfície pisável.
+   * Chamar SEMPRE dentro de um `clip(path)`: o traço é largo e, sem recorte,
+   * metade dele cai fora da rocha.
+   */
+  _crosta(ctx, tema) {
+    const p = this._pathCristas();
+    const pureza = tema.pureza ?? 0;
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = misturarHex(tema.terreno, tema.crista, lerp(0.34, 0.5, pureza));
+    // Largura ímpar de propósito: metade do traço fica fora da silhueta e é
+    // cortada pelo clip, então a "profundidade" real é metade do valor.
+    const passos = [[54, 0.06], [34, 0.09], [18, 0.13], [8, 0.2]];
+    for (const [larg, alfa] of passos) {
+      ctx.globalAlpha = alfa * lerp(0.85, 1.25, pureza);
+      ctx.lineWidth = larg;
+      ctx.stroke(p);
+    }
+    ctx.globalAlpha = 1;
   }
 
   _cristas(ctx, tema) {

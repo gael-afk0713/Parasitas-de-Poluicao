@@ -575,6 +575,41 @@ export class ArteJogador {
     olho(3.4, 1);
   }
 
+  /**
+   * O CRESCENTE do golpe, em coordenadas locais (origem no eixo do arco, já
+   * espelhado pela direção). Grossa no meio e afinando pras duas pontas: é o
+   * afilamento que faz ler como um corte varrendo o ar. Um `arc()` com
+   * `lineWidth` constante — que era o que havia aqui — tem espessura igual do
+   * começo ao fim e lê como um pedaço de aro.
+   *
+   * @param {number} k     0..1, progresso do golpe
+   * @param {number} escala engrossa/afina o crescente inteiro
+   */
+  _crescente(ctx, k, escala = 1) {
+    const ang0 = lerp(-1.85, -1.0, k);
+    const ang1 = lerp(-1.15, 1.6, k);
+    const rMed = lerp(20, 31, k);
+    const esp = lerp(12, 4, k) * escala;
+    const N = 16;
+
+    ctx.beginPath();
+    for (let i = 0; i <= N; i++) {          // borda de fora, ida
+      const u = i / N;
+      const ang = lerp(ang0, ang1, u);
+      const r = rMed + esp * 0.5 * Math.sin(u * Math.PI) ** 0.6;
+      const x = Math.cos(ang) * r, y = Math.sin(ang) * r;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    for (let i = N; i >= 0; i--) {          // borda de dentro, volta
+      const u = i / N;
+      const ang = lerp(ang0, ang1, u);
+      const r = rMed - esp * 0.5 * Math.sin(u * Math.PI) ** 0.6;
+      ctx.lineTo(Math.cos(ang) * r, Math.sin(ang) * r);
+    }
+    ctx.closePath();
+    return { ang0, ang1, rMed, esp };
+  }
+
   _ataque(ctx, j, tema) {
     if (j.ataqueRestante <= 0) return;
     const t = 1 - j.ataqueRestante / 0.22;
@@ -585,13 +620,34 @@ export class ArteJogador {
     ctx.save();
     ctx.translate(j.centroX + j.direcao * 20, j.centroY - 4);
     ctx.scale(j.direcao, 1);
+
+    // 1 · esteira: dois crescentes maiores e apagados, atrasados no tempo.
+    //     É o que dá VELOCIDADE ao golpe — sem eles o corte aparece e some
+    //     no mesmo lugar, e o olho não vê movimento nenhum.
+    ctx.fillStyle = misturarHex(tema.crista, tema.luz, 0.4);
+    for (const [atraso, alfa, esc] of [[0.20, 0.16, 1.5], [0.10, 0.26, 1.2]]) {
+      const kk = k - atraso;
+      if (kk <= 0) continue;
+      ctx.globalAlpha = a * alfa;
+      this._crescente(ctx, kk, esc);
+      ctx.fill();
+    }
+
+    // 2 · o corte: massa clara com a borda de fora acesa.
     ctx.globalAlpha = a * 0.95;
-    // Arco fino e alongado: um CORTE, não uma bola de luz.
-    ctx.strokeStyle = misturarHex('#ffffff', tema.crista, 0.5);
-    ctx.lineWidth = lerp(7, 1.2, k);
+    const g = ctx.createLinearGradient(0, -30, 0, 30);
+    g.addColorStop(0, misturarHex('#ffffff', tema.crista, 0.15));
+    g.addColorStop(1, misturarHex(tema.crista, tema.luz, 0.55));
+    ctx.fillStyle = g;
+    const c = this._crescente(ctx, k);
+    ctx.fill();
+
+    ctx.globalAlpha = a;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.1;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.arc(0, 0, lerp(20, 30, k), lerp(-1.7, -0.7, k), lerp(0.3, 1.5, k));
+    ctx.arc(0, 0, c.rMed + c.esp * 0.42, c.ang0 + 0.12, c.ang1 - 0.12);
     ctx.stroke();
     ctx.restore();
   }
@@ -624,8 +680,20 @@ export class ArteJogador {
     if (j.ataqueRestante > 0) {
       const t = 1 - j.ataqueRestante / 0.22;
       const a = Math.sin(clamp01(t) * Math.PI);
-      luzRadial(ctx, j.centroX + j.direcao * 30, j.centroY - 4, 46,
-        misturarHex('#ffffff', tema.crista, 0.4), a * 0.9);
+      // O bloom segue a FORMA do corte, não uma bola no lugar dele: um halo
+      // redondo apaga justamente o afilamento que dá leitura ao golpe.
+      if (t > 0.18) {
+        ctx.save();
+        ctx.translate(j.centroX + j.direcao * 20, j.centroY - 4);
+        ctx.scale(j.direcao, 1);
+        ctx.globalAlpha = a * 0.85;
+        ctx.fillStyle = misturarHex('#ffffff', tema.crista, 0.35);
+        this._crescente(ctx, (t - 0.18) / 0.82, 1.35);
+        ctx.fill();
+        ctx.restore();
+      }
+      luzRadial(ctx, j.centroX + j.direcao * 26, j.centroY - 4, 30,
+        misturarHex('#ffffff', tema.crista, 0.4), a * 0.55);
     }
     if (j.estado === ESTADOS.INVESTIDA) {
       luzRadial(ctx, j.centroX, j.centroY, 52, tema.acento, 0.8);
