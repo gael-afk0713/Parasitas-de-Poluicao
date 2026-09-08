@@ -29,6 +29,26 @@ import { atirarReto, atirarArco, atirarSpray, atirarAnel, Explosao, OndaChoque, 
 
 const GRAVIDADE = 1500;
 
+/* -------------------------------------------------------------------------
+   Assinaturas de `projeteis.js` que já pegaram este arquivo de surpresa —
+   anotadas aqui porque não são uniformes entre si:
+
+     new PocaAcida(x, y, { largura, duracao, dano })   ← POSICIONAL, e o
+         tamanho é `largura`, não `raio`. Chamar com um objeto só fazia `y`
+         virar undefined e o passe de luz explodir com "non-finite value".
+     new OndaChoque({ x, y, dir, vel, alcance, altura, dano })
+         ← viaja numa direção SÓ; para um baque no chão são DUAS ondas.
+     new Explosao({ x, y, raio, dano, duracao })       ← objeto, expande em
+         círculo a partir do centro.
+   ------------------------------------------------------------------------- */
+
+/** Baque no chão: duas ondas, uma para cada lado. */
+function ondaDupla(mundo, x, y, alcance, dano = 1) {
+  for (const dir of [-1, 1]) {
+    mundo.entidades.push(new OndaChoque({ x, y, dir, alcance, dano, vel: 260 }));
+  }
+}
+
 /* =========================================================================
    BASE
    ========================================================================= */
@@ -246,7 +266,7 @@ class MaeAfogada extends Chefe {
               raio: 7, cor: 'acento',
               // Deixa poça ao cair: o chão da arena vai ficando menor, e é
               // isso que impede o jogador de resolver a luta parado num canto.
-              aoBater: (m, p) => m.entidades.push(new PocaAcida({ x: p.x, y: p.y, raio: 34, duracao: 5 })),
+              aoBater: (m, p) => m.entidades.push(new PocaAcida(p.x, p.y, { largura: 64, duracao: 5 })),
             });
           }
           mundo.camera.sacudir(0.3);
@@ -278,9 +298,7 @@ class MaeAfogada extends Chefe {
           this.perigoso = true;
           if (k > 0.3 && !this._emergiu) {
             this._emergiu = true;
-            mundo.entidades.push(new OndaChoque({
-              x: this.centroX, y: this.baseY + this.altura, raio: 150, dano: 1,
-            }));
+            ondaDupla(mundo, this.centroX, this.baseY + this.altura, 340, 1);
             mundo.camera.sacudir(0.6);
             mundo.laco.congelar(0.05);
           }
@@ -504,9 +522,7 @@ class Maquina extends Chefe {
           const res = this._gravidade(dt, terreno);
           if (res.chao && this.vy === 0 && this.tempoEstado > AVISO + 0.25) {
             this._pulou = false;
-            mundo.entidades.push(new OndaChoque({
-              x: this.centroX, y: this.y + this.altura, raio: 190, dano: 1,
-            }));
+            ondaDupla(mundo, this.centroX, this.y + this.altura, 420, 1);
             mundo.camera.sacudir(0.9);
             mundo.laco.congelar(0.09);
             this._trocarEstado('atordoada');

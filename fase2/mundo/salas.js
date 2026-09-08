@@ -212,6 +212,36 @@ export function validarRegistro() {
     const sala = new Sala(def);
     const nomesPortas = new Set(sala.portas.map((p) => p.tipo));
 
+    // Comprimento de linha: `normalizarMapa` completa com '.' em SILÊNCIO, e
+    // uma linha curta vira buraco aberto na borda da sala — o jogador cai pra
+    // fora do mundo sem explicação nenhuma. É o erro de autoria mais fácil de
+    // cometer e o mais difícil de diagnosticar jogando.
+    const larguras = new Map();
+    def.mapa.forEach((linha, i) => {
+      if (!larguras.has(linha.length)) larguras.set(linha.length, []);
+      larguras.get(linha.length).push(i);
+    });
+    if (larguras.size > 1) {
+      const maisComum = [...larguras.entries()].sort((a, b) => b[1].length - a[1].length)[0][0];
+      for (const [larg, linhas] of larguras) {
+        if (larg === maisComum) continue;
+        problemas.push(
+          `${def.id}: linha(s) ${linhas.join(',')} têm ${larg} chars, esperado ${maisComum}`
+        );
+      }
+    }
+
+    // Um altar sem `def.altar` daria sempre saltoDuplo, silenciosamente.
+    if (sala.objetos.some((o) => o.tipo === 'altar') && !def.altar) {
+      problemas.push(`${def.id}: tem altar '!' no mapa mas nenhum "altar:" na definição`);
+    }
+    if (sala.objetos.some((o) => o.tipo === 'chefe') && !def.chefe) {
+      problemas.push(`${def.id}: tem arena 'B' no mapa mas nenhum "chefe:" na definição`);
+    }
+    if (sala.objetos.some((o) => o.tipo === 'portao') && !def.portao) {
+      problemas.push(`${def.id}: tem portão 'g' no mapa mas nenhum "portao:" na definição`);
+    }
+
     for (const [nome, destino] of Object.entries(sala.ligacoes)) {
       if (!nomesPortas.has(nome)) {
         problemas.push(`${def.id}: ligação "${nome}" não tem porta correspondente no mapa`);

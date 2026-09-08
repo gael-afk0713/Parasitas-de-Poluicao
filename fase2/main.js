@@ -17,7 +17,16 @@ import { criarEntidade } from './entidades/catalogo.js';
 import { Hud } from './ui/hud.js';
 import { Audio } from './audio/audio.js';
 
+// Registram-se sozinhas ao serem importadas (ver `registrarSala`).
+// A ORDEM é a ordem narrativa, e importa: `validarRegistro` reclama de
+// ligação para sala ainda não registrada, então uma área não pode citar outra
+// que venha depois — hoje todas as ligações apontam para frente, então a
+// ordem narrativa e a ordem de carga coincidem.
 import './mundo/salas-raizes.js';
+import './mundo/salas-varzea.js';
+import './mundo/salas-clareira.js';
+import './mundo/salas-dossel.js';
+import './mundo/salas-coracao.js';
 
 /* ---------------------------------------------------------------- montagem -- */
 
