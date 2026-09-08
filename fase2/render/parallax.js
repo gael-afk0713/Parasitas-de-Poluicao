@@ -1137,31 +1137,56 @@ const CAMADAS = {
   ],
 
   /* --- CORAÇÃO: nada de rocha; carne, lobos, veias ----------------------- */
+  /* --- CORAÇÃO: a floresta INCHADA, ainda a céu aberto -------------------
+     A composição anterior era só `organico` — e metade das massas estava com
+     `rel` acima de 0.5, ou seja, na parte de CIMA da tela. O efeito era uma
+     caverna de bolhas: o céu sumia atrás de massas suspensas e a área final
+     parecia um interior de gruta, não o coração de uma floresta.
+
+     Aqui a corrupção vem DO CHÃO. As massas orgânicas incham a partir de
+     baixo, e as árvores continuam presentes — deformadas, fundidas com a
+     coisa que cresceu nelas, mas presentes. É o que mantém a área ligada ao
+     resto do jogo: o jogador precisa reconhecer que ainda está na floresta,
+     e que ela virou isto. Uma caverna genérica não diria nada.
+
+     O céu fica aberto e é a coisa mais clara da tela, como nas outras áreas —
+     só que aqui ele é violeta e a luz vem de baixo, do próprio Coração, o que
+     inverte a leitura e é o que dá o desconforto. -------------------------- */
   coracao: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
-      { f: 'organico', rel: 0.5, passo: 300, dens: 0.9, rMin: 150, rMax: 380, semente: 401 },
+      // Linha do horizonte: árvores doentes, baixas, quase dissolvidas.
+      { f: 'troncosColossais', rel: 1.04, passo: 130, dens: 0.85,
+        largMin: 5, largMax: 14, semente: 401, altura: [0.24, 0.40] },
+      { f: 'organico', rel: 1.12, passo: 300, dens: 0.9, rMin: 120, rMax: 300, semente: 403 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
-      { f: 'organico', rel: 0.36, passo: 260, dens: 0.85, rMin: 110, rMax: 280, semente: 409 },
+      { f: 'troncosColossais', rel: 1.06, passo: 190, dens: 0.7,
+        largMin: 8, largMax: 22, semente: 407, altura: [0.36, 0.56] },
+      { f: 'organico', rel: 1.14, passo: 260, dens: 0.85, rMin: 110, rMax: 280, semente: 409 },
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
-      { f: 'organico', rel: 0.66, passo: 240, dens: 0.8, rMin: 90, rMax: 240, semente: 419 },
-      { f: 'raizes', rel: 0.0, passo: 240, dens: 0.5, compMin: 200, compMax: 520,
-        largMin: 10, largMax: 30, semente: 421 },
+      { f: 'troncosColossais', rel: 1.08, passo: 320, dens: 0.55,
+        largMin: 14, largMax: 34, semente: 417, altura: [0.5, 0.78] },
+      { f: 'organico', rel: 1.16, passo: 240, dens: 0.8, rMin: 90, rMax: 240, semente: 419 },
+      // As raízes aéreas continuam — mas curtas, para não virarem cortina.
+      { f: 'raizes', rel: -0.04, passo: 300, dens: 0.32, compMin: 120, compMax: 300,
+        largMin: 10, largMax: 26, semente: 421 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
-      { f: 'organico', rel: 0.18, passo: 300, dens: 0.7, rMin: 100, rMax: 260, semente: 431 },
-      { f: 'organico', rel: 0.92, passo: 280, dens: 0.7, rMin: 110, rMax: 270, semente: 433 },
+      { f: 'organico', rel: 1.02, passo: 300, dens: 0.7, rMin: 100, rMax: 260, semente: 431 },
+      { f: 'organico', rel: 1.2, passo: 280, dens: 0.7, rMin: 110, rMax: 270, semente: 433 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
-      { f: 'organico', rel: 1.06, passo: 320, dens: 0.75, rMin: 130, rMax: 300, semente: 439 },
+      { f: 'troncosColossais', rel: 1.14, passo: 480, dens: 0.45,
+        largMin: 26, largMax: 60, semente: 437, altura: [0.9, 1.3] },
+      { f: 'organico', rel: 1.1, passo: 320, dens: 0.75, rMin: 130, rMax: 300, semente: 439 },
     ] },
     { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
-      { f: 'organico', rel: -0.04, passo: 340, dens: 0.6, rMin: 120, rMax: 290, semente: 443 },
-      { f: 'organico', rel: 1.16, passo: 360, dens: 0.6, rMin: 140, rMax: 320, semente: 449 },
+      { f: 'organico', rel: 1.18, passo: 340, dens: 0.6, rMin: 120, rMax: 290, semente: 443 },
+      { f: 'organico', rel: 1.3, passo: 360, dens: 0.6, rMin: 140, rMax: 320, semente: 449 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
-      { f: 'organico', rel: 1.3, passo: 420, dens: 0.5, rMin: 170, rMax: 380, semente: 457 },
+      { f: 'organico', rel: 1.34, passo: 420, dens: 0.5, rMin: 170, rMax: 380, semente: 457 },
     ] },
   ],
 };
@@ -1369,7 +1394,15 @@ const MOLDURA = {
   // Com estalactite a cena inteira lia como gruta, por mais troncos que
   // houvesse no parallax — o primeiro plano é o que mais define o lugar,
   // porque é o que está mais perto e mais escuro.
-  raizes: { base: 'raizGrossa', topo: 'galhoFolhado' },
+  //
+  // A base virou `moitaBaixa` depois de duas tentativas com `raizGrossa`. O
+  // problema não era o desenho da raiz: era o CONCEITO. Um objeto alto e
+  // escuro, sozinho, repetido ao longo da tela, sempre lê como "uma coisa" —
+  // primeiro cone, depois barbatana, por mais que se conserte a curva. Na
+  // referência (GRIS) o primeiro plano não é feito de objetos isolados: é uma
+  // FAIXA baixa de terra com plantas pequenas recortadas em cima. Faixa não
+  // vira objeto, e é o que emoldura sem competir com o personagem.
+  raizes: { base: 'moitaBaixa', topo: 'galhoFolhado' },
   varzea: { base: 'folhaLarga', topo: 'juncoAlto' },
   clareira: { base: 'viga', topo: 'cano' },
   dossel: { base: 'raizGrossa', topo: 'galhoFolhado' },
@@ -1421,18 +1454,126 @@ function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, refX, tempo, tema) {
 
     const escala = lerp(0.7, 1.5, h3);
     switch (tipo) {
-      case 'raizGrossa': {
-        // raiz saindo do chão e arqueando — massa larga embaixo, ponta fina
-        const alt = vh * lerp(0.20, 0.46, h3);
-        const larg = lerp(40, 110, h2);
+      /* Faixa baixa de terra com plantas recortadas — ver a nota em MOLDURA
+         sobre por que isto substituiu a raiz isolada. Três camadas:
+         o monte, os talos e as folhas. Nenhuma delas sobe o bastante pra
+         disputar espaço com o jogador. */
+      case 'moitaBaixa': {
+        const altMonte = vh * lerp(0.055, 0.14, h3);
+        const largMonte = lerp(150, 330, h2);
+
+        // 1 · o monte: contorno ondulado por ruído, base bem larga.
         ctx.beginPath();
-        ctx.moveTo(px - larg, yBase + 60);
-        ctx.bezierCurveTo(px - larg * 0.8, yBase - alt * 0.35,
-          px - larg * 0.15, yBase - alt * 0.8, px + (h - 0.5) * 90, yBase - alt);
-        ctx.bezierCurveTo(px + larg * 0.3, yBase - alt * 0.72,
-          px + larg * 0.85, yBase - alt * 0.3, px + larg, yBase + 60);
+        ctx.moveTo(px - largMonte, yBase + 80);
+        const N = 16;
+        for (let i = 0; i <= N; i++) {
+          const t = i / N;
+          const x = px + lerp(-largMonte, largMonte, t);
+          // Perfil de meia-elipse com ruído por cima: monte de terra, não domo.
+          const perfil = Math.sin(t * Math.PI);
+          const n = ruido1(t * 5 + h * 9, 771) - 0.5;
+          ctx.lineTo(x, yBase + 80 - altMonte * (perfil * (1 + n * 0.55) + 0.15));
+        }
+        ctx.lineTo(px + largMonte, yBase + 80);
         ctx.closePath();
         ctx.fill();
+
+        // 2 · talos e folhas saindo do monte.
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 9; i++) {
+          const hi = hash2(Math.round(px) + i * 31, 787, 3);
+          const hj = hash2(Math.round(px) - i * 17, 797, 3);
+          if (hi > 0.78) continue;
+          const bx = px + lerp(-largMonte * 0.85, largMonte * 0.85, hj);
+          const perfil = Math.sin(((bx - px) / largMonte * 0.5 + 0.5) * Math.PI);
+          const by = yBase + 80 - altMonte * (perfil + 0.15);
+          const alt = vh * lerp(0.05, 0.16, hi) * lerp(0.7, 1.3, hj);
+          const verga = (hi - 0.5) * alt * 0.9;
+
+          ctx.lineWidth = lerp(2, 5.5, hi);
+          ctx.beginPath();
+          ctx.moveTo(bx, by + 6);
+          ctx.quadraticCurveTo(bx + verga * 0.3, by - alt * 0.55, bx + verga, by - alt);
+          ctx.stroke();
+
+          // Folha na ponta: elipse inclinada. Só em alguns, senão vira mato.
+          if (hj > 0.45) {
+            ctx.save();
+            ctx.translate(bx + verga, by - alt);
+            ctx.rotate(verga * 0.02 + (hi - 0.5) * 0.8);
+            ctx.beginPath();
+            ctx.ellipse(0, -alt * 0.1, alt * 0.1, alt * 0.26, 0, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+        break;
+      }
+
+      case 'raizGrossa': {
+        // Raiz saindo do chão e arqueando.
+        //
+        // A versão anterior era uma massa SIMÉTRICA afinando até um bico, e
+        // por isso lia como cone — chapéu de bruxa preto plantado na tela, o
+        // defeito mais visível do primeiro plano em todas as áreas. Raiz de
+        // verdade não é simétrica, não termina em agulha e não sobe reta: ela
+        // ARQUEIA para um lado, mantém espessura na ponta e se divide.
+        //
+        // Agora é uma fita curva: uma linha de centro que arqueia, com largura
+        // caindo suavemente, mais uma raiz secundária saindo do meio.
+        // Baixa e larga, não alta e pontuda: elemento de primeiro plano que
+        // sobe muito vira lâmina atravessando a tela e disputa com o jogador.
+        const alt = vh * lerp(0.13, 0.30, h3);
+        const larg = lerp(34, 88, h2);
+        const arco = (h - 0.5) * 2.4;   // para que lado ela verga
+
+        /** Fita curva com borda IRREGULAR — contorno liso lê como recorte. */
+        const fita = (bx, byBase, altura, largura, curvatura, sem) => {
+          const passos = 14;
+          ctx.beginPath();
+          for (let lado = 0; lado < 2; lado++) {
+            const sinal = lado === 0 ? -1 : 1;
+            for (let i = 0; i <= passos; i++) {
+              const t = lado === 0 ? i / passos : 1 - i / passos;
+              const cx2 = bx + curvatura * t * t * largura * 1.5;
+              const cy2 = byBase - altura * t;
+              // Largura cai devagar e PARA em 26% — a ponta continua grossa.
+              // A ondulação por ruído é o que tira o ar de forma vetorial.
+              const ondula = 1 + (ruido1(t * 6 + sem, 91) - 0.5) * 0.42;
+              const w = largura * lerp(1, 0.26, t * t) * ondula;
+              const px2 = cx2 + sinal * w;
+              if (lado === 0 && i === 0) ctx.moveTo(px2, cy2);
+              else ctx.lineTo(px2, cy2);
+            }
+          }
+          ctx.closePath();
+          ctx.fill();
+        };
+
+        fita(px, yBase + 60, alt + 60, larg, arco, h * 10);
+        // Raiz secundária: sai do meio e verga para o outro lado. É o que
+        // quebra a leitura de "objeto único repetido".
+        if (h3 > 0.3) {
+          fita(px + arco * larg * 0.5, yBase + 60 - alt * 0.4,
+            alt * 0.55, larg * 0.4, -arco * 1.5, h2 * 10);
+        }
+        // Radículas finas saindo da base: detalhe pequeno que dá escala e
+        // impede a massa de terminar numa curva limpa contra o chão.
+        ctx.strokeStyle = ctx.fillStyle;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 4; i++) {
+          const hi = hash2(Math.round(px) + i * 7, 863, 5);
+          if (hi > 0.65) continue;
+          const rx = px + (hi - 0.5) * larg * 2.4;
+          const ry = yBase + 20 - hi * alt * 0.5;
+          ctx.lineWidth = lerp(2, 6, hi);
+          ctx.beginPath();
+          ctx.moveTo(rx, yBase + 60);
+          ctx.quadraticCurveTo(rx + (hi - 0.5) * 40, (yBase + ry) * 0.5,
+            rx + (hi - 0.5) * 70, ry);
+          ctx.stroke();
+        }
         break;
       }
       case 'folhaLarga': {
