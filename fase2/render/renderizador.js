@@ -308,67 +308,121 @@ export class Renderizador {
   sacudirCor(valor = 0.5) { this.aberracao = Math.max(this.aberracao, valor); }
 
   /**
-   * O céu — primeiro pass de todo frame.
+   * O céu — primeiro pass de todo frame, e o único plano sem paralaxe: está
+   * infinitamente longe, então fica preso à tela.
    *
    * O jogo se passa AO AR LIVRE, e ao ar livre o céu é a coisa mais clara da
    * cena, mesmo à noite, mesmo sob fumaça. É isso que faz silhueta de árvore
    * ler como silhueta em vez de virar mais uma mancha escura entre outras.
    * Um gradiente escuro de cima a baixo, como era antes, é céu de caverna.
    *
-   * Três camadas:
+   * Quatro camadas:
    *   1. gradiente base, escurecendo pra cima (o zênite é sempre o mais escuro)
-   *   2. CLARÃO DE HORIZONTE — a faixa mais clara da tela inteira, logo acima
-   *      da linha das copas. É o que dá profundidade e diz "há mundo além"
-   *   3. faixas de fumaça derivando devagar, porque esta floresta está doente
-   *      e o céu precisa contar isso antes de qualquer texto
+   *   2. SOL — a origem da luz, sem a qual os feixes descem de lugar nenhum
+   *   3. CLARÃO DE HORIZONTE — a faixa mais clara da tela inteira
+   *   4. estratos de fumaça derivando devagar, porque esta floresta está
+   *      doente e o céu precisa contar isso antes de qualquer texto
+   *
+   * @param {number} alturaMundo   altura da sala em px
+   * @param {number} tempo         relógio do laço
+   * @param {number} angLuz        ângulo da luz da área (ANGULO_LUZ)
    */
-  desenharCeu(alturaMundo = 2000, tempo = 0) {
+  desenharCeu(alturaMundo = 2000, tempo = 0, angLuz = 0.22) {
     this.camadaTela((ctx, tema, w, h) => {
-      // Quanto do mundo já foi escalado. Perto do chão o horizonte fica baixo
-      // na tela; subindo, ele desce — dá a sensação de altitude ganha.
-      const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo - this.tela.altura));
-      const yHorizonte = h * lerp(0.58, 0.92, alturaRel);
+      /* O HORIZONTE fica na altura do OLHO — perto do meio da tela, porque a
+         câmera segue o jogador. Ele sobe um pouco quando se está lá no alto:
+         daí se enxerga o mundo distante espalhado ABAIXO da linha, que é o
+         que dá a sensação de altitude.
 
-      // 1 · base
+         (A versão anterior tinha o sinal trocado e o horizonte ia parar em
+         0.92·h junto ao chão; o clarão saía pela borda de baixo e o que
+         sobrava na tela era só o degradê chapado do topo. Era por isso que o
+         céu lia como uma parede de cor lisa.) */
+      const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo - this.tela.altura));
+      const yHorizonte = h * lerp(0.50, 0.68, alturaRel);
+      const pureza = clamp01(tema.pureza ?? 0);
+
+      // 1 · base — o zênite é o ponto mais escuro do céu, e é dele que sai a
+      //     amplitude de valor que faz o horizonte parecer luminoso.
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, tema.ceuTopo);
-      g.addColorStop(0.45, misturarHex(tema.ceuTopo, tema.ceuBase, 0.6));
+      g.addColorStop(0, misturarHex(tema.ceuTopo, tema.primeiroPlano, 0.22));
+      g.addColorStop(0.38, tema.ceuTopo);
+      g.addColorStop(0.78, misturarHex(tema.ceuTopo, tema.ceuBase, 0.72));
       g.addColorStop(1, tema.ceuBase);
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
 
-      // 2 · clarão de horizonte
-      const clarao = ctx.createLinearGradient(0, yHorizonte - h * 0.42, 0, yHorizonte + h * 0.1);
+      // 2 · SOL. Um céu aberto precisa de uma origem pra luz: sem ela os
+      //     feixes volumétricos descem de lugar nenhum. Poluído ele é um
+      //     borrão largo atrás da fumaça; restaurado, vira um disco. É a
+      //     recompensa mais visível de limpar uma área.
+      const solX = clamp01(0.5 + Math.sin(angLuz) * 1.15) * w;
+      // Luz rasante (|sen| grande) = sol baixo; quase vertical = sol alto.
+      const alt = clamp01(Math.abs(Math.sin(angLuz)) / 0.4);
+      const solY = yHorizonte - h * lerp(0.62, 0.16, alt);
+      // Poluído o halo é FRACO de propósito: um halo largo e forte lava a
+      // tela inteira numa cor só e some com a amplitude de valor — foi o que
+      // aconteceu na primeira tentativa, a Clareira virou um chapado marrom.
+      const rSol = h * lerp(0.56, 0.34, pureza);
+      const halo = ctx.createRadialGradient(solX, solY, 0, solX, solY, rSol);
+      halo.addColorStop(0, rgba(tema.luz, lerp(0.11, 0.46, pureza)));
+      halo.addColorStop(0.35, rgba(misturarHex(tema.luz, tema.bruma, 0.5), lerp(0.05, 0.20, pureza)));
+      halo.addColorStop(1, rgba(tema.bruma, 0));
+      ctx.fillStyle = halo;
+      ctx.fillRect(0, 0, w, h);
+      if (pureza > 0.3) {                      // o disco só rompe a fumaça
+        const rd = h * 0.045;
+        const disco = ctx.createRadialGradient(solX, solY, 0, solX, solY, rd);
+        disco.addColorStop(0, rgba(tema.luz, (pureza - 0.3) * 1.2));
+        disco.addColorStop(0.6, rgba(tema.luz, (pureza - 0.3) * 0.55));
+        disco.addColorStop(1, rgba(tema.luz, 0));
+        ctx.fillStyle = disco;
+        ctx.fillRect(solX - rd, solY - rd, rd * 2, rd * 2);
+      }
+
+      // 3 · clarão de horizonte — pico NA linha, com queda pros dois lados.
+      //     Antes o degradê terminava no horizonte e o resto da tela herdava
+      //     a última parada: metade de baixo virava um chapado de bruma.
+      const clarao = ctx.createLinearGradient(0, yHorizonte - h * 0.34, 0, yHorizonte + h * 0.26);
       clarao.addColorStop(0, rgba(tema.bruma, 0));
-      clarao.addColorStop(0.72, rgba(misturarHex(tema.bruma, tema.luz, 0.28), 0.55));
-      clarao.addColorStop(1, rgba(misturarHex(tema.bruma, tema.luz, 0.4), 0.75));
+      clarao.addColorStop(0.56, rgba(misturarHex(tema.bruma, tema.luz, 0.30), 0.42));
+      clarao.addColorStop(0.62, rgba(misturarHex(tema.bruma, tema.luz, 0.42), 0.62));
+      clarao.addColorStop(1, rgba(tema.bruma, 0.06));
       ctx.fillStyle = clarao;
       ctx.fillRect(0, 0, w, h);
 
-      // 3 · fumaça em faixas
-      // Alongadas e quase horizontais: nuvem redonda lê como algodão, faixa
-      // esticada lê como poluição parada no ar. Derivam devagar e em
-      // velocidades diferentes, senão a camada inteira desliza como um bloco.
-      ctx.save();
-      for (let i = 0; i < 5; i++) {
-        const f = i / 4;
-        const y = yHorizonte - h * lerp(0.05, 0.5, f) + Math.sin(tempo * 0.06 + i) * 6;
-        const deriva = (tempo * lerp(3, 9, f) + i * 260) % (w * 2) - w * 0.5;
-        const larguraFaixa = w * lerp(0.5, 1.1, ((i * 37) % 10) / 10);
-        const alturaFaixa = h * lerp(0.02, 0.055, f);
-        const alfa = lerp(0.16, 0.05, f) * (1 - (tema.pureza ?? 0) * 0.55);
-        const gf = ctx.createRadialGradient(
-          deriva + larguraFaixa / 2, y, 0,
-          deriva + larguraFaixa / 2, y, larguraFaixa / 2
-        );
-        gf.addColorStop(0, rgba(tema.bruma, alfa));
+      // 4 · ESTRATOS. Faixas longas com a borda de cima irregular. Elipse com
+      //     degradê radial (o que havia aqui) é invisível: sem silhueta, não
+      //     há nuvem — só uma mancha. O que lê como poluição parada no ar é
+      //     uma faixa esticada com contorno próprio.
+      for (let i = 0; i < 6; i++) {
+        const f = i / 5;
+        const yBase = yHorizonte - h * lerp(0.02, 0.62, f * f);
+        const esp = h * lerp(0.018, 0.075, f);
+        const deriva = (tempo * lerp(2.5, 11, f) + i * 337) % (w * 1.6) - w * 0.3;
+        const larg = w * lerp(0.55, 1.25, ((i * 41) % 7) / 6);
+        const alfa = lerp(0.20, 0.05, f) * lerp(1, 0.35, pureza);
+        const gf = ctx.createLinearGradient(0, yBase - esp, 0, yBase + esp * 0.7);
+        gf.addColorStop(0, rgba(tema.bruma, 0));
+        gf.addColorStop(0.45, rgba(tema.bruma, alfa));
         gf.addColorStop(1, rgba(tema.bruma, 0));
         ctx.fillStyle = gf;
         ctx.beginPath();
-        ctx.ellipse(deriva + larguraFaixa / 2, y, larguraFaixa / 2, alturaFaixa, 0, 0, Math.PI * 2);
+        ctx.moveTo(deriva, yBase + esp);
+        const N = 22;
+        for (let k = 0; k <= N; k++) {
+          const t = k / N;
+          const x = deriva + t * larg;
+          // Duas senóides incomensuráveis: ondulação sem período visível.
+          const ond = Math.sin(t * 7.3 + i * 2.1) * 0.55 + Math.sin(t * 17.1 + i) * 0.28;
+          // Afina nas pontas, senão a faixa termina num corte reto.
+          const bico = Math.sin(t * Math.PI) ** 0.55;
+          ctx.lineTo(x, yBase - esp * bico * (0.55 + ond * 0.45));
+        }
+        ctx.lineTo(deriva + larg, yBase + esp);
+        ctx.closePath();
         ctx.fill();
       }
-      ctx.restore();
     });
   }
 
@@ -382,10 +436,21 @@ export class Renderizador {
     if (forca <= 0.002) return;
     this.camadaTela((ctx, tema, w, h) => {
       ctx.globalAlpha = clamp01(forca * tema.densidadeBruma);
+      /* O perfil vertical é o que separa névoa de FILTRO. A versão anterior
+         ia de 0.85 a 1.0 a 0.7 — praticamente um retângulo chapado, e como
+         o primeiro véu cai logo depois da camada mais distante, ele também
+         lavava o CÉU: o zênite escuro sumia e a tela inteira virava uma cor
+         só (era o marrom liso da Clareira).
+
+         Ar de verdade se acumula na horizontal: olhando pro alto atravessa-
+         se pouca atmosfera, olhando pro horizonte atravessa-se muita. Então
+         o véu é quase nada em cima, cheio na faixa do horizonte, e cai de
+         novo embaixo — onde o que se vê já está perto. */
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, rgba(tema.bruma, 0.85));
-      g.addColorStop(0.6, rgba(tema.bruma, 1));
-      g.addColorStop(1, rgba(tema.bruma, 0.7));
+      g.addColorStop(0, rgba(tema.bruma, 0.06));
+      g.addColorStop(0.32, rgba(tema.bruma, 0.34));
+      g.addColorStop(0.62, rgba(tema.bruma, 1));
+      g.addColorStop(1, rgba(tema.bruma, 0.62));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
     });
