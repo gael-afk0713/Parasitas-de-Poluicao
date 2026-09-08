@@ -23,7 +23,7 @@ await import('./mundo/salas-ramos.js');
 
 const SALA_INICIAL = 'raizes-01';
 
-const problemas = validarRegistro();
+const { problemas, avisos } = validarRegistro();
 
 // --- alcançabilidade ------------------------------------------------------
 const visitadas = new Set();
@@ -54,10 +54,18 @@ if (orfas.length) {
   for (const id of orfas) console.log('  ' + id);
 }
 
+// Avisos NÃO derrubam a verificação: são cheiro de autoria, não defeito.
+// Misturar os dois faz o autor aprender a ignorar a saída inteira, que é pior
+// do que não ter verificador nenhum.
+if (avisos.length) {
+  console.log(`\n${avisos.length} aviso(s) — o jogo roda, mas confira:`);
+  for (const a of avisos) console.log('  · ' + a);
+}
+
 if (problemas.length) {
-  console.log(`\n${problemas.length} problema(s):`);
+  console.log(`\n${problemas.length} PROBLEMA(S):`);
   for (const p of problemas) console.log('  ' + p);
   process.exit(1);
 }
 if (orfas.length) process.exit(1);
-console.log('\nOK — nenhum problema.');
+console.log(avisos.length ? '\nSem problemas (só avisos).' : '\nOK — nada a apontar.');

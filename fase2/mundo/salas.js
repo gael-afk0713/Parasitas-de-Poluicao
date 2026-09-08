@@ -25,6 +25,29 @@
 import { Terreno, TILE, normalizarMapa } from './terreno.js';
 
 /**
+ * Tipos que precisam nascer APOIADOS no chão.
+ *
+ * O mapa ASCII dá a célula, não a altura exata da superfície — e a célula
+ * escolhida à mão quase nunca é a que encosta no chão. O resultado eram 33
+ * objetos flutuando pelo jogo: pontos de salvamento a 2 tiles do piso, um
+ * cuspidor a 13, um chefe a 7. Nada disso aparece num teste automatizado
+ * (o jogo roda perfeitamente com um chefe flutuando) e é gritante jogando.
+ *
+ * Em vez de acertar 33 células à mão — e recomeçar a cada sala nova — os
+ * tipos daqui são ENCOSTADOS no chão ao carregar a sala.
+ *
+ * Quem NÃO entra na lista: semente, fragmento e fonte flutuam de propósito;
+ * voador ignora terreno; tecelão pende do teto; portas são posicionais.
+ */
+const ANCORADOS_NO_CHAO = new Set([
+  'inicio', 'salvamento', 'altar', 'lapide', 'portao', 'chefe',
+  'parasita', 'cuspidor', 'explosivo', 'rastejante',
+]);
+
+/** Até onde procurar chão abaixo do ponto do mapa, em tiles. */
+const ALCANCE_ENCOSTE = 24;
+
+/**
  * char → tipo de entidade. Tudo aqui vira VAZIO no terreno.
  *
  * Este conjunto é CONGELADO: o desenhista de salas e o autor de inimigos
@@ -125,6 +148,8 @@ export class Sala {
     this.largura = this.terreno.larguraPx;
     this.altura = this.terreno.alturaPx;
 
+    this._encostarNoChao();
+
     this.luzes = def.luzes || [];
     this.portas = this.objetos.filter((o) => o.tipo.startsWith('porta-'));
     this.inicio = this.objetos.find((o) => o.tipo === 'inicio') || {
@@ -134,6 +159,23 @@ export class Sala {
     /** Estado mutável de sessão (não persiste) — preenchido pelo mundo. */
     this.entidades = [];
     this.visitada = false;
+  }
+
+  /**
+   * Desce cada objeto ancorado até a primeira superfície abaixo dele.
+   * Guarda a distância percorrida em `o.encoste` — o verificador usa isso pra
+   * apontar salas em que o desvio foi grande demais pra ser só descuido de
+   * uma célula (provavelmente o objeto foi posto no lugar errado).
+   */
+  _encostarNoChao() {
+    for (const o of this.objetos) {
+      if (!ANCORADOS_NO_CHAO.has(o.tipo)) { o.encoste = 0; continue; }
+      // Sonda a partir de logo abaixo do ponto original, senão um objeto já
+      // apoiado "encontra" o próprio chão em que está e não sai do lugar.
+      const d = this.terreno.alturaAteChao(o.x, o.y + 1, ALCANCE_ENCOSTE);
+      o.encoste = Number.isFinite(d) ? d : 0;
+      if (Number.isFinite(d) && d > 0) o.y += d;
+    }
   }
 
   get limites() {
@@ -206,8 +248,16 @@ function hashId(s) {
    jogando (você só descobre quando cai numa sala sem saída), então é melhor
    quebrar no console na hora do que depois.
    ========================================================================= */
+/**
+ * @returns {{problemas: string[], avisos: string[]}}
+ *   `problemas` quebram o jogo (porta sem saída, sala inexistente, linha
+ *   curta). `avisos` são cheiro de autoria: o jogo roda, mas alguém
+ *   provavelmente errou. Misturar os dois faz o autor aprender a ignorar a
+ *   saída inteira, que é pior do que não ter verificador.
+ */
 export function validarRegistro() {
   const problemas = [];
+  const avisos = [];
   for (const def of REGISTRO.values()) {
     const sala = new Sala(def);
     const nomesPortas = new Set(sala.portas.map((p) => p.tipo));
@@ -227,6 +277,19 @@ export function validarRegistro() {
         if (larg === maisComum) continue;
         problemas.push(
           `${def.id}: linha(s) ${linhas.join(',')} têm ${larg} chars, esperado ${maisComum}`
+        );
+      }
+    }
+
+    // Objeto que desceu MUITO ao ser encostado no chão. O encoste conserta o
+    // desenho, mas um desvio grande quase sempre quer dizer que o símbolo foi
+    // parar na linha errada do mapa — e aí ele está no lugar errado da SALA,
+    // o que o encoste não conserta. 2,5 tiles separa descuido de engano.
+    for (const o of sala.objetos) {
+      if ((o.encoste ?? 0) > TILE * 2.5) {
+        avisos.push(
+          `${def.id}: "${o.tipo}" em (col ${o.cx}, row ${o.cy}) estava a ` +
+          `${(o.encoste / TILE).toFixed(1)} tiles do chão — confira a linha`
         );
       }
     }
@@ -262,5 +325,5 @@ export function validarRegistro() {
     }
     if (!def.mapa.length) problemas.push(`${def.id}: mapa vazio`);
   }
-  return problemas;
+  return { problemas, avisos };
 }
