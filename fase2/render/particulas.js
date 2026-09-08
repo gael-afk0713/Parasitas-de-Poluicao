@@ -112,6 +112,26 @@ function atmosfera(ctx, tema, camera, mundo, parallax, soBrilhantes = false) {
 }
 
 /**
+ * Topo do primeiro tile pisável abaixo do alto da área visível, na coluna `x`.
+ * Varre de cima pra baixo em passos de um tile; se a coluna for um poço sem
+ * fundo à vista, devolve a base da área visível.
+ */
+function alturaDoChao(terreno, x, a) {
+  const base = a.y + a.altura;
+  if (!terreno) return base;
+  const cx = Math.floor(x / terreno.tile);
+  // `solido()` trata fora-do-mapa como sólido; aqui isso devolveria o topo da
+  // tela como se fosse chão. Coluna fora da sala não tem chão, e ponto.
+  if (cx < 0 || cx >= terreno.largura) return base;
+  const cy0 = Math.max(0, Math.floor(a.y / terreno.tile));
+  const cy1 = Math.min(terreno.altura - 1, Math.ceil(base / terreno.tile));
+  for (let cy = cy0; cy <= cy1; cy++) {
+    if (terreno.solido(cx, cy)) return cy * terreno.tile;
+  }
+  return base;
+}
+
+/**
  * Neblina rasteira — bancos de névoa que se movem devagar junto ao chão.
  * Barato: são só elipses borradas. Chamar entre o terreno e as entidades pra
  * a névoa passar NA FRENTE do chão e ATRÁS do jogador.
@@ -119,6 +139,7 @@ function atmosfera(ctx, tema, camera, mundo, parallax, soBrilhantes = false) {
 export function desenharNevoa(render, mundo, parallax = 0.85) {
   const tema = mundo.tema;
   if (tema.densidadeBruma < 0.05) return;
+  const terreno = mundo.sala?.terreno;
 
   render.camada(parallax, (ctx, t, camera) => {
     const a = camera.areaVisivel(300);
@@ -129,17 +150,25 @@ export function desenharNevoa(render, mundo, parallax = 0.85) {
     ctx.globalCompositeOperation = 'screen';
     for (let x = x0; x < a.x + a.largura; x += passo) {
       const n = ruido1(x * 0.004, 17);
-      const y = a.y + a.altura * lerp(0.62, 0.95, n) + Math.sin(tempo * 0.22 + n * TAU) * 26;
+      const deriva = (tempo * lerp(5, 14, n)) % (passo * 3);
+      const cxm = x + deriva;
+      // Névoa RASTEIRA se apoia no CHÃO, não na tela. Ancorada na área
+      // visível (que era o que estava aqui), ela ficava sempre na mesma
+      // altura do quadro: subindo numa sala alta, os bancos subiam junto e
+      // ficavam pairando no ar sobre o vazio. O chão é medido na posição em
+      // que o banco vai ser DESENHADO, não na de origem — senão a deriva o
+      // arrasta pra longe do chão que o ancorou.
+      const y = alturaDoChao(terreno, cxm, a) - lerp(6, 34, n)
+        + Math.sin(tempo * 0.22 + n * TAU) * 14;
       const w = lerp(260, 520, n);
       const h = lerp(40, 90, ruido1(x * 0.009 + 5, 17));
-      const deriva = (tempo * lerp(5, 14, n)) % (passo * 3);
 
-      const g = ctx.createRadialGradient(x + deriva, y, 0, x + deriva, y, w);
+      const g = ctx.createRadialGradient(cxm, y, 0, cxm, y, w);
       g.addColorStop(0, rgba(t.bruma, 0.2 * t.densidadeBruma));
       g.addColorStop(1, rgba(t.bruma, 0));
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.ellipse(x + deriva, y, w, h, 0, 0, TAU);
+      ctx.ellipse(cxm, y, w, h, 0, 0, TAU);
       ctx.fill();
     }
     ctx.globalCompositeOperation = 'source-over';
