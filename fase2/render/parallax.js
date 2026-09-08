@@ -1091,50 +1091,56 @@ const CAMADAS = {
        · planos MÉDIOS e PRÓXIMOS = as ruínas, que ficam DENTRO do buraco.
      A linha do chão distante desceu de 0.70 para ~1.05: em 0.70 ela tapava
      metade da tela e o céu virava uma faixa. ---------------------------- */
+  /* Os `rel` de tudo que fica no CHÃO subiram 0.18 (o mesmo problema da
+     Várzea: a âncora do parallax é o meio da sala e, com as 12 fileiras de
+     céu do `abrirCeu`, o chão de verdade ficou bem abaixo dela). Chaminés,
+     torres, esteiras e escombros — as ruínas da fábrica da Fase 1, que são o
+     assunto desta área — caíam todas abaixo da borda de baixo do quadro e
+     nunca apareciam. O que sobrava na tela eram só os troncos finos. */
   clareira: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
       // A borda da mata no horizonte: baixa, densa, quase dissolvida na bruma.
-      { f: 'troncosColossais', rel: 1.04, passo: 110, dens: 0.9,
+      { f: 'troncosColossais', rel: 0.86, passo: 110, dens: 0.9,
         largMin: 4, largMax: 11, semente: 201, altura: [0.26, 0.40] },
-      { f: 'massa', lado: 'baixo', rel: 1.10, amp: 70, escala: 0.0009, semente: 203,
+      { f: 'massa', lado: 'baixo', rel: 0.92, amp: 70, escala: 0.0009, semente: 203,
         passo: 18, picos: 0.5 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
-      { f: 'troncosColossais', rel: 1.06, passo: 165, dens: 0.78,
+      { f: 'troncosColossais', rel: 0.88, passo: 165, dens: 0.78,
         largMin: 7, largMax: 18, semente: 207, altura: [0.38, 0.58] },
       // As chaminés começam a aparecer ENTRE as árvores, não no lugar delas.
-      { f: 'chamines', rel: 1.02, passo: 320, dens: 0.4, altMin: 120, altMax: 300,
+      { f: 'chamines', rel: 0.84, passo: 320, dens: 0.4, altMin: 120, altMax: 300,
         escalaLarg: 0.6, torcao: 0.2, semente: 211 },
       { f: 'fumaca', rel: 0.62, passo: 300, dens: 0.4, semente: 213 },
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
-      { f: 'troncosColossais', rel: 1.08, passo: 300, dens: 0.5,
+      { f: 'troncosColossais', rel: 0.90, passo: 300, dens: 0.5,
         largMin: 12, largMax: 28, semente: 215, altura: [0.55, 0.8] },
-      { f: 'massa', lado: 'baixo', rel: 1.06, amp: 82, escala: 0.0022, semente: 217,
+      { f: 'massa', lado: 'baixo', rel: 0.88, amp: 82, escala: 0.0022, semente: 217,
         passo: 14, picos: 0.7 },
-      { f: 'torres', rel: 1.02, passo: 340, dens: 0.6, altMin: 110, altMax: 260, escalaLarg: 0.75, semente: 223 },
-      { f: 'chamines', rel: 1.02, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
+      { f: 'torres', rel: 0.84, passo: 340, dens: 0.6, altMin: 110, altMax: 260, escalaLarg: 0.75, semente: 223 },
+      { f: 'chamines', rel: 0.84, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
         escalaLarg: 0.8, torcao: 0.22, semente: 227 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
-      { f: 'esteiras', rel: 0.80, passo: 480, dens: 0.7, escalaLarg: 0.85, semente: 229 },
-      { f: 'massa', lado: 'baixo', rel: 0.98, amp: 80, escala: 0.003, semente: 233, passo: 13, picos: 0.6 },
-      { f: 'escombros', rel: 0.98, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
+      { f: 'esteiras', rel: 0.62, passo: 480, dens: 0.7, escalaLarg: 0.85, semente: 229 },
+      { f: 'massa', lado: 'baixo', rel: 0.80, amp: 80, escala: 0.003, semente: 233, passo: 13, picos: 0.6 },
+      { f: 'escombros', rel: 0.80, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'cabos', rel: 0.16, passo: 300, dens: 0.72, escalaLarg: 1, semente: 241 },
-      { f: 'chamines', rel: 1.04, passo: 420, dens: 0.42, altMin: 260, altMax: 520,
+      { f: 'chamines', rel: 0.86, passo: 420, dens: 0.42, altMin: 260, altMax: 520,
         escalaLarg: 1.15, torcao: 0.24, semente: 251 },
-      { f: 'massa', lado: 'baixo', rel: 1.06, amp: 78, escala: 0.0042, semente: 257, passo: 11, picos: 0.7 },
+      { f: 'massa', lado: 'baixo', rel: 0.88, amp: 78, escala: 0.0042, semente: 257, passo: 11, picos: 0.7 },
     ] },
     { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
-      { f: 'esteiras', rel: 1.0, passo: 620, dens: 0.5, escalaLarg: 1.2, semente: 263 },
-      { f: 'massa', lado: 'baixo', rel: 1.16, amp: 70, escala: 0.0055, semente: 269, passo: 10, picos: 0.6 },
-      { f: 'escombros', rel: 1.16, passo: 230, dens: 0.55, escalaLarg: 1.2, semente: 271 },
+      { f: 'esteiras', rel: 0.82, passo: 620, dens: 0.5, escalaLarg: 1.2, semente: 263 },
+      { f: 'massa', lado: 'baixo', rel: 0.98, amp: 70, escala: 0.0055, semente: 269, passo: 10, picos: 0.6 },
+      { f: 'escombros', rel: 0.98, passo: 230, dens: 0.55, escalaLarg: 1.2, semente: 271 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'cabos', rel: -0.10, passo: 380, dens: 0.5, escalaLarg: 1.8, semente: 277 },
-      { f: 'escombros', rel: 1.3, passo: 300, dens: 0.45, escalaLarg: 1.8, semente: 281 },
+      { f: 'escombros', rel: 1.12, passo: 300, dens: 0.45, escalaLarg: 1.8, semente: 281 },
     ] },
   ],
 

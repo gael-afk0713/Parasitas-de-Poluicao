@@ -176,15 +176,21 @@ export const AREAS = {
     nomeRestaurado: 'A Clareira Coberta',
     ordem: 3,
     poluido: {
-      ceuTopo: '#1c1208', ceuBase: '#4a2f16',
-      bruma: '#63421f',
-      distante: '#21140a', medio: '#180e07', proximo: '#100904',
+      /* Era tudo o mesmo marrom-laranja, do zênite ao chão. Agora o alto do
+         céu é cinza-cinza-arroxeado (cinza fria, ar frio) e a linha do
+         horizonte é quente — fumaça vista contra a luz. É a diferença de
+         MATIZ, não só de valor, que faz a área parar de ler como um chapado
+         sépia. A bruma caiu de 0.56 pra 0.47 para os planos próximos
+         continuarem escuros em vez de convergirem todos pro mesmo tom. */
+      ceuTopo: '#171218', ceuBase: '#6b3a15',
+      bruma: '#6b4520',
+      distante: '#1f1610', medio: '#180e07', proximo: '#0e0804',
       terreno: '#120c07', terrenoFundo: '#080502',
       borda: '#37220f', crista: '#6b3a22',
       primeiroPlano: '#050301',
-      luz: '#c07a2a', luzAmbiente: '#2a1a0c',
+      luz: '#d08a30', luzAmbiente: '#2a1a0c',
       particula: '#7a5a3a', acento: '#c2481a',
-      densidadeBruma: 0.56, vinheta: 0.80, saturacao: 0.60, brilhoBloom: 0.36,
+      densidadeBruma: 0.47, vinheta: 0.80, saturacao: 0.60, brilhoBloom: 0.36,
     },
     restaurado: {
       ceuTopo: '#131a10', ceuBase: '#3a4820',
