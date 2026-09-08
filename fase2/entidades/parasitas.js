@@ -74,32 +74,70 @@ export class Sombra {
     this.temManto = forma.temManto ?? true;
     this.gravidade = forma.gravidade ?? true;
 
-    const nTent = forma.tentaculos ?? 7;
+    /* Proporção da mancha. É o que diferencia as seis espécies a 26 px de
+       tela — raio ±3 px e ±2 tentáculos não diferenciam nada. */
+    this.escalaX = forma.escalaX ?? 1;
+    this.escalaY = forma.escalaY ?? 1;
+
+    /* OS CHIFRES (antes: "tentáculos").
+       Eram SETE, num leque simétrico de 190°, e o do meio era o mais longo
+       (`lerp(0.6, 1.25, sin(f·π))`) — que é exatamente a proporção de uma mão
+       humana. Com comprimento de até 39 px saindo de um corpo de raio 13, o
+       desenho ficava 3× mais largo que a hitbox e a massa era 11% da
+       silhueta (numa Sombra de verdade é 65-75%). A criatura lia como uma
+       MÃO ABERTA, não como uma coisa encapuzada.
+
+       Agora são poucos, CURTOS (nunca passam de 0,9·raio), varridos pra trás
+       — o que de quebra dá direção à criatura, coisa que antes era impossível
+       de ler — e o perfil está invertido: as pontas do leque são as longas. */
+    const nTent = forma.tentaculos ?? 2;
     const espalha = forma.espalhaTentaculos ?? 1;
     this.tentaculos = Array.from({ length: nTent }, (_, i) => {
       const f = nTent === 1 ? 0.5 : i / (nTent - 1);
       const h = hash2(obj.cx + i, obj.cy, 23);
       return {
-        // Só o hemisfério superior: em 360° a criatura lê como aranha.
-        ang: lerp(-Math.PI * 1.03, 0.09, f) * espalha
-             - (1 - espalha) * Math.PI / 2 + (h - 0.5) * 0.28,
-        comp: (forma.compTentaculo ?? 26) * lerp(0.6, 1.25, Math.sin(f * Math.PI)) * (0.8 + h * 0.4),
+        ang: lerp(-Math.PI * 0.88, -Math.PI * 0.34, f) * espalha
+             - (1 - espalha) * Math.PI / 2 + (h - 0.5) * 0.16,
+        comp: Math.min(this.raio * 0.9, (forma.compTentaculo ?? 11)
+          * lerp(1.15, 0.55, Math.sin(f * Math.PI)) * (0.85 + h * 0.3)),
         fase: h * TAU,
         vel: 0.7 + h * 0.8,
         curva: (f - 0.5) * 1.7 + (h - 0.5) * 0.4,
       };
     });
 
-    const nOlhos = forma.olhos ?? 5;
+    /* AS FENDAS.
+       Eram cinco riscos de 1,15 px de meia-largura espremidos numa faixa de
+       11 px — um terço da área do olho do herói — e ficavam ENTERRADOS: as
+       bases dos sete tentáculos convergiam exatamente sobre eles. Na tela
+       sobrava um olho visível, às vezes dois.
+
+       Duas fendas grandes, com vão escuro entre elas e inclinadas pra dentro
+       (carranca). O rosto é a âncora de reconhecimento da Sombra. */
+    const nOlhos = forma.olhos ?? 2;
     this.olhos = Array.from({ length: nOlhos }, (_, i) => {
       const f = nOlhos === 1 ? 0.5 : i / (nOlhos - 1);
+      const lado = f < 0.5 ? -1 : 1;
       return {
-        dx: lerp(-this.raio * 0.42, this.raio * 0.42, f),
-        dy: -this.raio * 0.7 + Math.abs(f - 0.5) * this.raio * 0.42,
-        alt: lerp(this.raio * 0.4, this.raio * 0.2, Math.abs(f - 0.5) * 2),
+        dx: nOlhos === 1 ? 0 : lado * this.raio * 0.36,
+        dy: -this.raio * 0.62,
+        alt: this.raio * 0.52,
+        giro: -lado * 0.28,
         fase: hash2(obj.cx, obj.cy + i, 29) * TAU,
       };
     });
+    /* A barra do manto desce até 2,4·raio abaixo do centro, mas a caixa da
+       criatura tem só `altura`: com o desenho centrado no centro da caixa, a
+       franja entrava uns 15 px no chão e a criatura lia como mato nascendo do
+       piso. Este deslocamento apoia a ponta da barra exatamente nos pés.
+       Quem flutua não precisa (e não deve) ser apoiado. */
+    this.deslocDesenhoY = (this.temManto && this.gravidade)
+      ? this.altura / 2 - this.raio * 2.4 : 0;
+
+    // Piscada: um piscar vale mais que qualquer tremeluzir. Dessincronizado
+    // por criatura, senão a sala inteira pisca junto.
+    this._proxPiscada = 1 + hash2(obj.cx, obj.cy, 43) * 5;
+    this._piscando = 0;
   }
 
   get centroX() { return this.x + this.largura / 2; }
@@ -117,6 +155,14 @@ export class Sombra {
   atualizar(dt, mundo) {
     this.t += dt;
     this.piscarDano = Math.max(0, this.piscarDano - dt);
+
+    // Piscar > tremeluzir: o alfa dos olhos era uma senoide permanente, que
+    // lê como vaga-lume. Uma piscada curta e rara lê como encarada.
+    if (this._piscando > 0) this._piscando -= dt;
+    else if ((this._proxPiscada -= dt) <= 0) {
+      this._piscando = 0.06;
+      this._proxPiscada = 3 + hash2(this.cxInicial, Math.round(this.t), 47) * 3;
+    }
 
     if (this.morrendo > 0) {
       this.morrendo += dt * 2.6;
@@ -201,7 +247,7 @@ export class Sombra {
     const morre = clamp01(this.morrendo);
     const ferida = this.piscarDano > 0;
     const cx = this.centroX;
-    const cy = this.centroY + Math.sin(this.t * 3.1) * 1.6;
+    const cy = this.centroY + this.deslocDesenhoY + Math.sin(this.t * 3.1) * 1.6;
 
     ctx.save();
     if (morre > 0) {
@@ -212,12 +258,11 @@ export class Sombra {
     }
 
     this._aureola(ctx, tema, cx, cy);
-    this._fumaca(ctx, tema, cx, cy);
-    // Massa ANTES dos tentáculos: o halo do corpo cobria a base deles quando
-    // a ordem era a inversa, e a silhueta perdia exatamente o traço que a
-    // distingue de uma bolha.
+    // Corpo e chifres num caminho SÓ; as fendas por ÚLTIMO. Antes a massa
+    // vinha antes dos tentáculos e as bases dos sete convergiam exatamente
+    // sobre os olhos, soterrando o rosto — sobrava um olho visível na tela.
     this._massa(ctx, tema, cx, cy, ferida);
-    this._tentaculos(ctx, tema, cx, cy, ferida);
+    this._olhos(ctx, tema, cx, cy, ferida);
 
     ctx.restore();
   }
@@ -233,87 +278,25 @@ export class Sombra {
    * é: um buraco no mundo.
    */
   _aureola(ctx, tema, cx, cy) {
-    const r = this.raio * 2.6;
+    // 2,6 de raio a 0,55 de alfa era uma mancha borrada que comia justamente
+    // a borda que precisa estar nítida. Menor e mais fraca.
+    const r = this.raio * 1.7;
     const g = ctx.createRadialGradient(cx, cy - this.raio * 0.2, this.raio * 0.3, cx, cy - this.raio * 0.2, r);
-    g.addColorStop(0, rgba(tema.primeiroPlano, 0.55));
-    g.addColorStop(0.55, rgba(tema.primeiroPlano, 0.28));
+    g.addColorStop(0, rgba(tema.primeiroPlano, 0.34));
+    g.addColorStop(0.55, rgba(tema.primeiroPlano, 0.14));
     g.addColorStop(1, rgba(tema.primeiroPlano, 0));
     ctx.fillStyle = g;
     ctx.fillRect(cx - r, cy - this.raio * 0.2 - r, r * 2, r * 2);
   }
 
-  _fumaca(ctx, tema, cx, cy) {
-    ctx.save();
-    ctx.globalAlpha = 0.15;
-    ctx.fillStyle = tema.primeiroPlano;
-    for (let i = 0; i < 3; i++) {
-      const f = (this.t * 0.35 + i / 3) % 1;
-      ctx.beginPath();
-      ctx.arc(cx + Math.sin(this.t * 0.9 + i * 2) * 5,
-        cy - this.raio * 0.5 - f * 22, this.raio * 0.45 + f * 7, 0, TAU);
-      ctx.fill();
-    }
-    ctx.restore();
-  }
-
-  _tentaculos(ctx, tema, cx, cy, ferida) {
-    const cor = ferida ? '#ffffff' : misturarHex(tema.primeiroPlano, tema.ceuTopo, 0.4);
-    const ox = cx, oy = cy - this.raio * 0.46;
-    // Inflam junto com o telegrafo — o aviso é físico, não um ícone.
-    const escala = 1 + this.telegrafo * 0.35;
-
-    ctx.save();
-    ctx.lineCap = 'round';
-    for (const t of this.tentaculos) {
-      const a = t.ang + Math.sin(this.t * t.vel + t.fase) * 0.42;
-      const comp = t.comp * escala;
-      const px = ox + Math.cos(a) * comp;
-      const py = oy + Math.sin(a) * comp * 0.85;
-      const mx = ox + Math.cos(a + t.curva * 0.5) * comp * 0.55;
-      const my = oy + Math.sin(a + t.curva * 0.5) * comp * 0.5;
-
-      // Afina em 4 subsegmentos: o canvas não tem espessura variável, e
-      // garra de espessura constante lê como antena de inseto.
-      //
-      // Duas passadas: primeiro um traço mais LARGO na cor do halo, depois o
-      // traço escuro por cima. Sem isso os tentáculos ficavam invisíveis —
-      // são escuros como o corpo, e o halo em volta da massa cobria a base
-      // deles; a criatura lia como um ovo com contorno em vez da silhueta
-      // ramificada que a define.
-      for (const passada of (ferida ? ['massa'] : ['halo', 'massa'])) {
-        let ax = ox, ay = oy;
-        const extra = passada === 'halo' ? 2.0 : 0;
-        ctx.strokeStyle = passada === 'halo'
-          ? rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.30)
-          : cor;
-        for (let k = 1; k <= 4; k++) {
-          const u = k / 4, iu = 1 - u;
-          const bx = iu * iu * ox + 2 * iu * u * mx + u * u * px;
-          const by = iu * iu * oy + 2 * iu * u * my + u * u * py;
-          ctx.lineWidth = lerp(this.raio * 0.5, 0.9, (k - 0.5) / 4) + extra;
-          ctx.beginPath();
-          ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
-          ax = bx; ay = by;
-        }
-      }
-
-      /* Fio de luz no eixo do tentáculo. Ele existia SEMPRE, somado ao halo
-         que já contorna o mesmo traço — duas linhas claras por tentáculo. O
-         bicho lia como um rabisco de neon, e não como a sombra que deveria
-         ser. Agora só acende quando a criatura está carregando um ataque, e
-         aí vira informação: o aviso é o brilho. */
-      if (!ferida && this.telegrafo > 0.05) {
-        ctx.globalAlpha = this.telegrafo * 0.65;
-        ctx.strokeStyle = tema.acento;
-        ctx.lineWidth = 0.9;
-        ctx.beginPath();
-        ctx.moveTo(ox, oy); ctx.quadraticCurveTo(mx, my, px, py); ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
-    ctx.restore();
-  }
-
+  /**
+   * O CORPO INTEIRO num caminho só — capuz, barra do manto e chifres.
+   *
+   * Antes o corpo e cada chifre eram traçados e contornados SEPARADAMENTE, e
+   * cada chifre ainda levava um traço largo claro por baixo (o "halo"). Numa
+   * criatura de 26 px isso somava dezesseis linhas claras internas: a Sombra
+   * lia como um diagrama de si mesma. Uma silhueta = um contorno.
+   */
   _massa(ctx, tema, cx, cy, ferida) {
     const r = this.raio * (1 + this.telegrafo * 0.18);
     const cor = ferida ? '#ffffff' : misturarHex(tema.primeiroPlano, tema.ceuTopo, 0.4);
@@ -322,68 +305,105 @@ export class Sombra {
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(inclina);
-    ctx.fillStyle = cor;
+    ctx.scale(this.escalaX, this.escalaY);
 
     const onda = (a, k) => Math.sin(a * 3 + this.t * 1.7 + k) * r * 0.12;
 
-    // O caminho é montado uma vez e usado DUAS: primeiro como contorno
-    // (traço largo, cor de bruma) e depois como preenchimento.
-    //
-    // Sem esse contorno a criatura é um buraco preto sobre um mundo escuro:
-    // funciona quando ela passa na frente do terreno, e SOME quando está
-    // contra a própria silhueta do fundo — que é metade do tempo. Um inimigo
-    // que só aparece às vezes não é atmosfera, é dano injusto. O contorno
-    // resolve sem clarear a criatura: ela continua sendo um vazio, mas um
-    // vazio com borda.
-    const traçarCorpo = () => {
+    /** Cunha preenchida no lugar do traço de 4 segmentos: ponta de verdade,
+     *  sem as bolotas de `lineCap` que viravam juntas de dedo. */
+    const chifre = (t) => {
+      const a = t.ang + Math.sin(this.t * t.vel + t.fase) * 0.42
+        - this.dir * 0.30;                       // varrido pra trás = direção
+      const comp = t.comp * (1 + this.telegrafo * 0.35);
+      const bx = Math.cos(a) * r * 0.72, by = Math.sin(a) * r * 0.72;
+      const px = bx + Math.cos(a) * comp, py = by + Math.sin(a) * comp * 0.9;
+      const nx = -Math.sin(a) * r * 0.26, ny = Math.cos(a) * r * 0.26;
+      const mx = bx + Math.cos(a + t.curva * 0.35) * comp * 0.55;
+      const my = by + Math.sin(a + t.curva * 0.35) * comp * 0.5;
+      ctx.lineTo(bx - nx, by - ny);
+      ctx.quadraticCurveTo(mx - nx * 0.4, my - ny * 0.4, px, py);
+      ctx.quadraticCurveTo(mx + nx * 0.4, my + ny * 0.4, bx + nx, by + ny);
+    };
+
+    const traçar = () => {
       ctx.beginPath();
-      ctx.moveTo(0, -r * 1.6);                                  // ponta do capuz
-      ctx.bezierCurveTo(r * 0.46 + onda(1, 0), -r * 1.38, r * 0.92 + onda(2, 1), -r * 0.7, r, -0.08 * r);
+      ctx.moveTo(0, -r * 1.15);                                  // topo do capuz
+      // lado direito do capuz, com os chifres saindo dele
+      for (const t of this.tentaculos) if (Math.cos(t.ang) > 0) chifre(t);
+      ctx.bezierCurveTo(r * 0.46 + onda(1, 0), -r * 1.05, r * 0.92 + onda(2, 1), -r * 0.7, r, -0.08 * r);
       if (this.temManto) {
-        ctx.bezierCurveTo(r * 1.04, r * 0.54, r * 0.77, r, r * 0.54 + onda(3, 2), r * 1.3);
-        // Barra esfarrapada: dentes irregulares dissolvendo em fumaça.
-        for (let i = 3; i >= -3; i--) {
-          const x = i * r * 0.2;
-          ctx.lineTo(x, r * 1.3 + Math.sin(i * 2.1 + this.t * 2.2) * r * 0.27);
-          ctx.lineTo(x - r * 0.1, r * 0.92 + Math.sin(i * 1.7 + this.t) * r * 0.12);
+        ctx.bezierCurveTo(r * 1.04, r * 0.54, r * 0.9, r * 0.9, r * 0.84, r * 1.1);
+        /* BARRA DO MANTO. Eram sete dentes iguais de ~5 px num vão de ±0,6 r
+           — mais estreito que o corpo — pendurados sob uma tigela: lia como
+           vaso de grama. Quatro dentes DESIGUAIS, num vão de ±0,84 r e três
+           vezes mais longos, leem como pano rasgado; e o arrasto pro lado
+           oposto ao movimento codifica a direção de graça. */
+        for (let i = 2; i >= -2; i--) {
+          const hd = hash2(this.cxInicial + i, this.cyInicial, 41);
+          const x = i * r * 0.42;
+          const L = 1.55 + hd * 0.85;
+          ctx.lineTo(x - this.dir * r * 0.22,
+            r * L + Math.sin(i * 2.1 + this.t * 2.2) * r * 0.30);
+          ctx.lineTo(x - r * 0.16, r * 1.02 + Math.sin(i * 1.7 + this.t) * r * 0.10);
         }
-        ctx.bezierCurveTo(-r * 0.77, r, -r * 1.04, r * 0.54, -r, -0.08 * r);
+        ctx.bezierCurveTo(-r * 0.9, r * 0.9, -r * 1.04, r * 0.54, -r, -0.08 * r);
       } else {
-        // Sem manto: fundo arredondado. É o que separa o Espreita (que flutua)
-        // dos que andam — a silhueta conta como a criatura se move.
         ctx.bezierCurveTo(r * 1.02, r * 0.6, r * 0.6, r * 1.05, 0, r * 1.05);
         ctx.bezierCurveTo(-r * 0.6, r * 1.05, -r * 1.02, r * 0.6, -r, -0.08 * r);
       }
-      ctx.bezierCurveTo(-r * 0.92 + onda(2, 3), -r * 0.7, -r * 0.46 + onda(1, 4), -r * 1.38, 0, -r * 1.6);
+      ctx.bezierCurveTo(-r * 0.92 + onda(2, 3), -r * 0.7, -r * 0.46 + onda(1, 4), -r * 1.05, 0, -r * 1.15);
       ctx.closePath();
     };
 
+    /* CONTORNO DE DOIS TONS. O halo antigo era `bruma+acento` a 0,30 de alfa:
+       dava luminância ~45 sobre um fundo de parede ~67, ou seja, o "halo de
+       separação" era MAIS ESCURO que aquilo de que ele deveria separar. Com
+       um anel escuro por fora e um claro por dentro, a criatura se recorta
+       tanto contra o preto quanto contra o céu — e continua sendo um vazio. */
     if (!ferida) {
-      // Halo de separação: mais claro que a criatura E que o fundo típico.
-      ctx.strokeStyle = rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.30);
-      ctx.lineWidth = 1.9;
       ctx.lineJoin = 'round';
-      traçarCorpo();
+      ctx.strokeStyle = rgba(tema.primeiroPlano, 0.85);
+      ctx.lineWidth = 4;
+      traçar();
+      ctx.stroke();
+      ctx.strokeStyle = rgba(misturarHex(tema.bruma, '#ffffff', 0.3), 0.62);
+      ctx.lineWidth = 1.5;
+      traçar();
       ctx.stroke();
     }
-    traçarCorpo();
+    ctx.fillStyle = cor;
+    traçar();
     ctx.fill();
+    ctx.restore();
+  }
 
-    if (!ferida) {
-      ctx.fillStyle = '#ffffff';
-      for (const o of this.olhos) {
-        ctx.globalAlpha = (0.75 + 0.25 * Math.sin(this.t * 2.6 + o.fase)) * (1 - this.telegrafo * 0.2)
-          + this.telegrafo * 0.25;
-        ctx.save();
-        ctx.translate(o.dx * this.dir, o.dy);
-        ctx.rotate(o.dx * this.dir * 0.055);
-        ctx.beginPath();
-        ctx.ellipse(0, 0, 1.15, o.alt * (1 + this.telegrafo * 0.5), 0, 0, TAU);
-        ctx.fill();
-        ctx.restore();
-      }
-      ctx.globalAlpha = 1;
+  /**
+   * As fendas. Desenhadas por último, no espaço do mundo (sem a escala do
+   * corpo), pra não virarem ovais achatados nas espécies largas.
+   */
+  _olhos(ctx, tema, cx, cy, ferida) {
+    const r = this.raio;
+    const inclina = this.dir * 0.12 + Math.sin(this.t * 0.8) * 0.05;
+    const piscada = this._piscando > 0 ? clamp01(this._piscando / 0.06) : 0;
+
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(inclina);
+    // Durante o flash de dano a criatura virava um borrão branco SEM ROSTO
+    // por 0,13 s. Fendas pretas no branco resolvem, e é de graça.
+    ctx.fillStyle = ferida ? tema.primeiroPlano : '#ffffff';
+    ctx.globalAlpha = ferida ? 0.9 : 0.92;
+    for (const o of this.olhos) {
+      ctx.save();
+      ctx.translate(o.dx * this.dir, o.dy);
+      ctx.rotate(o.giro * this.dir);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.18,
+        o.alt * (1 - piscada) * (1 + this.telegrafo * 0.5), 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
     }
+    ctx.globalAlpha = 1;
     ctx.restore();
   }
 
@@ -398,20 +418,31 @@ export class Sombra {
       return;
     }
 
-    const cy = this.centroY + Math.sin(this.t * 3.1) * 1.6;
+    /* LUZ = PERIGO, nunca ambiente.
+       O corpo emitia `tema.acento` a 0,3 o tempo todo, num raio de quase 2×
+       o próprio: um buraco no mundo brilhando por dentro, que é a contradição
+       exata da referência. E como `acento` vai de oliva morto (poluído) a
+       turquesa vivo (restaurado), quanto MAIS o jogador curava a área, mais
+       bonito e mais neon o parasita ficava — o oposto da leitura narrativa.
+       Pior: com 0,3 de base, o telégrafo (subir pra 0,9) era só "um pouco
+       mais claro", e não sinal nenhum. Agora sai de 0 e o aviso triplica de
+       força sem tocar em uma linha da lógica de combate. */
+    const cy = this.centroY + this.deslocDesenhoY + Math.sin(this.t * 3.1) * 1.6;
+    const piscada = this._piscando > 0 ? 1 : 0;
     ctx.save();
     ctx.translate(this.centroX, cy);
     ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = (0.55 + this.telegrafo * 0.45) * (1 - piscada);
     for (const o of this.olhos) {
-      ctx.globalAlpha = (0.5 + 0.3 * Math.sin(this.t * 2.6 + o.fase)) + this.telegrafo * 0.5;
       ctx.beginPath();
-      ctx.ellipse(o.dx * this.dir, o.dy, 1.6, o.alt * 1.35, 0, 0, TAU);
+      ctx.ellipse(o.dx * this.dir, o.dy, this.raio * 0.2, o.alt * 1.2, 0, 0, TAU);
       ctx.fill();
     }
     ctx.restore();
 
-    luzRadial(ctx, this.centroX, cy, this.raio * 1.9,
-      tema.acento, 0.3 + this.telegrafo * 0.6);
+    if (this.telegrafo > 0.05) {
+      luzRadial(ctx, this.centroX, cy, this.raio * 2.2, tema.acento, this.telegrafo * 0.9);
+    }
   }
 }
 
@@ -421,7 +452,8 @@ export class Sombra {
 
 export class Errante extends Sombra {
   constructor(obj) {
-    super(obj, { vida: 2, raio: 13, largura: 30, altura: 32, tentaculos: 7 });
+    // A REFERÊNCIA da espécie: proporção 1:1, dois chifres, barra longa.
+    super(obj, { vida: 2, raio: 13, largura: 30, altura: 32, tentaculos: 2 });
     this.vel = 46;
   }
   comportamento(dt, mundo) { this._patrulhar(dt, mundo, this.vel); }
@@ -438,8 +470,10 @@ export class Errante extends Sombra {
 export class Espreita extends Sombra {
   constructor(obj) {
     super(obj, {
+      // Gota LISA: zero chifres e sem barra. É a única silhueta redonda do
+      // bestiário, e é o que faz "aquele que flutua" ser lido de longe.
       vida: 1, raio: 11, largura: 26, altura: 26,
-      tentaculos: 9, compTentaculo: 20, olhos: 3,
+      tentaculos: 0, olhos: 2, escalaX: 1.05, escalaY: 0.95,
       temManto: false, gravidade: false,
     });
     this.baseY = this.y;
@@ -488,8 +522,11 @@ const TELEGRAFO_CUSPIDOR = 0.62;   // bem acima do mínimo de 0,25 s: o tiro é
 export class Cuspidor extends Sombra {
   constructor(obj) {
     super(obj, {
+      // CORCUNDA: mais largo que alto, com UM chifre grosso só do lado de
+      // onde sai o tiro. Assimetria é o que diz "isto aponta pra você".
       vida: 3, raio: 15, largura: 34, altura: 36,
-      tentaculos: 5, compTentaculo: 22, olhos: 6,
+      tentaculos: 1, compTentaculo: 13, olhos: 2,
+      escalaX: 1.35, escalaY: 0.85, espalhaTentaculos: 0.55,
     });
     this.recarga = RECARGA_CUSPIDOR * (0.5 + hash2(obj.cx, obj.cy, 3));
     this.carregando = 0;
@@ -517,7 +554,7 @@ export class Cuspidor extends Sombra {
 
     this.telegrafo = damp(this.telegrafo, 0, 0.1, dt);
     this.recarga -= dt;
-    if (this.recarga <= 0 && d < this.alcance && !j.vivo === false) {
+    if (this.recarga <= 0 && d < this.alcance && j.vivo !== false) {
       this.carregando = TELEGRAFO_CUSPIDOR;
     }
   }
@@ -561,8 +598,10 @@ const NORMAIS = [
 export class Rastejante extends Sombra {
   constructor(obj) {
     super(obj, {
+      // ACHATADO contra a superfície — a única silhueta larga e baixa.
       vida: 1, raio: 10, largura: 24, altura: 24,
-      tentaculos: 6, compTentaculo: 17, olhos: 3, temManto: false, gravidade: false,
+      tentaculos: 0, olhos: 2, escalaX: 1.6, escalaY: 0.6,
+      temManto: false, gravidade: false,
     });
     this.normal = 0;
     this.vel = 96;
@@ -622,6 +661,18 @@ export class Rastejante extends Sombra {
     super.desenhar(ctx, tema, camera);
     ctx.restore();
   }
+
+  /** O passe emissivo precisa da MESMA rotação do corpo. Sem isto, no teto o
+   *  corpo aparecia de cabeça pra baixo e as fendas acesas ficavam em pé:
+   *  dois pares de olhos, em lugares diferentes, na mesma criatura. */
+  desenharLuz(ctx, tema, camera) {
+    ctx.save();
+    ctx.translate(this.centroX, this.centroY);
+    ctx.rotate(this.anguloCorpo ?? 0);
+    ctx.translate(-this.centroX, -this.centroY);
+    super.desenharLuz(ctx, tema, camera);
+    ctx.restore();
+  }
 }
 
 /* =========================================================================
@@ -637,8 +688,9 @@ const PAVIO = 0.85;
 export class Estopim extends Sombra {
   constructor(obj) {
     super(obj, {
+      // CÍRCULO perfeito e SEM chifre nenhum: a coisa que só incha e estoura.
       vida: 1, raio: 12, largura: 28, altura: 28,
-      tentaculos: 8, compTentaculo: 15, olhos: 2, dano: 2,
+      tentaculos: 0, olhos: 2, dano: 2,
     });
     this.vel = 88;
     this.raioPercepcao = 210;
@@ -707,8 +759,10 @@ export class Estopim extends Sombra {
 export class Tecelao extends Sombra {
   constructor(obj) {
     super(obj, {
+      // ALTO E FINO, com um espinho reto pra cima que entra no fio.
       vida: 2, raio: 12, largura: 26, altura: 28,
-      tentaculos: 6, compTentaculo: 18, olhos: 4, gravidade: false,
+      tentaculos: 1, compTentaculo: 12, olhos: 2,
+      escalaX: 0.7, escalaY: 1.45, espalhaTentaculos: 1, gravidade: false,
     });
     this.tetoY = this.y;
     this.alcanceQueda = 260;
