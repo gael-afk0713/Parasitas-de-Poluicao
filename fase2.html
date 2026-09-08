@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=3">
-<link rel="stylesheet" href="fase2.css?v=1">
+<link rel="stylesheet" href="fase2.css?v=3">
 </head>
 <body class="fase2-body">
 
@@ -34,6 +34,60 @@
     </div>
   </div>
 
+  <!-- Painéis em DOM, e não em canvas, porque têm BOTÕES: foco, navegação por
+       teclado, leitor de tela e alvo de toque decente vêm de graça aqui e
+       dariam muito trabalho no canvas para um resultado pior. Reaproveitam as
+       classes .painel de style.css, como o menu e a Fase 1. -->
+  <section class="painel" id="painel-pausa" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Pausado</p>
+      <h2 class="painel-titulo" id="pausa-area">—</h2>
+      <ul class="painel-lista painel-lista--stats">
+        <li><span>Restaurado</span><strong id="pausa-restaurado">0%</strong></li>
+        <li><span>Fragmentos</span><strong id="pausa-fragmentos">0</strong></li>
+        <li><span>Habilidades</span><strong id="pausa-habilidades">nenhuma</strong></li>
+      </ul>
+      <p class="painel-status" id="status-pausa"></p>
+      <div class="config-acoes">
+        <button class="painel-voltar" id="btn-pausa-salvar">Salvar agora</button>
+        <button class="painel-voltar config-acao-sair" id="btn-pausa-menu">Voltar ao Menu</button>
+      </div>
+      <div class="painel-acoes painel-acoes--fim">
+        <button class="painel-confirmar" id="btn-pausa-continuar">Continuar</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Morte: aparece e some sozinha em ~2s. Sem botão "tentar de novo" de
+       propósito — o respawn já é automático, e um modal transformaria a morte
+       numa interrupção em vez de um tropeço. -->
+  <section class="painel painel--fim" id="painel-morte" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Você caiu</p>
+      <h2 class="painel-titulo" id="morte-frase">A floresta te recolhe.</h2>
+    </div>
+  </section>
+
+  <section class="painel painel--fim" id="painel-fim" aria-hidden="true">
+    <div class="painel-conteudo">
+      <p class="painel-rotulo">Fim</p>
+      <h2 class="painel-titulo">O Coração Desperto</h2>
+      <p class="painel-explicacao">
+        O que você derrubou não volta igual. Volta diferente — e volta porque
+        alguém ficou para plantar. A floresta não te perdoou; ela apenas
+        aceitou recomeçar com você dentro dela.
+      </p>
+      <ul class="painel-lista painel-lista--stats">
+        <li><span>Mundo restaurado</span><strong id="fim-restaurado">—</strong></li>
+        <li><span>Fragmentos</span><strong id="fim-fragmentos">—</strong></li>
+        <li><span>Salas visitadas</span><strong id="fim-salas">—</strong></li>
+      </ul>
+      <div class="painel-acoes painel-acoes--fim">
+        <a class="painel-confirmar" href="index.html">Voltar ao Menu</a>
+      </div>
+    </div>
+  </section>
+
   <!-- Tela inicial: existe porque o áudio do navegador exige um gesto do
        usuário antes de tocar qualquer coisa, e começar um jogo de atmosfera
        em silêncio arruína a primeira impressão. -->
@@ -57,6 +111,6 @@
     </div>
   </div>
 
-<script type="module" src="fase2/main.js?v=1"></script>
+<script type="module" src="fase2/main.js?v=2"></script>
 </body>
 </html>

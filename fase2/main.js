@@ -19,6 +19,7 @@ import { TelaMapa } from './ui/mapa.js';
 import { Audio } from './audio/audio.js';
 import { Save } from './sistemas/save.js';
 import { Efeitos } from './render/efeitos.js';
+import { Paineis } from './ui/paineis.js';
 
 // Registram-se sozinhas ao serem importadas (ver `registrarSala`).
 // A ORDEM é a ordem narrativa, e importa: `validarRegistro` reclama de
@@ -47,6 +48,7 @@ const mundo = new Mundo(camera, laco, render);
 const hud = new Hud(document.getElementById('hud-fase2'), mundo);
 const mapa = new TelaMapa(mundo);
 const efeitos = new Efeitos();
+let paineis = null;   // criado depois do `save`, de quem depende
 
 mundo.fabricaEntidade = criarEntidade;
 mundo._transicao = (cb) => transicao.cortar(cb, 0.3);
@@ -73,6 +75,7 @@ laco.iniciar();
 // jogo já começa jogável na sala inicial e o save TROCA a sala se houver
 // progresso. É o mesmo padrão da Fase 1 — nunca deixar a tela esperando a rede.
 const save = new Save(mundo);
+paineis = new Paineis(mundo, laco, { aoSalvar: (motivo) => save.salvar(motivo) });
 save.iniciar()
   .then((restaurou) => {
     save.ligarGatilhos();
@@ -119,9 +122,9 @@ function passo(dt) {
   if (entrada.acabouDePressionar('mapa')) mapa.alternar();
   if (entrada.acabouDePressionar('pausa')) {
     if (mapa.aberta) mapa.fechar();
-    else { laco.pausado = !laco.pausado; hud.definirPausa(laco.pausado); }
+    else paineis?.alternarPausa();
   }
-  if (laco.pausado || mapa.aberta) return;
+  if (laco.pausado || mapa.aberta || paineis?.bloqueiaJogo) return;
 
   mundo.atualizar(dt, entrada);
 }
@@ -253,6 +256,7 @@ function efeitoDeEvento(ev) {
       efeitos.faiscas(j.centroX, j.centroY, { n: 16, cor: 'rust', forca: 1.2 });
       break;
     case 'morte':
+      paineis?.mostrarMorte();
       efeitos.dissolucao(j.centroX, j.centroY);
       efeitos.vinhetaDano({ forca: 1.4, dur: 1.6 });
       render.piscar('#ffffff', 0.7);
@@ -284,6 +288,9 @@ function efeitoDeEvento(ev) {
       hud.anunciar(ev.nome, 'silenciado', 4);
       laco.definirEscalaTempo(0.25, 0.2);
       setTimeout(() => laco.definirEscalaTempo(1, 1.4), 1600);
+      // O Coração é o último: derrubá-lo encerra o jogo. Com folga pra a
+      // animação de morte dele terminar antes da tela aparecer.
+      if (ev.nome === 'O Coração') setTimeout(() => paineis?.mostrarFim(), 3200);
       break;
     case 'portaoTrancado':
       hud.anunciar('Trancado', 'algo que você ainda não sabe fazer', 2.2);
@@ -303,6 +310,6 @@ function efeitoDeEvento(ev) {
 /* ------------------------------------------------------------------ debug --- */
 
 if (new URLSearchParams(location.search).has('debug')) {
-  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, efeitos, passo, quadro };
+  window.__fase2 = { mundo, camera, laco, render, entrada, tela, audio, hud, mapa, save, efeitos, paineis, passo, quadro };
   console.info('[fase2] modo debug: window.__fase2 disponível');
 }

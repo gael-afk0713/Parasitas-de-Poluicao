@@ -101,6 +101,62 @@
   }
 }
 
+/* ============ PAINÉIS ============
+   Reaproveitam as classes `.painel` de style.css (estrutura, layout,
+   tipografia, animação de abertura) e só trocam o ACENTO: o âmbar industrial
+   da Fase 1 sobre a floresta fria da Fase 2 lê como UI de outro jogo colada
+   por cima. Sobrescrever a cor mantém a continuidade de forma — que é o que
+   faz o jogador reconhecer o painel — sem quebrar a atmosfera da fase.
+
+   Escopo em `.fase2-body` de propósito: nada aqui pode vazar pro menu ou pra
+   Fase 1, que continuam em âmbar. */
+.fase2-body .painel-rotulo,
+.fase2-body .painel-lista--stats strong{
+  color:var(--f2-vivo);
+}
+.fase2-body .painel-conteudo::before,
+.fase2-body .painel-conteudo::after{
+  border-color:var(--f2-vivo-dim);
+}
+.fase2-body .painel-voltar{
+  border-color:rgba(127,216,166,0.28);
+}
+.fase2-body .painel-voltar:hover,
+.fase2-body .painel-voltar:focus-visible{
+  border-color:var(--f2-vivo);
+  background:rgba(127,216,166,0.08);
+}
+.fase2-body .painel-confirmar{
+  background:var(--f2-vivo);
+  color:#06110d;
+}
+.fase2-body .painel-confirmar:hover,
+.fase2-body .painel-confirmar:focus-visible{
+  background:#9ce8c0;
+}
+/* O "voltar ao menu" continua sendo a ação de saída — mantém o vermelho de
+   alerta do projeto, que é o único lugar em que ele aparece. */
+.fase2-body .config-acao-sair:hover,
+.fase2-body .config-acao-sair:focus-visible{
+  border-color:var(--rust);
+  background:rgba(138,74,47,0.12);
+}
+
+/* Morte: sem chrome nenhum. É um instante, não um diálogo. */
+.fase2-body #painel-morte .painel-conteudo{
+  border:none;
+  background:transparent;
+  text-align:center;
+}
+.fase2-body #painel-morte{
+  background:rgba(4,8,10,0.72);
+}
+.fase2-body #painel-morte .painel-titulo{
+  font-weight:500;
+  font-size:clamp(1.3rem,3.4vw,2rem);
+  color:var(--paper-dim);
+}
+
 /* ============ ABERTURA ============ */
 .fase2-abertura{
   position:fixed;
@@ -211,4 +267,6 @@
   .abertura-comecar:focus-visible{ letter-spacing:0.22em; }
   .fase2-abertura{ transition:opacity .2s ease, visibility .2s; }
   .toque-botao{ transition:none; }
+  .fase2-body .painel-voltar,
+  .fase2-body .painel-confirmar{ transition:none; }
 }
