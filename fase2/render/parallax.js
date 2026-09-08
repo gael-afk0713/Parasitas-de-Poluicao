@@ -877,9 +877,15 @@ const FORMAS = {
    `cor`    chave do tema            `brilho` degrau da escada de valor
    `veu`    força da névoa aplicada DEPOIS da camada (null = automático)
 
-   Sete camadas por área. A escada de `brilho` vai de +0.18 (horizonte, quase
-   dissolvido na bruma) a -0.20 (quase silhueta) — é ela que dá contraste
+   Sete camadas por área. A escada de `brilho` vai de +0.22 (horizonte, quase
+   dissolvido na bruma) a -0.48 (quase silhueta pura) — é ela que dá contraste
    numa paleta em que todas as cores estão entre #08 e #24.
+
+   A faixa foi ALARGADA depois de olhar screenshots das cinco áreas: com o
+   intervalo original (+0.20 a -0.22) as sete camadas caíam quase todas no
+   mesmo meio-tom, e a cena virava papa ao apertar os olhos — que é
+   exatamente o teste de silhueta. O que separa plano de plano é diferença de
+   VALOR; saturação e bruma só ajudam depois que ela existe.
    ========================================================================= */
 
 const CAMADAS = {
@@ -893,24 +899,24 @@ const CAMADAS = {
      A densidade cai e a espessura sobe conforme aproxima: longe é uma cerca
      de vultos finos, perto são poucos troncos grossos que emolduram a tela. */
   raizes: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.19, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.21, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.00, amp: 70, escala: 0.0011, semente: 19, passo: 18 },
       { f: 'troncosColossais', rel: 1.02, passo: 120, dens: 0.92,
         largMin: 5, largMax: 13, semente: 11 },
     ] },
-    { p: 0.095, d: 0.88, cor: 'distante', brilho: 0.12, formas: [
+    { p: 0.095, d: 0.88, cor: 'distante', brilho: 0.13, formas: [
       { f: 'troncosColossais', rel: 1.04, passo: 170, dens: 0.82,
         largMin: 8, largMax: 20, semente: 23 },
       { f: 'galhos', rel: 0.20, passo: 260, dens: 0.55, escalaLarg: 0.45, semente: 29 },
       { f: 'massa', lado: 'baixo', rel: 1.05, amp: 74, escala: 0.0017, semente: 31, passo: 15 },
     ] },
-    { p: 0.17, d: 0.73, cor: 'medio', brilho: 0.05, formas: [
+    { p: 0.17, d: 0.73, cor: 'medio', brilho: 0.04, formas: [
       { f: 'troncosColossais', rel: 1.06, passo: 250, dens: 0.7,
         largMin: 13, largMax: 32, semente: 37 },
       { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
     ] },
-    { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.02, formas: [
+    { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.10, formas: [
       { f: 'troncosColossais', rel: 1.08, passo: 340, dens: 0.62,
         largMin: 18, largMax: 44, semente: 43 },
       // Raízes aéreas descendo do alto: a assinatura do sub-bosque, e o que
@@ -919,19 +925,19 @@ const CAMADAS = {
         largMin: 7, largMax: 20, semente: 47 },
       { f: 'galhos', rel: 0.06, passo: 380, dens: 0.5, escalaLarg: 0.9, semente: 49 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.06, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'troncosColossais', rel: 1.12, passo: 460, dens: 0.55,
         largMin: 26, largMax: 62, semente: 59 },
       { f: 'massa', lado: 'baixo', rel: 1.10, amp: 70, escala: 0.0036, semente: 61,
         passo: 11, picos: 0.35 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.13, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
       { f: 'raizes', rel: -0.08, passo: 280, dens: 0.45, compMin: 240, compMax: 620,
         largMin: 12, largMax: 34, semente: 67 },
       { f: 'massa', lado: 'baixo', rel: 1.18, amp: 74, escala: 0.0048, semente: 71,
         passo: 10, picos: 0.45 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.22, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'troncosColossais', rel: 1.30, passo: 620, dens: 0.42,
         largMin: 40, largMax: 96, semente: 73 },
       { f: 'massa', lado: 'baixo', rel: 1.28, amp: 62, escala: 0.0062, semente: 79,
@@ -941,70 +947,70 @@ const CAMADAS = {
 
   /* --- VÁRZEA: juncos, troncos submersos, lâmina d'água ------------------ */
   varzea: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.19, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.21, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.72, amp: 96, escala: 0.0009, semente: 101, passo: 18 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.12, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.13, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.80, amp: 86, escala: 0.0016, semente: 103, passo: 16 },
       { f: 'troncos', rel: 0.78, passo: 340, dens: 0.6, compMin: 90, compMax: 200, semente: 107 },
       { f: 'juncos', rel: 0.80, passo: 70, dens: 0.7, compMin: 34, compMax: 90, escalaLarg: 0.6, semente: 109 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.05, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.86, amp: 74, escala: 0.0024, semente: 113, passo: 14 },
       { f: 'juncos', rel: 0.86, passo: 84, dens: 0.78, compMin: 56, compMax: 150, escalaLarg: 0.8, semente: 127 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.02, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
       { f: 'agua', rel: 0.90, altura: 420, semente: 131 },
       { f: 'troncos', rel: 0.90, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.06, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.02, amp: 66, escala: 0.0034, semente: 139, passo: 12 },
       { f: 'juncos', rel: 1.02, passo: 96, dens: 0.8, compMin: 90, compMax: 250, semente: 149 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.13, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.12, amp: 60, escala: 0.0046, semente: 151, passo: 11 },
       { f: 'troncos', rel: 1.10, passo: 520, dens: 0.5, compMin: 200, compMax: 380, semente: 157 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.22, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'juncos', rel: 1.26, passo: 140, dens: 0.6, compMin: 180, compMax: 420, escalaLarg: 1.6, semente: 163 },
     ] },
   ],
 
   /* --- CÂNION: as ruínas da fábrica da Fase 1 ---------------------------- */
   clareira: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.20, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.70, amp: 150, escala: 0.0009, semente: 201, passo: 18, picos: 0.8 },
       { f: 'massa', lado: 'cima', rel: 0.02, amp: 90, escala: 0.0011, semente: 203, passo: 18 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.13, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.78, amp: 110, escala: 0.0015, semente: 207, passo: 16, picos: 0.9 },
       { f: 'chamines', rel: 0.78, passo: 230, dens: 0.55, altMin: 90, altMax: 250,
         escalaLarg: 0.6, torcao: 0.2, semente: 211 },
       { f: 'fumaca', rel: 0.55, passo: 300, dens: 0.4, semente: 213 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.05, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.88, amp: 92, escala: 0.0022, semente: 217, passo: 14, picos: 0.7 },
       { f: 'torres', rel: 0.88, passo: 340, dens: 0.6, altMin: 110, altMax: 260, escalaLarg: 0.75, semente: 223 },
       { f: 'chamines', rel: 0.88, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
         escalaLarg: 0.8, torcao: 0.22, semente: 227 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.02, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
       { f: 'esteiras', rel: 0.80, passo: 480, dens: 0.7, escalaLarg: 0.85, semente: 229 },
       { f: 'massa', lado: 'baixo', rel: 0.98, amp: 80, escala: 0.003, semente: 233, passo: 13, picos: 0.6 },
       { f: 'escombros', rel: 0.98, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.06, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'cabos', rel: 0.16, passo: 300, dens: 0.72, escalaLarg: 1, semente: 241 },
       { f: 'chamines', rel: 1.04, passo: 420, dens: 0.42, altMin: 260, altMax: 520,
         escalaLarg: 1.15, torcao: 0.24, semente: 251 },
       { f: 'massa', lado: 'baixo', rel: 1.06, amp: 78, escala: 0.0042, semente: 257, passo: 11, picos: 0.7 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.13, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
       { f: 'esteiras', rel: 1.0, passo: 620, dens: 0.5, escalaLarg: 1.2, semente: 263 },
       { f: 'massa', lado: 'baixo', rel: 1.16, amp: 70, escala: 0.0055, semente: 269, passo: 10, picos: 0.6 },
       { f: 'escombros', rel: 1.16, passo: 230, dens: 0.55, escalaLarg: 1.2, semente: 271 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.22, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'cabos', rel: -0.10, passo: 380, dens: 0.5, escalaLarg: 1.8, semente: 277 },
       { f: 'escombros', rel: 1.3, passo: 300, dens: 0.45, escalaLarg: 1.8, semente: 281 },
     ] },
@@ -1012,31 +1018,31 @@ const CAMADAS = {
 
   /* --- DOSSEL: a árvore-mãe, troncos colossais e folhagem ---------------- */
   dossel: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.20, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
       { f: 'troncosColossais', rel: 1.35, passo: 300, dens: 0.85, largMin: 40, largMax: 110, semente: 301 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.13, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
       { f: 'troncosColossais', rel: 1.4, passo: 340, dens: 0.7, largMin: 30, largMax: 90, semente: 307 },
       { f: 'folhagem', rel: 0.22, passo: 210, dens: 0.8, rMin: 70, rMax: 180, semente: 311 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.05, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
       { f: 'galhos', rel: 0.20, passo: 380, dens: 0.7, escalaLarg: 0.7, semente: 313 },
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 88, escala: 0.0021, semente: 317, passo: 14 },
       { f: 'folhagem', rel: 0.30, passo: 250, dens: 0.72, rMin: 60, rMax: 150, semente: 331 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.02, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
       { f: 'troncosColossais', rel: 1.5, passo: 420, dens: 0.55, largMin: 46, largMax: 130, semente: 337 },
       { f: 'galhos', rel: 0.36, passo: 440, dens: 0.65, escalaLarg: 0.9, semente: 347 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.06, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.04, amp: 74, escala: 0.0034, semente: 349, passo: 12 },
       { f: 'folhagem', rel: 0.14, passo: 300, dens: 0.66, rMin: 90, rMax: 220, semente: 353 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.13, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
       { f: 'troncosColossais', rel: 1.6, passo: 560, dens: 0.4, largMin: 60, largMax: 170, semente: 359 },
       { f: 'massa', lado: 'baixo', rel: 1.14, amp: 66, escala: 0.005, semente: 367, passo: 11 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.22, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'galhos', rel: -0.12, passo: 520, dens: 0.5, escalaLarg: 1.6, semente: 373 },
       { f: 'folhagem', rel: -0.16, passo: 400, dens: 0.5, rMin: 120, rMax: 280, semente: 379 },
     ] },
@@ -1044,29 +1050,29 @@ const CAMADAS = {
 
   /* --- CORAÇÃO: nada de rocha; carne, lobos, veias ----------------------- */
   coracao: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.20, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
       { f: 'organico', rel: 0.5, passo: 300, dens: 0.9, rMin: 150, rMax: 380, semente: 401 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.13, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
       { f: 'organico', rel: 0.36, passo: 260, dens: 0.85, rMin: 110, rMax: 280, semente: 409 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.05, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
       { f: 'organico', rel: 0.66, passo: 240, dens: 0.8, rMin: 90, rMax: 240, semente: 419 },
       { f: 'raizes', rel: 0.0, passo: 240, dens: 0.5, compMin: 200, compMax: 520,
         largMin: 10, largMax: 30, semente: 421 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.02, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
       { f: 'organico', rel: 0.18, passo: 300, dens: 0.7, rMin: 100, rMax: 260, semente: 431 },
       { f: 'organico', rel: 0.92, passo: 280, dens: 0.7, rMin: 110, rMax: 270, semente: 433 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.06, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
       { f: 'organico', rel: 1.06, passo: 320, dens: 0.75, rMin: 130, rMax: 300, semente: 439 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.13, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
       { f: 'organico', rel: -0.04, passo: 340, dens: 0.6, rMin: 120, rMax: 290, semente: 443 },
       { f: 'organico', rel: 1.16, passo: 360, dens: 0.6, rMin: 140, rMax: 320, semente: 449 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.22, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
       { f: 'organico', rel: 1.3, passo: 420, dens: 0.5, rMin: 170, rMax: 380, semente: 457 },
     ] },
   ],

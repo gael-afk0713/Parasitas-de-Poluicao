@@ -19,7 +19,7 @@
    ========================================================================= */
 
 import {
-  TAU, clamp01, lerp, damp, rgba, misturarHex, easeOutCubic, easeOutBack, Rng, sobrepoe,
+  TAU, clamp01, lerp, damp, rgba, misturarHex, easeOutCubic, easeOutBack, Rng, sobrepoe, hash2,
 } from '../core/mat.js';
 import { luzRadial } from '../render/renderizador.js';
 import { criarParasita } from './parasitas.js';
@@ -323,6 +323,23 @@ class Barreira {
     this.t = 0;
     this.dissolvendo = 0;
     this.morta = false;
+
+    /* Variação por posição.
+       A primeira versão desenhava a MESMA forma em todo tile, e uma parede de
+       barreira virava uma grade de carimbos idênticos — lia como cenário de
+       tile map, não como matéria orgânica. Aqui cada célula sorteia (de forma
+       determinística, pela posição) raio, rotação, número de lóbulos e fase.
+       O raio passa de 15 para 19-23, MAIOR que o meio-tile: as células
+       vizinhas se sobrepõem e a parede vira uma massa só em vez de uma
+       fileira de bolhas encostadas. */
+    const h1 = hash2(obj.cx, obj.cy, 61);
+    const h2 = hash2(obj.cx, obj.cy, 97);
+    const h3 = hash2(obj.cx, obj.cy, 131);
+    this.raio = lerp(19, 23, h1);
+    this.giro = h2 * TAU;
+    this.lobulos = 3 + Math.floor(h3 * 4);
+    this.fase = h2 * TAU;
+    this.pulsoVel = lerp(0.8, 1.5, h3);
   }
   caixa() { return { x: this.x, y: this.y, largura: this.largura, altura: this.altura }; }
 
@@ -369,24 +386,52 @@ class Barreira {
 
   desenhar(ctx, tema) {
     const d = clamp01(this.dissolvendo);
+    const pulso = 1 + Math.sin(this.t * this.pulsoVel + this.fase) * 0.05;
+
     ctx.save();
     ctx.globalAlpha = 1 - d;
     ctx.translate(this.x + 16, this.y + 16);
-    ctx.scale(1 + d * 0.3, 1 + d * 0.3);
-    // Cristal de matéria corrompida — irregular, pulsando devagar.
-    ctx.fillStyle = misturarHex(tema.primeiroPlano, tema.acento, 0.3);
-    ctx.strokeStyle = tema.acento;
-    ctx.lineWidth = 1.4;
+    ctx.rotate(this.giro + Math.sin(this.t * 0.3 + this.fase) * 0.06);
+    ctx.scale((1 + d * 0.35) * pulso, (1 + d * 0.35) * pulso);
+
+    // Massa de matéria corrompida. O preenchimento é ESCURO e só o contorno
+    // é aceso: assim uma parede inteira não vira um bloco de cor sólida, e
+    // as células vizinhas se leem como uma trama em vez de um chapado.
+    const g = ctx.createRadialGradient(0, 0, this.raio * 0.15, 0, 0, this.raio);
+    g.addColorStop(0, misturarHex(tema.primeiroPlano, tema.acento, 0.42));
+    g.addColorStop(1, misturarHex(tema.primeiroPlano, tema.ceuTopo, 0.5));
+    ctx.fillStyle = g;
+
     ctx.beginPath();
-    for (let i = 0; i <= 8; i++) {
-      const a = (i / 8) * TAU;
-      const r = 15 + Math.sin(a * 3 + this.t * 1.2) * 2.4;
+    const N = 22;
+    for (let i = 0; i <= N; i++) {
+      const a = (i / N) * TAU;
+      const r = this.raio
+        * (1 + 0.14 * Math.sin(a * this.lobulos + this.t * 0.9 + this.fase)
+             + 0.07 * Math.sin(a * (this.lobulos * 2 + 1) - this.t * 0.6));
       const px = Math.cos(a) * r, py = Math.sin(a) * r;
       i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
     }
     ctx.closePath();
     ctx.fill();
+
+    ctx.strokeStyle = rgba(tema.acento, 0.75);
+    ctx.lineWidth = 1.3;
     ctx.stroke();
+
+    // Nervura interna: dá matéria ao miolo sem clarear a massa.
+    ctx.strokeStyle = rgba(tema.acento, 0.3);
+    ctx.lineWidth = 1;
+    for (let i = 0; i < this.lobulos; i++) {
+      const a = (i / this.lobulos) * TAU + this.fase;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(
+        Math.cos(a + 0.4) * this.raio * 0.45, Math.sin(a + 0.4) * this.raio * 0.45,
+        Math.cos(a) * this.raio * 0.8, Math.sin(a) * this.raio * 0.8
+      );
+      ctx.stroke();
+    }
     ctx.restore();
   }
 

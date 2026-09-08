@@ -444,44 +444,89 @@ export class ArteTerreno {
    * Vegetação nas faces superiores. Determinística por posição (hash2), então
    * não pisca entre frames nem muda ao recarregar a sala.
    */
+  /**
+   * Vegetação nas faces superiores, em TUFOS.
+   *
+   * A primeira versão desenhava uma lâmina por ponto do contorno. Como o
+   * Chaikin deixa os pontos densos e quase equidistantes, o resultado era um
+   * PENTE: lâminas iguais, igualmente espaçadas, ao longo de toda borda —
+   * a coisa mais artificial que restava na tela.
+   *
+   * Agora a grama nasce em tufos de 3-6 lâminas, separados por vãos
+   * irregulares, com altura decrescente do centro para as pontas de cada
+   * tufo. Grama de verdade cresce onde pegou, não em fila.
+   */
   _musgo(ctx, tema, faixas, pureza) {
     if (pureza < 0.02) return;
     const densidade = clamp01(pureza);
+    const corBase = rgba(tema.crista, lerp(0.25, 0.75, densidade));
+    ctx.lineCap = 'round';
 
     for (let f = 0; f < faixas.length; f++) {
       const faixa = faixas[f];
+
+      // Percorre a aresta por COMPRIMENTO DE ARCO, não por índice: assim o
+      // espaçamento dos tufos é o mesmo num trecho reto e num curvo.
+      let percorrido = 0;
+      let proximoTufo = 0;
+
       for (let i = 0; i < faixa.length - 1; i++) {
         const a = faixa[i], b = faixa[i + 1];
-        const h = hash2(Math.round(a.x), Math.round(a.y), this.semente + f);
-        if (h > densidade * 0.75) continue;
-
         const dx = b.x - a.x, dy = b.y - a.y;
-        const len = Math.hypot(dx, dy) || 1;
-        // Normal pra fora (pra cima), pra que a grama cresça perpendicular à
-        // superfície e acompanhe a inclinação do terreno.
-        const nx = dy / len, ny = -dx / len;
-        const alturaTufo = lerp(3, 11, hash2(Math.round(a.y), Math.round(a.x), this.semente)) * densidade;
-        const inclina = (h - 0.5) * 0.8;
+        const seg = Math.hypot(dx, dy) || 0.001;
 
-        ctx.strokeStyle = rgba(tema.crista, lerp(0.3, 0.85, densidade));
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.quadraticCurveTo(
-          a.x + nx * alturaTufo * 0.6 + inclina * 3,
-          a.y + ny * alturaTufo * 0.6,
-          a.x + nx * alturaTufo + inclina * 6,
-          a.y + ny * alturaTufo
-        );
-        ctx.stroke();
+        if (percorrido + seg < proximoTufo) { percorrido += seg; continue; }
 
-        // Flor esporádica só em pureza alta — a recompensa visual final.
-        if (densidade > 0.65 && h < 0.06) {
-          ctx.fillStyle = tema.acento;
-          ctx.beginPath();
-          ctx.arc(a.x + nx * alturaTufo + inclina * 6, a.y + ny * alturaTufo, 1.7, 0, TAU);
-          ctx.fill();
+        // Normal pra fora: a grama cresce perpendicular à superfície e
+        // acompanha a inclinação do terreno.
+        const nx = dy / seg, ny = -dx / seg;
+        const tx = dx / seg, ty = dy / seg;
+
+        while (proximoTufo <= percorrido + seg) {
+          const t = (proximoTufo - percorrido) / seg;
+          const bx = a.x + dx * t, by = a.y + dy * t;
+          const h = hash2(Math.round(bx), Math.round(by), this.semente + f);
+          const h2 = hash2(Math.round(by), Math.round(bx), this.semente + 13);
+
+          // Vão até o próximo tufo: irregular, e menor quanto mais viva a área.
+          proximoTufo += lerp(34, 9, densidade) * lerp(0.5, 1.8, h2);
+
+          if (h > densidade * 0.9) continue;
+
+          const lâminas = 3 + Math.floor(h2 * 4);
+          const alturaTufo = lerp(5, 15, h) * densidade;
+          ctx.strokeStyle = corBase;
+
+          for (let k = 0; k < lâminas; k++) {
+            const kf = lâminas === 1 ? 0 : k / (lâminas - 1) - 0.5;   // -0.5..0.5
+            // Altura cai do meio pras pontas: dá forma de tufo, não de cerca.
+            const alt = alturaTufo * (1 - Math.abs(kf) * 0.85) * lerp(0.7, 1.15, hash2(k, Math.round(bx), f));
+            const raiz = { x: bx + tx * kf * 7, y: by + ty * kf * 7 };
+            const curva = kf * 2.2 + (h - 0.5) * 0.9;
+            ctx.lineWidth = lerp(1.5, 0.7, Math.abs(kf) * 2);
+            ctx.beginPath();
+            ctx.moveTo(raiz.x, raiz.y);
+            ctx.quadraticCurveTo(
+              raiz.x + nx * alt * 0.55 + tx * curva * 2,
+              raiz.y + ny * alt * 0.55 + ty * curva * 2,
+              raiz.x + nx * alt + tx * curva * 5,
+              raiz.y + ny * alt + ty * curva * 5
+            );
+            ctx.stroke();
+          }
+
+          // Flor no topo de um tufo, esporádica e só em pureza alta — é a
+          // recompensa visual final da restauração, e vale exatamente porque
+          // é rara.
+          if (densidade > 0.6 && h < 0.13) {
+            const alt = alturaTufo * 1.05;
+            ctx.fillStyle = tema.acento;
+            ctx.beginPath();
+            ctx.arc(bx + nx * alt, by + ny * alt, lerp(1.4, 2.4, h2), 0, TAU);
+            ctx.fill();
+          }
         }
+        percorrido += seg;
       }
     }
   }
