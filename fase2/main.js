@@ -90,9 +90,19 @@ save.iniciar()
   .then((restaurou) => {
     save.ligarGatilhos();
     tutor.aplicarSave(mundo.dicasVistas);
-    // O mundo guarda a lista no save; o tutor é quem sabe o conteúdo dela.
-    // Este gancho mantém as duas em dia sem o mundo precisar conhecer o tutor.
-    Object.defineProperty(mundo, 'dicasVistas', { get: () => tutor.paraSave(), configurable: true });
+    /* O mundo guarda a lista no save; o tutor é quem sabe o conteúdo dela.
+       Este gancho mantém as duas em dia sem o mundo precisar conhecer o tutor.
+
+       O `set` NÃO é opcional: `Mundo.aplicarSave` faz `this.dicasVistas = ...`,
+       e uma propriedade só com `get` lança TypeError em módulo ES (que é
+       sempre strict). Como o gancho só é instalado DEPOIS que `save.iniciar()`
+       resolve, a primeira carga passava e qualquer carga posterior — outro
+       slot, ou o mesmo save recarregado — estourava. */
+    Object.defineProperty(mundo, 'dicasVistas', {
+      get: () => tutor.paraSave(),
+      set: (v) => tutor.aplicarSave(v),
+      configurable: true,
+    });
     if (restaurou) hud.anunciar('Continuando', save.estado, 2.8, 'sussurro');
   })
   .catch(() => { /* `iniciar` já degrada sozinho; nada a fazer aqui */ });
