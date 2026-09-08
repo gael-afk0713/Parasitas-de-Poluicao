@@ -20,7 +20,7 @@ import {
   TAU, clamp, clamp01, lerp, rgba, misturarHex, ruido1, hash2, Rng,
 } from '../core/mat.js';
 import { caminhoDe, luzRadial } from './renderizador.js';
-import { PLATAFORMA, PERIGO, AGUA } from '../mundo/terreno.js';
+import { VAZIO, PLATAFORMA, PERIGO, AGUA } from '../mundo/terreno.js';
 
 export class ArteTerreno {
   /** @param {import('../mundo/terreno.js').Terreno} terreno */
@@ -283,36 +283,113 @@ export class ArteTerreno {
     const faixas = this._faixas(camera, AGUA);
     if (!faixas.length) return;
 
+    // A onda é uma soma de três senoides de períodos incomensuráveis. Uma só
+    // lê como animação em loop; três nunca repetem visivelmente, e é o que faz
+    // parecer água em vez de um retângulo com uma cobra em cima.
+    const onda = (px) =>
+      Math.sin(px * 0.055 + tempo * 1.5) * 1.9 +
+      Math.sin(px * 0.017 - tempo * 0.9) * 1.3 +
+      Math.sin(px * 0.0083 + tempo * 0.47) * 0.9;
+
     for (const f of faixas) {
       const x0 = f.cx0 * t.tile;
       const x1 = (f.cx1 + 1) * t.tile;
       const y = f.cy * t.tile;
-      // É a linha de superfície? (não há água logo acima)
-      const superficie = t.em(f.cx0, f.cy - 1) !== AGUA;
+
+      /* Onde esta faixa tem LÂMINA D'ÁGUA de verdade.
+         Superfície existe onde há AR logo acima — não basta "não é água".
+         Testando só `!== AGUA` na primeira coluna da faixa, água embaixo de um
+         bloco sólido era classificada como superfície, e o corpo d'água ficava
+         cortado por linhas de onda horizontais no meio. Aqui o teste é por
+         COLUNA e exige VAZIO, então a lâmina aparece só onde ela existiria. */
+      const trechos = [];
+      let ini = -1;
+      for (let cx = f.cx0; cx <= f.cx1 + 1; cx++) {
+        const ehLamina = cx <= f.cx1 && t.em(cx, f.cy - 1) === VAZIO;
+        if (ehLamina && ini < 0) ini = cx;
+        else if (!ehLamina && ini >= 0) { trechos.push([ini, cx - 1]); ini = -1; }
+      }
+      const superficie = trechos.length > 0;
+
+      // --- corpo ---------------------------------------------------------
+      // O gradiente vai do claro no topo ao escuro no fundo em CADA faixa, o
+      // que dá a sensação de profundidade acumulando: quanto mais fundo, mais
+      // opaco, como água de verdade.
+      // Cor PLANA por linha, escolhida pela profundidade real abaixo da
+      // lâmina. Antes cada linha desenhava seu próprio gradiente de claro a
+      // escuro dentro do tile, e a fronteira entre linhas virava uma costura
+      // visível — o corpo d'água saía listrado de alto a baixo. Com cor plana
+      // por linha e escurecimento acumulando com a profundidade, o degradê
+      // aparece na coluna inteira e não sobra emenda nenhuma.
+      let prof = 0;
+      for (let cy = f.cy - 1; cy >= 0 && t.em(f.cx0, cy) === AGUA; cy--) prof++;
+      const k = clamp01(prof / 7);
 
       ctx.save();
       ctx.globalAlpha = 0.55;
-      const g = ctx.createLinearGradient(0, y, 0, y + t.tile);
-      g.addColorStop(0, rgba(tema.luz, superficie ? 0.34 : 0.16));
-      g.addColorStop(1, rgba(tema.bruma, 0.5));
-      ctx.fillStyle = g;
+      ctx.fillStyle = rgba(misturarHex(tema.luz, tema.bruma, lerp(0.35, 0.95, k)),
+        lerp(0.42, 0.62, k));
+      // +1 px de sobreposição pra não deixar fresta por arredondamento.
       ctx.fillRect(x0, y, x1 - x0, t.tile + 1);
       ctx.restore();
 
       if (!superficie) continue;
 
-      // Linha de superfície ondulando — é o que faz ler como líquido em vez
-      // de retângulo azul.
+      // --- superfície ----------------------------------------------------
       ctx.save();
-      ctx.strokeStyle = rgba(tema.crista, 0.7);
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      for (let px = x0; px <= x1; px += 6) {
-        const oy = y + Math.sin(px * 0.06 + tempo * 1.6) * 1.6
-                     + Math.sin(px * 0.017 - tempo * 0.9) * 1.1;
-        px === x0 ? ctx.moveTo(px, oy) : ctx.lineTo(px, oy);
+      const gs = ctx.createLinearGradient(0, y - 2, 0, y + t.tile * 0.55);
+      gs.addColorStop(0, rgba(tema.crista, 0.28));
+      gs.addColorStop(1, rgba(tema.crista, 0));
+
+      for (const [ci, cf] of trechos) {
+        const tx0 = ci * t.tile;
+        const tx1 = (cf + 1) * t.tile;
+
+        // 1 · fatia clara logo abaixo da linha d'água: é onde a luz entra e
+        //     espalha, e o que mais faz o olho aceitar aquilo como líquido.
+        ctx.fillStyle = gs;
+        ctx.beginPath();
+        ctx.moveTo(tx0, y + t.tile * 0.55);
+        for (let px = tx0; px <= tx1; px += 8) ctx.lineTo(px, y + onda(px));
+        ctx.lineTo(tx1, y + t.tile * 0.55);
+        ctx.closePath();
+        ctx.fill();
+
+        // 2 · a linha da lâmina.
+        ctx.strokeStyle = rgba(tema.crista, 0.75);
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        for (let px = tx0; px <= tx1; px += 6) {
+          const oy = y + onda(px);
+          px === tx0 ? ctx.moveTo(px, oy) : ctx.lineTo(px, oy);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
+
+      // 3 · brilhos: traços curtos e horizontais deslizando devagar sobre a
+      //     lâmina. É o detalhe que separa "água" de "gel colorido" — sem
+      //     eles a superfície fica morta mesmo ondulando.
+      ctx.strokeStyle = rgba(misturarHex(tema.crista, '#ffffff', 0.5), 0.5);
+      ctx.lineWidth = 1.1;
+      ctx.lineCap = 'round';
+      const passoBrilho = 46;
+      const bx0 = Math.floor(x0 / passoBrilho) * passoBrilho;
+      for (let bx = bx0; bx <= x1; bx += passoBrilho) {
+        const h = hash2(bx, f.cy, this.semente + 41);
+        // Deriva lenta e por brilho: todos na mesma velocidade lê como
+        // textura rolando, não como reflexo.
+        const deriva = (tempo * lerp(4, 13, h) + h * 300) % (passoBrilho * 3);
+        const px = bx + deriva;
+        if (px < x0 || px > x1) continue;
+        const comp = lerp(8, 26, h);
+        // Piscam entrando e saindo, senão viram tracinhos permanentes.
+        const alfa = 0.35 + 0.65 * Math.abs(Math.sin(tempo * lerp(0.6, 1.4, h) + h * 6));
+        ctx.globalAlpha = alfa;
+        ctx.beginPath();
+        ctx.moveTo(px, y + onda(px) + 3);
+        ctx.lineTo(px + comp, y + onda(px + comp) + 3);
+        ctx.stroke();
+      }
       ctx.restore();
     }
   }
