@@ -93,7 +93,7 @@ save.iniciar()
     // O mundo guarda a lista no save; o tutor é quem sabe o conteúdo dela.
     // Este gancho mantém as duas em dia sem o mundo precisar conhecer o tutor.
     Object.defineProperty(mundo, 'dicasVistas', { get: () => tutor.paraSave(), configurable: true });
-    if (restaurou) hud.anunciar('Continuando', save.estado, 2.8);
+    if (restaurou) hud.anunciar('Continuando', save.estado, 2.8, 'sussurro');
   })
   .catch(() => { /* `iniciar` já degrada sozinho; nada a fazer aqui */ });
 
@@ -296,10 +296,12 @@ function efeitoDeEvento(ev) {
       render.piscar(tema.crista, 0.22);
       break;
     case 'fragmento':
+      // Fragmento é ganho pequeno e frequente: sussurro na base da tela, não
+      // um título de 30 px no meio, com o mesmo peso de destravar habilidade.
       hud.anunciar(
         ev.subiuVida ? 'Vitalidade' : 'Fragmento',
         ev.subiuVida ? 'a vida máxima cresceu' : `faltam ${ev.faltam} para o próximo`,
-        2.6
+        2.6, ev.subiuVida ? 'marco' : 'sussurro'
       );
       render.piscar(tema.crista, 0.3);
       break;
@@ -307,7 +309,7 @@ function efeitoDeEvento(ev) {
       render.sacudirCor(0.8);
       break;
     case 'chefeMorto':
-      hud.anunciar(ev.nome, 'silenciado', 4);
+      hud.anunciar(ev.nome, 'silenciado', 4, 'marco');
       laco.definirEscalaTempo(0.25, 0.2);
       setTimeout(() => laco.definirEscalaTempo(1, 1.4), 1600);
       // O Coração é o último: derrubá-lo encerra o jogo. Com folga pra a
@@ -315,10 +317,10 @@ function efeitoDeEvento(ev) {
       if (ev.nome === 'O Coração') setTimeout(() => paineis?.mostrarFim(), 3200);
       break;
     case 'portaoTrancado':
-      hud.anunciar('Trancado', 'algo que você ainda não sabe fazer', 2.2);
+      hud.anunciar('Trancado', 'algo que você ainda não sabe fazer', 2.2, 'sussurro');
       break;
     case 'lore':
-      if (ev.texto) hud.anunciar('', ev.texto, 4.5);
+      if (ev.texto) hud.anunciar('', ev.texto, 4.5, 'sussurro');
       break;
     case 'semente': {
       /* O momento central do jogo: uma sala inteira volta a ter cor. A cor
@@ -339,7 +341,7 @@ function efeitoDeEvento(ev) {
       camera.sacudir(0.3);
       laco.definirEscalaTempo(0.35, 0.2);
       setTimeout(() => laco.definirEscalaTempo(1, 0.7), 900);
-      setTimeout(() => hud.anunciar(nomeArea(ev.area, 1), 'a raiz respondeu', 3.6), 1400);
+      setTimeout(() => hud.anunciar(nomeArea(ev.area, 1), 'a raiz respondeu', 3.6, 'marco'), 1400);
       break;
     }
   }
