@@ -68,6 +68,8 @@ export class Hud {
     this._dpr = 1;
     this._t = 0;
     this._habNova = null;     // { id, t } — o chip aparece e some
+    /** Ligado por main.js quando o sistema pede movimento reduzido. */
+    this.movimentoReduzido = false;
   }
 
   /* Todo o HUD era posicionado em px fixos, então numa janela de 2560 px ele
@@ -241,10 +243,14 @@ export class Hud {
 
     ctx.save();
     // Tremor curto no golpe — some junto com o flash.
-    if (flash > 0) ctx.translate(Math.sin(flash * 42) * flash * 2.6 * k, 0);
+    if (flash > 0 && !this.movimentoReduzido) {
+      ctx.translate(Math.sin(flash * 42) * flash * 2.6 * k, 0);
+    }
     // Piscada da invulnerabilidade: comunica os i-frames sem ícone novo.
+    // Com movimento reduzido vira um esmaecido constante em vez de pulso.
     if (j.invulneravel > 0) {
-      ctx.globalAlpha = 0.75 + 0.25 * Math.abs(Math.sin(this._t * 26));
+      ctx.globalAlpha = this.movimentoReduzido
+        ? 0.8 : 0.75 + 0.25 * Math.abs(Math.sin(this._t * 26));
     }
 
     for (let i = 0; i < j.vidaMax; i++) {

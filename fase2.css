@@ -269,4 +269,10 @@
   .toque-botao{ transition:none; }
   .fase2-body .painel-voltar,
   .fase2-body .painel-confirmar{ transition:none; }
+  /* Canvas (atenuado por JS em fase2/main.js, listado aqui pra a convenção
+     continuar valendo como índice de tudo que anima):
+       · tremor de câmera e aberração cromática — desligados
+       · flash de tela cheia — teto de 0.12
+       · HUD: tremor ao perder máscara — desligado
+       · HUD: pulso de invulnerabilidade a 26 Hz — vira esmaecido constante */
 }

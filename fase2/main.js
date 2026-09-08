@@ -134,6 +134,10 @@ if (movimentoReduzido) {
   camera.sacudir = () => {};
   render.sacudirCor = () => {};
   render.piscar = (cor, v) => { render.flash.cor = cor; render.flash.valor = Math.min(v, 0.12); };
+  // O HUD ganhou tremor na perda de máscara e pulso de i-frame a 26 Hz —
+  // ambos entram na regra, e o pulso rápido é também questão de fotossensi-
+  // bilidade, não só de preferência.
+  hud.movimentoReduzido = true;
 }
 
 /* -------------------------------------------------------------------- passo -- */
