@@ -41,6 +41,12 @@
     <nav class="menu">
       <button class="item item-principal" id="btn-novo-jogo">Novo Jogo</button>
       <button class="item" id="btn-continuar">Continuar</button>
+      <!-- Atalho direto pra Fase 2. Existe porque a Fase 2 só é alcançada
+           terminando a Fase 1, o que leva bastante tempo — e sem esse atalho
+           ela ficaria inacessível pra quem quer só voltar de onde parou.
+           A Fase 2 lê o mesmo save ativo, então continuar por aqui restaura o
+           progresso normalmente. -->
+      <button class="item" id="btn-fase2">Fase 2 · O Guardião</button>
       <button class="item" id="btn-como-jogar">Como Jogar</button>
       <button class="item" id="btn-creditos">Créditos</button>
     </nav>
@@ -179,6 +185,6 @@
     </div>
   </section>
 
-<script type="module" src="script.js?v=1"></script>
+<script type="module" src="script.js?v=9"></script>
 </body>
 </html>

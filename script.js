@@ -522,6 +522,29 @@ document.getElementById('btn-continuar').addEventListener('click', async () => {
   window.location.href = 'fase1.html';
 });
 
+/* ---------------------------------------------------------------------------
+   Fase 2 — mesma lógica do Continuar, outro destino.
+   A Fase 2 lê `parasitas-save-ativo` igual à Fase 1 e guarda o progresso dela
+   num campo próprio do mesmo slot (`progressoFase2`), então entrar por aqui
+   restaura o Guardião de onde ele parou sem tocar no save da Fase 1.
+--------------------------------------------------------------------------- */
+document.getElementById('btn-fase2')?.addEventListener('click', async () => {
+  if (!usuarioAtual) { abrirGateLogin(); return; }
+  const saves = await carregarSavesConta();
+  const existentes = [1, 2, 3].map((n) => saves[n]).filter(Boolean);
+  if (existentes.length === 0) {
+    document.getElementById('btn-novo-jogo').click();
+    setTimeout(() => mostrarStatus('Crie um save antes de descer.', false), 260);
+    return;
+  }
+  const maisRecente = existentes.sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0))[0];
+  localStorage.setItem('parasitas-save-ativo', JSON.stringify({
+    uid: usuarioAtual.uid, slot: maisRecente.slot, nomeSave: maisRecente.nomeSave,
+    jogador: maisRecente.jogador, empresa: maisRecente.empresa, dificuldade: maisRecente.dificuldade,
+  }));
+  window.location.href = 'fase2.html';
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     // exceto o gate de login: não dá pra escapar dele sem entrar

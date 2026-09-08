@@ -12,8 +12,8 @@ Jogo em **HTML/CSS/JS puro**, sem frameworks, pra hospedar no **GitHub
 Pages**. Tema: você é o CEO de uma empresa que cresce à custa da natureza
 (desmatamento, poluição de rios, fábricas) até a empresa colapsar — a partir
 daí o jogador vira o **"Guardião da Natureza"** e precisa restaurar o que foi
-destruído. Essa segunda metade (fase de restauração) ainda **não foi
-construída** — por enquanto o jogo cobre só a fase de expansão da empresa.
+destruído. Essa segunda metade **existe**: é um metroidvania 2D em canvas, em
+`fase2/` — ver a seção "FASE 2" mais abaixo e `fase2/ARQUITETURA.md`.
 
 ## Estrutura de arquivos
 
@@ -1028,6 +1028,159 @@ apresentadas (multa escalada por tempo na zona crítica, fiscalização com
 horário incerto, janela mais apertada só no Expert) ficam como ideias
 futuras se o jogo ainda precisar de mais dificuldade depois de testado.
 
+## FASE 2 — "O Guardião" (metroidvania)
+
+A segunda metade do jogo, que este documento descrevia como "ainda não
+construída", **existe agora**. É um metroidvania 2D em canvas, na mesma stack
+do resto (HTML/CSS/JS puro, módulos ES direto no navegador, sem build step,
+sem npm). Tudo mora em `fase2/`, mais `fase2.html` e `fase2.css` na raiz.
+
+**Leia `fase2/ARQUITETURA.md` antes de mexer em qualquer coisa dela** — tem os
+contratos, a paleta, como rodar e testar, e a direção de arte.
+
+### Como chegar nela
+
+- Botão **"Fase 2 · O Guardião"** no menu principal (`index.html`), que segue a
+  mesma lógica do Continuar e manda pra `fase2.html`.
+- As duas telas de fim da Fase 1 (vitória e colapso) agora oferecem
+  **"Continuar → Fase 2"** em vez de dizer que ela não existe.
+
+### Direção de arte (corrigida pelo autor a meio caminho)
+
+As referências são **inspiração, não gabarito**. Comparar com Hollow Knight
+serve pra medir nível de acabamento, nunca pra chegar perto do visual dele.
+
+- O lugar é uma **FLORESTA destruída e poluída**, restaurada aos poucos. Não é
+  caverna, não é fábrica. Uma primeira versão virou gruta por causa de
+  estalactites no primeiro plano — o plano mais próximo é o que mais define o
+  lugar, porque é o mais perto e o mais escuro.
+- O **Guardião é inspirado no Ori**: criatura-espírito pequena, pálida e
+  luminosa, olhos grandes escuros, duas orelhas longas varridas pra trás em V,
+  cauda com inércia. É a principal fonte de luz móvel do jogo.
+- Os **parasitas são inspirados na Sombra do Hollow Knight**: vulto preto
+  encapuzado, fendas brancas no lugar de rosto, tentáculos saindo só da metade
+  DE CIMA (em 360° leem como aranha), manto esfarrapado dissolvendo em fumaça.
+- **Contraste invertido** entre herói e inimigo: ele é claro sobre escuro, eles
+  são buracos pretos com pontos de luz. Numa tela escura os dois continuam
+  legíveis e nunca se confundem.
+- **Restaurar não CLAREIA a cena** — deixa o mundo LUMINOSO. Floresta viva à
+  noite, não floresta de dia. É o que mantém o jogo sombrio (pedido do autor) e
+  ainda dá o salto emocional, porque o salto vem de contraste e cor.
+
+### Estrutura
+
+```
+fase2/
+  ARQUITETURA.md        contratos e direção de arte — leia primeiro
+  main.js               só LIGA as peças; nenhuma regra de jogo mora nele
+  dev-servidor.py       servidor local sem cache (ver abaixo)
+  verificar-mapas.mjs   valida o mapa fora do navegador
+  core/    mat.js (matemática/cor/ruído) · entrada.js · laco.js (passo fixo,
+           hitstop, câmera, tela com DPR)
+  mundo/   terreno.js · salas.js · mundo.js · salas-{raizes,varzea,clareira,
+           dossel,coracao,ramos}.js
+  render/  paleta.js · renderizador.js · parallax.js · terreno-arte.js ·
+           particulas.js · efeitos.js
+  entidades/ jogador.js · jogador-arte.js · catalogo.js · parasitas.js ·
+             chefes.js · projeteis.js
+  ui/      hud.js · mapa.js · paineis.js
+  audio/   audio.js · musica.js
+  sistemas/ save.js
+```
+
+### Decisões que custaram caro e não devem ser refeitas
+
+- **Terreno: grade de tiles pra COLISÃO, contorno orgânico pra DESENHO.** A
+  física é de grade (rápida, previsível, editável em ASCII) e a silhueta vem de
+  marching squares por arestas → fundir colineares → reamostrar → ruído →
+  Chaikin. Colidir contra polígonos suavizados traz bug de canto e jitter por
+  nada.
+  - Douglas-Peucker + Catmull-Rom foi tentado e **descartado**: o RDP com
+    tolerância de ~9px destruía plataformas de 4 tiles (viravam lentes) e o
+    Catmull-Rom fazia overshoot nos cantos, desenhando chão fora da colisão.
+    Chaikin é convexo por construção — a curva nunca escapa da forma.
+  - `Terreno.em()` devolve SÓLIDO fora do mapa de propósito (impede sair
+    voando da sala), mas o extrator de contorno usa `_solidoVisual()`, que não
+    faz isso. **Não unifique as duas**: com a mesma regra, a fileira da borda
+    não gera aresta, o contorno externo some e o preenchimento sai INVERTIDO
+    (a caverna vira rocha).
+  - Em junção diagonal saem duas arestas do mesmo vértice; a escolha é pela
+    curva mais fechada à direita. Escolher qualquer uma funde contornos num
+    laço em oito e desenha uma faixa diagonal atravessando a sala.
+- **Física do jogador derivada de intenção**, não de números mágicos:
+  `ALTURA_PULO` e `TEMPO_APICE` são as constantes; gravidade e velocidade
+  saem de `2h/t²` e `2h/t`. Mexa nas de cima, nunca nas derivadas.
+  Medido no navegador: pulo 99px (3,09 tiles de 32px), ápice 0,342s, corrida
+  232px/s, investida ~95px. **Essa é a régua de todo vão de todo mapa.**
+- **Plataforma, perigo e água precisam de passe de desenho PRÓPRIO** —
+  `contornos()` só extrai fronteira de tiles sólidos. Sem eles, existiam na
+  colisão e não na tela (o jogador pisava no ar e morria em espinho
+  invisível). A face de cima da plataforma é o elemento mais claro da cena
+  depois do Guardião: legibilidade de affordance vence sutileza de atmosfera.
+- **`projeteis.js` tem assinaturas NÃO uniformes** (herdado de um subagente):
+  `new PocaAcida(x, y, {largura, duracao})` é POSICIONAL e usa `largura`, não
+  `raio`; `new OndaChoque({x, y, dir, alcance})` viaja numa direção só;
+  `new Explosao({x, y, raio})` expande em círculo. Estão anotadas no topo de
+  `chefes.js`.
+
+### Mundo
+
+30 salas em 5 áreas, todas alcançáveis, escritas em ASCII (ver
+`LEGENDA_OBJETOS` em `mundo/salas.js` — conjunto **congelado**).
+
+| área | identidade de layout | altar |
+|---|---|---|
+| Sub-bosque Cinzento | horizontal e apertado, aula muda | Salto Duplo |
+| Várzea Afogada | baixa e alagada, água lenta | Investida |
+| A Clareira Queimada | RETILÍNEA — é a ruína da fábrica da Fase 1 | Canto |
+| Dossel Cinéreo | vertical e aberto | Agarre, Planeio |
+| O Coração | orgânica e fechada; não dá habilidade, cobra todas | — |
+
+Trancas são **geometria** sempre que possível (um vão de 4 tiles já exige
+Salto Duplo sem precisar de porta). `mundo/salas-ramos.js` adiciona ramos
+verticais, uma tranca por habilidade duas áreas adiante e um atalho que fecha
+o primeiro ciclo do mapa — foram acrescentados depois que a tela de mapa
+mostrou que o mundo era uma linha reta.
+
+**Rode `node fase2/verificar-mapas.mjs` sempre que mexer num mapa.** Ele checa
+comprimento de linha (o parser completa com `.` em SILÊNCIO, e linha curta vira
+buraco na borda da sala), porta sem ligação, ligação pra sala inexistente,
+altar/chefe/portão sem definição, e alcançabilidade. Erro de mapa em
+metroidvania só aparece jogando, e aparece tarde.
+
+### Sistemas
+
+- **Pureza** — uma variável 0..1 por sala dirige cor, flora, densidade de
+  partícula, filtro do áudio e floração do Guardião de uma vez só. É o que faz
+  a restauração parecer causal em vez de um contador subindo num canto.
+- **Save** — `usuarios/{uid}.saves.{slot}.progressoFase2`, campo próprio pra
+  não arriscar o `progresso` da Fase 1 do mesmo slot. Grava em MOMENTOS
+  (checkpoint, habilidade, semente, fragmento, chefe morto), nunca em laço —
+  cota diária do Firestore. Degrada em silêncio sem sessão: abrir
+  `fase2.html` direto roda igual, só não salva.
+- **Trilha** — sintetizada, agendada por lookahead (setTimeout tem jitter que
+  destrói ritmo). A pureza abre o filtro: 354 Hz numa sala poluída, 2337 Hz na
+  mesma sala restaurada.
+- **Mapa** — layout DERIVADO do grafo de portas por BFS + passe de separação.
+  Mexer numa sala nunca exige lembrar de mexer no mapa.
+
+### Rodar e testar
+
+```bash
+python fase2/dev-servidor.py 8766
+```
+
+`http://127.0.0.1:8766/fase2.html?debug` expõe `window.__fase2`.
+
+**Use esse servidor, não `python -m http.server`**: o padrão responde 304 pra
+módulo ES recém-editado e o navegador roda a versão antiga — o sintoma é um
+`does not provide an export named X` apontando pra um export que existe.
+
+Em painel de navegador automatizado o `requestAnimationFrame` costuma não
+disparar. Não conclua que travou: avance o passo fixo na mão, que é teste
+melhor de qualquer jeito (determinístico, sem flakiness de timing) — receita
+completa em `fase2/ARQUITETURA.md`.
+
 ## Preferências de fluxo de trabalho do autor
 
 - **Editar arquivos existentes de forma pontual** (tipo find & replace) —
@@ -1081,12 +1234,11 @@ removido intencionalmente — não recriar sem pedir.
 - Rotação de pegada (2x1 ↔ 1x2) já existiu e foi removida a pedido do
   usuário — a infraestrutura de pegada multi-célula continua, reintroduzir
   é reversível (ver seção "Rotação" acima).
-- **Poluição agora afeta o jogo de verdade**: multa periódica proporcional
-  (fiscalização), e cruzar `LIMIAR_COLAPSO` termina a partida (tela de
-  colapso). O que ainda falta é a Fase 2 jogável de verdade ("Guardião da
-  Natureza" / restauração) — hoje colapso e vitória são as DUAS telas de
-  fim da Fase 1, cada uma com uma nota explícita de que a próxima etapa
-  ainda não existe.
+- **Poluição afeta o jogo de verdade**: multa periódica proporcional
+  (fiscalização), e cruzar `LIMIAR_COLAPSO` termina a partida. As duas telas
+  de fim da Fase 1 agora levam pra Fase 2, que existe (ver a seção "FASE 2").
+  O que falta lá é playtesting humano de balanceamento, texto de lore nas
+  lápides, e áudio/idioma nas opções.
 - **Contas de verdade (Firebase Auth) + saves na nuvem (Firestore) + apagar
   save já funcionam** (login obrigatório com e-mail/senha real,
   recuperação de senha por e-mail, 3 slots reais por conta sincronizados
