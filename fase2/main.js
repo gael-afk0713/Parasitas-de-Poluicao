@@ -11,7 +11,9 @@ import { Entrada } from './core/entrada.js';
 import { Renderizador, luzRadial, feixeLuz } from './render/renderizador.js';
 import { Mundo } from './mundo/mundo.js';
 import { validarRegistro } from './mundo/salas.js';
-import { desenharParallax, desenharPrimeiroPlano, anguloLuzArea } from './render/parallax.js';
+import {
+  desenharParallax, desenharPrimeiroPlano, anguloLuzArea, desenharHorizonte,
+} from './render/parallax.js';
 import { desenharParticulas, desenharNevoa } from './render/particulas.js';
 import { criarEntidade } from './entidades/catalogo.js';
 import { Hud } from './ui/hud.js';
@@ -156,6 +158,8 @@ function quadro(alpha, dtReal) {
 
   // 1 · céu
   render.desenharCeu(sala.altura, laco.tempo, anguloLuzArea(sala.area));
+  // 1b · a silhueta recortada contra o clarão — sem ela o céu é só degradê.
+  desenharHorizonte(render, sala, mundo);
 
   // 2-5 · parallax + luz volumétrica
   desenharParallax(render, sala, mundo);

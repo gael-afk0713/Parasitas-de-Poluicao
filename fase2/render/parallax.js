@@ -1244,31 +1244,45 @@ export function desenharRaios(render, sala, mundo) {
   const tempo = mundo.laco?.tempo ?? 0;
   const P = 0.55;
 
+  /* A BOCA de todo feixe fica ACIMA do topo da sala. Nenhuma sala declara
+     `feixe: true` — o campo nunca foi usado — então o caminho que valia era o
+     do "ponto de luz solto", que punha a boca do trapézio no meio do ar, à
+     vista. Num jogo a céu aberto a luz desce do céu, ponto: a boca sai de
+     cena por cima e o que se vê é só a coluna atravessando a floresta.
+     (Era isso, junto com a aresta dura do degradê, que desenhava um retângulo
+     claro no meio do Coração.) */
+  const yBoca = -90;
+  const alcance = (sala.altura + 260) * 1.2;
+
   render.camada(P, (ctx, t, camera) => {
-    const comp = Math.max(sala.altura, camera.altura / camera.zoom) * 1.25;
+    const comp = Math.max(alcance, camera.altura / camera.zoom * 1.4);
     ctx.globalCompositeOperation = 'screen';
     for (let i = 0; i < luzes.length; i++) {
       const l = luzes[i];
-      const inten = (l.intensidade ?? 1) * (l.feixe ? 1 : 0.45);
-      const x = l.x, y = l.feixe ? l.y : l.y - (l.raio ?? 200) * 0.4;
+      const inten = l.intensidade ?? 1;
+      // A coluna desce inclinada: onde ela CRUZA a altura da luz declarada é
+      // que ela deve passar, então a boca recua na horizontal pelo tanto que
+      // o ângulo vai deslocá-la na descida.
+      const queda = l.y - yBoca;
+      const x = l.x + Math.sin(ang) * queda;
       // Três feixes de larguras diferentes: um feixe só tem borda dura de
       // trapézio e denuncia o truque; três sobrepostos dão penumbra.
-      feixeLuz(ctx, x, y, comp, 230, ang, t.luz, inten * 0.16);
-      feixeLuz(ctx, x - 26, y, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.17);
-      feixeLuz(ctx, x + 30, y, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.20);
-      poeiraNoFeixe(ctx, t, x, y, comp, 210, ang, inten, tempo, i);
+      feixeLuz(ctx, x, yBoca, comp, 230, ang, t.luz, inten * 0.20);
+      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.21);
+      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.24);
+      poeiraNoFeixe(ctx, t, x, yBoca, comp, 210, ang, inten, tempo, i);
     }
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
   });
 
   render.emissivo(P, (ctx, t, camera) => {
-    const comp = Math.max(sala.altura, camera.altura / camera.zoom) * 1.15;
+    const comp = Math.max(alcance, camera.altura / camera.zoom * 1.3);
     for (const l of luzes) {
-      if (!l.feixe) continue;
       const inten = l.intensidade ?? 1;
-      feixeLuz(ctx, l.x, l.y, comp, 44, ang, t.luz, inten * 0.30);
-      feixeLuz(ctx, l.x, l.y, comp * 0.6, 16, ang, t.luz, inten * 0.34);
+      const x = l.x + Math.sin(ang) * (l.y - yBoca);
+      feixeLuz(ctx, x, yBoca, comp, 44, ang, t.luz, inten * 0.26);
+      feixeLuz(ctx, x, yBoca, comp * 0.6, 16, ang, t.luz, inten * 0.30);
     }
   });
 }
@@ -1732,4 +1746,125 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
     }
   }
   ctx.globalAlpha = 1;
+}
+
+/* =========================================================================
+   9 · LINHA DO HORIZONTE
+   -------------------------------------------------------------------------
+   O céu ganhou um clarão de horizonte, mas clarão sozinho não é distância:
+   é preciso ter ALGUMA COISA recortada contra ele. Sem isso o topo da tela
+   continua sendo um degradê bonito e vazio, e o jogo não parece a céu aberto
+   — parece um fundo pintado.
+
+   Esta faixa não passa pelo sistema de CAMADAS porque precisa cair EXATAMENTE
+   sobre o clarão, que é calculado em espaço de tela. Então ela é desenhada em
+   espaço de tela e a paralaxe é feita à mão: o ruído é avaliado em
+   `x + viewX·p`, o que dá deslocamento contínuo sem repetição.
+
+   Duas bandas, sempre: uma quase dissolvida na bruma (o fim do mundo) e uma
+   um pouco mais escura logo à frente. Uma banda só lê como recorte de papel.
+   ========================================================================= */
+
+const HORIZONTE = {
+  //          tipo       altura da massa (fração de h)  espaçamento dos vultos
+  raizes:   { tipo: 'mata', alt: 0.085, passo: 46, semente: 811 },
+  varzea:   { tipo: 'brejo', alt: 0.075, passo: 40, semente: 823 },
+  clareira: { tipo: 'queimada', alt: 0.070, passo: 58, semente: 827 },
+  dossel:   { tipo: 'mata', alt: 0.115, passo: 62, semente: 829 },
+  coracao:  { tipo: 'rocha', alt: 0.105, passo: 90, semente: 839 },
+};
+
+/** Perfil ondulado da massa, em px acima do horizonte. */
+function perfilHorizonte(xm, s, amp, tipo) {
+  let v = ruido1(xm * 0.0013, s) * 0.62
+        + ruido1(xm * 0.0041 + 17, s + 7) * 0.28
+        + ruido1(xm * 0.011 + 53, s + 13) * 0.10;
+  if (tipo === 'rocha') {
+    // Cristas angulares: dobra o ruído em torno do meio e afia o topo.
+    v = Math.abs(v - 0.5) * 2;
+    v = v ** 0.7;
+  } else if (tipo === 'brejo') {
+    // Brejo é raso, mas não RETO: chapado demais a banda vira uma régua
+    // atravessando a tela e lê como muro, não como distância.
+    v = 0.28 + v * 0.72;
+  }
+  return v * amp;
+}
+
+/**
+ * A silhueta do horizonte. Chamar LOGO DEPOIS do céu e antes do parallax.
+ */
+export function desenharHorizonte(render, sala, mundo) {
+  const conf = HORIZONTE[sala.area] ?? HORIZONTE.raizes;
+  const camera = render.camera;
+
+  render.camadaTela((ctx, tema, w, h) => {
+    const yH = render.alturaHorizonte(sala.altura);
+    // Fora da tela por completo: nada a fazer (salas altas, câmera lá em cima).
+    if (yH < -200 || yH > h + 200) return;
+
+    for (let banda = 0; banda < 2; banda++) {
+      const p = banda === 0 ? 0.018 : 0.045;
+      const d = banda === 0 ? 0.97 : 0.86;
+      const amp = h * conf.alt * (banda === 0 ? 1 : 1.45);
+      const y0 = yH + h * (banda === 0 ? 0.008 : 0.028);
+      const desl = camera.viewX * p;
+      const s = conf.semente + banda * 101;
+      ctx.fillStyle = cor(tema, 'distante', d, banda === 0 ? 0.16 : 0.04);
+
+      // 1 · a massa
+      ctx.beginPath();
+      ctx.moveTo(-4, h + 4);
+      for (let x = -4; x <= w + 4; x += 6) {
+        ctx.lineTo(x, y0 - perfilHorizonte(x + desl, s, amp, conf.tipo));
+      }
+      ctx.lineTo(w + 4, h + 4);
+      ctx.closePath();
+      ctx.fill();
+
+      // 2 · os vultos que quebram a linha — é o que faz "mata" e não "duna".
+      if (conf.tipo === 'rocha') continue;
+      const passo = conf.passo * (banda === 0 ? 1 : 1.6);
+      const i0 = Math.floor((desl - 40) / passo);
+      const i1 = Math.ceil((desl + w + 40) / passo);
+      ctx.beginPath();
+      for (let i = i0; i <= i1; i++) {
+        const hx = hash2(i, banda, s);
+        const hy = hash2(banda, i, s + 3);
+        if (hx > (conf.tipo === 'brejo' ? 0.72 : 0.86)) continue;
+        const xm = i * passo + hx * passo * 0.8;
+        // Vulto nasce em MOITA. Espaçamento uniforme, mesmo com jitter, lê
+        // como cerca de estacas — o olho acha o ritmo antes de achar a mata.
+        if (ruido1(xm * 0.0026, s + 21) < 0.38) continue;
+        const x = xm - desl;
+        const base = y0 - perfilHorizonte(xm, s, amp, conf.tipo) + 2;
+        // Faixa de altura larga: vultos todos do mesmo tamanho denunciam
+        // repetição mais rápido que qualquer outra coisa.
+        const alt = h * lerp(0.014, conf.tipo === 'brejo' ? 0.062 : 0.115, hy * hy)
+          * (banda === 0 ? 1 : 1.5);
+        const larg = Math.max(0.9, alt * lerp(0.035, 0.075, hx));
+        // Tronco afinando pro topo. Retângulo denuncia poste.
+        ctx.moveTo(x - larg, base);
+        ctx.lineTo(x - larg * 0.28, base - alt);
+        ctx.lineTo(x + larg * 0.28, base - alt);
+        ctx.lineTo(x + larg, base);
+        ctx.closePath();
+        // Dois galhos secos em V, só nos vultos mais altos: é o detalhe que
+        // diz "árvore morta" a essa distância, e custa quatro linhas.
+        if (conf.tipo !== 'brejo' && hy > 0.55) {
+          const gy = base - alt * 0.72;
+          const gl = alt * 0.3;
+          ctx.moveTo(x, gy);
+          ctx.lineTo(x - gl, gy - gl * 0.75);
+          ctx.lineTo(x - gl * 0.82, gy - gl * 0.55);
+          ctx.closePath();
+          ctx.moveTo(x, gy + alt * 0.1);
+          ctx.lineTo(x + gl * 0.9, gy - gl * 0.55);
+          ctx.lineTo(x + gl * 0.74, gy - gl * 0.36);
+          ctx.closePath();
+        }
+      }
+      ctx.fill();
+    }
+  });
 }

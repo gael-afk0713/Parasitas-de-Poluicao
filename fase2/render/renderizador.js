@@ -327,6 +327,17 @@ export class Renderizador {
    * @param {number} tempo         relógio do laço
    * @param {number} angLuz        ângulo da luz da área (ANGULO_LUZ)
    */
+  /**
+   * Onde a linha do horizonte cai NA TELA, em px. Pública porque a silhueta
+   * do horizonte é desenhada pelo parallax (que é quem tem o vocabulário de
+   * cada área) e precisa cair exatamente sobre o clarão do céu.
+   */
+  alturaHorizonte(alturaMundo = 2000) {
+    const h = this.tela.altura;
+    const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo - h));
+    return h * lerp(0.50, 0.68, alturaRel);
+  }
+
   desenharCeu(alturaMundo = 2000, tempo = 0, angLuz = 0.22) {
     this.camadaTela((ctx, tema, w, h) => {
       /* O HORIZONTE fica na altura do OLHO — perto do meio da tela, porque a
@@ -338,8 +349,7 @@ export class Renderizador {
          0.92·h junto ao chão; o clarão saía pela borda de baixo e o que
          sobrava na tela era só o degradê chapado do topo. Era por isso que o
          céu lia como uma parede de cor lisa.) */
-      const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo - this.tela.altura));
-      const yHorizonte = h * lerp(0.50, 0.68, alturaRel);
+      const yHorizonte = this.alturaHorizonte(alturaMundo);
       const pureza = clamp01(tema.pureza ?? 0);
 
       // 1 · base — o zênite é o ponto mais escuro do céu, e é dele que sai a
@@ -494,9 +504,15 @@ export function feixeLuz(ctx, x, y, comprimento, largura, angulo, cor, intensida
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angulo);
+  /* A BOCA do feixe entra de zero. Enquanto ela ficava tapada pelo teto, um
+     degradê começando no pico funcionava; a céu aberto a boca fica exposta e
+     o pico vira uma aresta reta atravessando o céu — era o "retângulo" claro
+     que aparecia no Coração. Subir de 0 até o pico em 12% do comprimento
+     resolve sem tirar força do feixe. */
   const g = ctx.createLinearGradient(0, 0, 0, comprimento);
-  g.addColorStop(0, rgba(cor, 0.5 * intensidade));
-  g.addColorStop(0.42, rgba(cor, 0.2 * intensidade));
+  g.addColorStop(0, rgba(cor, 0));
+  g.addColorStop(0.12, rgba(cor, 0.5 * intensidade));
+  g.addColorStop(0.48, rgba(cor, 0.2 * intensidade));
   g.addColorStop(1, rgba(cor, 0));
   ctx.fillStyle = g;
   ctx.beginPath();
