@@ -258,7 +258,7 @@ export class ArteTerreno {
       // claro de toda a cena depois do próprio Guardião — legibilidade de
       // affordance vence sutileza de atmosfera, sempre.
       ctx.strokeStyle = rgba(misturarHex(tema.crista, '#ffffff', 0.4),
-        lerp(0.85, 1, pureza));
+        lerp(0.85, 0.72, pureza));
       ctx.lineWidth = 2.4;
       ctx.lineCap = 'round';
       ctx.beginPath();
@@ -471,8 +471,10 @@ export class ArteTerreno {
     // A face pisável emite de leve. Custa quase nada e é o que faz a
     // plataforma "saltar" do fundo escuro sem precisar clarear a cena toda.
     ctx.save();
-    ctx.strokeStyle = rgba(tema.crista, 0.42);
-    ctx.lineWidth = 3;
+    // 0,42 num tema restaurado (brilhoBloom 0,72) fazia o borrão contornar a
+    // plataforma INTEIRA em neon — o vazamento do bloom dá a volta na forma.
+    ctx.strokeStyle = rgba(tema.crista, 0.26);
+    ctx.lineWidth = 2.4;
     ctx.lineCap = 'round';
     for (const f of this._faixas(camera, PLATAFORMA)) {
       const y = f.cy * t.tile + 1;
@@ -765,13 +767,19 @@ export class ArteTerreno {
           const h = hash2(Math.round(bx), Math.round(by), this.semente + f);
           const h2 = hash2(Math.round(by), Math.round(bx), this.semente + 13);
 
-          // Vão até o próximo tufo: irregular, e menor quanto mais viva a área.
-          proximoTufo += lerp(34, 9, densidade) * lerp(0.5, 1.8, h2);
+          /* Vão até o próximo tufo: irregular, e menor quanto mais viva a
+             área. Com 9 px de piso e tufos de ±3,5 px, em pureza alta os
+             tufos se encostavam e a borda inteira virava um PENTE contínuo —
+             que é justamente o que o agrupamento em tufos existe pra evitar.
+             15 px de piso mantém vão visível entre um e outro. */
+          proximoTufo += lerp(38, 15, densidade) * lerp(0.45, 2, h2);
 
           if (h > densidade * 0.9) continue;
 
           const nLaminas = 3 + Math.floor(h2 * 4);
-          const alturaTufo = lerp(5, 15, h) * densidade;
+          // Faixa de altura mais larga: tufo todo do mesmo tamanho é o que
+          // mais rápido denuncia repetição numa borda longa.
+          const alturaTufo = lerp(4, 19, h) * densidade;
 
           for (let k = 0; k < nLaminas; k++) {
             const kf = nLaminas === 1 ? 0 : k / (nLaminas - 1) - 0.5;   // -0.5..0.5
