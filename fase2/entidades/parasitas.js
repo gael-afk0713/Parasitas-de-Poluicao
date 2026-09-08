@@ -211,6 +211,7 @@ export class Sombra {
       ctx.translate(-cx, -cy);
     }
 
+    this._aureola(ctx, tema, cx, cy);
     this._fumaca(ctx, tema, cx, cy);
     // Massa ANTES dos tentáculos: o halo do corpo cobria a base deles quando
     // a ordem era a inversa, e a silhueta perdia exatamente o traço que a
@@ -219,6 +220,26 @@ export class Sombra {
     this._tentaculos(ctx, tema, cx, cy, ferida);
 
     ctx.restore();
+  }
+
+  /**
+   * Auréola ESCURA em volta da criatura.
+   *
+   * O contorno claro resolve o caso "sombra contra parede preta", mas cria o
+   * problema oposto: contra o céu ou contra um feixe de luz, o bicho vira um
+   * desenho de linhas. A auréola cobre exatamente esse caso — escurece o que
+   * está atrás dela, então some no escuro e aparece no claro. Junto com o
+   * contorno, dá leitura nos dois fundos, e mantém a criatura sendo o que ela
+   * é: um buraco no mundo.
+   */
+  _aureola(ctx, tema, cx, cy) {
+    const r = this.raio * 2.6;
+    const g = ctx.createRadialGradient(cx, cy - this.raio * 0.2, this.raio * 0.3, cx, cy - this.raio * 0.2, r);
+    g.addColorStop(0, rgba(tema.primeiroPlano, 0.55));
+    g.addColorStop(0.55, rgba(tema.primeiroPlano, 0.28));
+    g.addColorStop(1, rgba(tema.primeiroPlano, 0));
+    ctx.fillStyle = g;
+    ctx.fillRect(cx - r, cy - this.raio * 0.2 - r, r * 2, r * 2);
   }
 
   _fumaca(ctx, tema, cx, cy) {
@@ -261,9 +282,9 @@ export class Sombra {
       // ramificada que a define.
       for (const passada of (ferida ? ['massa'] : ['halo', 'massa'])) {
         let ax = ox, ay = oy;
-        const extra = passada === 'halo' ? 3.2 : 0;
+        const extra = passada === 'halo' ? 2.0 : 0;
         ctx.strokeStyle = passada === 'halo'
-          ? rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.38)
+          ? rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.30)
           : cor;
         for (let k = 1; k <= 4; k++) {
           const u = k / 4, iu = 1 - u;
@@ -276,10 +297,13 @@ export class Sombra {
         }
       }
 
-      // Fio de luz na borda externa: sem ele a criatura preta some contra a
-      // parede escura em vez de ler como silhueta.
-      if (!ferida) {
-        ctx.globalAlpha = 0.22 + this.telegrafo * 0.5;
+      /* Fio de luz no eixo do tentáculo. Ele existia SEMPRE, somado ao halo
+         que já contorna o mesmo traço — duas linhas claras por tentáculo. O
+         bicho lia como um rabisco de neon, e não como a sombra que deveria
+         ser. Agora só acende quando a criatura está carregando um ataque, e
+         aí vira informação: o aviso é o brilho. */
+      if (!ferida && this.telegrafo > 0.05) {
+        ctx.globalAlpha = this.telegrafo * 0.65;
         ctx.strokeStyle = tema.acento;
         ctx.lineWidth = 0.9;
         ctx.beginPath();
@@ -336,8 +360,8 @@ export class Sombra {
 
     if (!ferida) {
       // Halo de separação: mais claro que a criatura E que o fundo típico.
-      ctx.strokeStyle = rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.38);
-      ctx.lineWidth = 2.6;
+      ctx.strokeStyle = rgba(misturarHex(tema.bruma, tema.acento, 0.18), 0.30);
+      ctx.lineWidth = 1.9;
       ctx.lineJoin = 'round';
       traçarCorpo();
       ctx.stroke();
@@ -354,7 +378,7 @@ export class Sombra {
         ctx.translate(o.dx * this.dir, o.dy);
         ctx.rotate(o.dx * this.dir * 0.055);
         ctx.beginPath();
-        ctx.ellipse(0, 0, 0.8, o.alt * (1 + this.telegrafo * 0.5), 0, 0, TAU);
+        ctx.ellipse(0, 0, 1.15, o.alt * (1 + this.telegrafo * 0.5), 0, 0, TAU);
         ctx.fill();
         ctx.restore();
       }
