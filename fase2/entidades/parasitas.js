@@ -607,10 +607,51 @@ export class Rastejante extends Sombra {
     this.vel = 96;
     this.ancoraX = this.centroX;
     this.ancoraY = this.centroY;
+    this._grudou = false;
+  }
+
+  /**
+   * Acha a superfície mais próxima e gruda nela.
+   *
+   * O Rastejante estava na lista de ANCORADOS_NO_CHAO, então o carregador de
+   * sala o DERRUBAVA até o chão — no `dossel-02` ele caía dez tiles. Só que a
+   * coisa toda dele é ser a ameaça que anda por parede e teto: nascer sempre
+   * no chão apagava a identidade dele e o transformava num Errante lento.
+   *
+   * Tirá-lo da lista sozinho não bastava: com `normal = 0` (de pé no chão) e
+   * nada embaixo, o passo cai todo quadro no ramo de "quina externa" e ele
+   * gira no lugar. Então a superfície é procurada uma vez, na primeira
+   * atualização — que é quando o terreno já existe.
+   */
+  _grudar(terreno) {
+    const sonda = this.raio + 3;
+    let melhor = -1, melhorD = Infinity;
+    for (let i = 0; i < NORMAIS.length; i++) {
+      const n = NORMAIS[i];
+      // Anda na direção OPOSTA à normal (para onde ficariam os "pés").
+      for (let d = 2; d <= terreno.tile * 6; d += 4) {
+        if (terreno.caixaSolida(
+          this.ancoraX - n.nx * d - 2, this.ancoraY - n.ny * d - 2, 4, 4)) {
+          if (d < melhorD) { melhorD = d; melhor = i; }
+          break;
+        }
+      }
+    }
+    // Sem superfície por perto: NÃO marca como grudado e devolve false. Com
+    // `normal` errado e nada embaixo, o passo cai todo quadro no ramo de
+    // quina externa e a criatura gira no lugar — melhor esperar parada.
+    if (melhor < 0) return false;
+    this._grudou = true;
+    this.normal = melhor;
+    const n = NORMAIS[melhor];
+    this.ancoraX -= n.nx * (melhorD - sonda);
+    this.ancoraY -= n.ny * (melhorD - sonda);
+    return true;
   }
 
   comportamento(dt, mundo) {
     const terreno = mundo.sala.terreno;
+    if (!this._grudou && !this._grudar(terreno)) return;
     const n = NORMAIS[this.normal];
     // Tangente = normal girada 90°, multiplicada pelo sentido da caminhada.
     const tx = -n.ny * this.dir;

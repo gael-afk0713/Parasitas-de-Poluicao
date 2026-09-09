@@ -39,9 +39,13 @@ import { Terreno, TILE, normalizarMapa } from './terreno.js';
  * Quem NÃO entra na lista: semente, fragmento e fonte flutuam de propósito;
  * voador ignora terreno; tecelão pende do teto; portas são posicionais.
  */
+/* O `rastejante` SAIU desta lista: a coisa toda dele é andar por parede e
+   teto, e ser derrubado até o chão no carregamento apagava a identidade dele
+   (no `dossel-02` ele caía dez tiles e virava um Errante lento). Ele acha a
+   superfície mais próxima sozinho, na primeira atualização. */
 const ANCORADOS_NO_CHAO = new Set([
   'inicio', 'salvamento', 'altar', 'lapide', 'portao', 'chefe',
-  'parasita', 'cuspidor', 'explosivo', 'rastejante',
+  'parasita', 'cuspidor', 'explosivo',
 ]);
 
 /** Até onde procurar chão abaixo do ponto do mapa, em tiles. */
