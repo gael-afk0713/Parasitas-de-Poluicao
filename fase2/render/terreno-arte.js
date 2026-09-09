@@ -40,9 +40,11 @@ export class ArteTerreno {
     const alturaMundo = this.terreno.alturaPx;
 
     // --- 1. massa ------------------------------------------------------
+    // 0,16 dava ~16 níveis de luminância de alcance no corpo INTEIRO da
+    // rocha: sem alcance não há material, só uma mancha.
     const g = ctx.createLinearGradient(0, camera.viewY, 0, camera.viewY + camera.altura);
-    g.addColorStop(0, misturarHex(tema.terreno, tema.crista, 0.16));
-    g.addColorStop(0.5, tema.terreno);
+    g.addColorStop(0, misturarHex(tema.terreno, tema.crista, 0.4));
+    g.addColorStop(0.45, tema.terreno);
     g.addColorStop(1, tema.terrenoFundo);
     ctx.fillStyle = g;
     ctx.fill(path);
@@ -525,7 +527,9 @@ export class ArteTerreno {
    */
   _estratos(ctx, tema, camera, alturaMundo) {
     const a = camera.areaVisivel(80);
-    const passo = 46;
+    // Manchas menores, mais densas e com mais contraste leem como terra
+    // socada; grandes e suaves leem como sujeira na lente, que era o caso.
+    const passo = 30;
     const x0 = Math.floor(a.x / passo) * passo;
     const y0 = Math.floor(a.y / passo) * passo;
 
@@ -536,12 +540,12 @@ export class ArteTerreno {
         if (h > 0.55) continue;
         const h2 = hash2(x, y, this.semente + 17);
         ctx.fillStyle = h2 > 0.5
-          ? rgba(tema.terrenoFundo, 0.34)
-          : rgba(misturarHex(tema.terreno, tema.borda, 0.45), 0.20);
+          ? rgba(tema.terrenoFundo, 0.48)
+          : rgba(misturarHex(tema.terreno, tema.crista, 0.35), 0.34);
         ctx.beginPath();
         ctx.ellipse(
           x + (h - 0.5) * passo, y + (h2 - 0.5) * passo,
-          lerp(20, 52, h), lerp(12, 30, h2),
+          lerp(10, 28, h), lerp(7, 17, h2),
           (h - 0.5) * 1.2, 0, TAU
         );
         ctx.fill();
@@ -645,10 +649,13 @@ export class ArteTerreno {
     ctx.lineCap = 'butt';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = 1;
-    ctx.strokeStyle = misturarHex(tema.terreno, tema.crista, lerp(0.34, 0.5, pureza));
+    /* A crosta somava ~6 níveis de luminância sobre o corpo — invisível. Uma
+       faixa de terra iluminada precisa de ~30 níveis pra ler como superfície
+       recebendo luz em vez de mais uma sombra. */
+    ctx.strokeStyle = misturarHex(tema.terreno, tema.crista, lerp(0.7, 0.85, pureza));
     // Largura ímpar de propósito: metade do traço fica fora da silhueta e é
     // cortada pelo clip, então a "profundidade" real é metade do valor.
-    const passos = [[54, 0.06], [34, 0.09], [18, 0.13], [8, 0.2]];
+    const passos = [[54, 0.1], [34, 0.17], [18, 0.26], [8, 0.4]];
     for (const [larg, alfa] of passos) {
       ctx.globalAlpha = alfa * lerp(0.85, 1.25, pureza);
       ctx.lineWidth = larg;

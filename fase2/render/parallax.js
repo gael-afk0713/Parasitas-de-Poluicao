@@ -1082,25 +1082,31 @@ const CAMADAS = {
 
      A densidade cai e a espessura sobe conforme aproxima: longe é uma cerca
      de vultos finos, perto são poucos troncos grossos que emolduram a tela. */
+  /* O campo `brilho` era uma escada CRESCENTE pro fundo (+0.21 no plano mais
+     distante, -0.48 no mais próximo). Somado a uma `bruma` mais clara que o
+     céu, isso punha a floresta distante em luminância ~108 contra um céu de
+     25-69 — o fundo mais claro que o céu, que é a assinatura visual de
+     caverna. A escada agora é decrescente do céu pro primeiro plano, que é
+     como perspectiva atmosférica funciona ao ar livre. */
   raizes: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.21, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.16, amp: 44, escala: 0.0011, semente: 19, passo: 18 },
       { f: 'troncosColossais', rel: 1.02, passo: 120, dens: 0.92,
         largMin: 5, largMax: 13, semente: 11, altura: [0.30, 0.46] },
     ] },
-    { p: 0.095, d: 0.88, cor: 'distante', brilho: 0.13, formas: [
+    { p: 0.095, d: 0.88, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 1.04, passo: 170, dens: 0.82,
         largMin: 8, largMax: 20, semente: 23, altura: [0.42, 0.62] },
       { f: 'galhos', rel: 0.20, passo: 260, dens: 0.55, escalaLarg: 0.45, semente: 29 },
       { f: 'massa', lado: 'baixo', rel: 1.18, amp: 56, escala: 0.0017, semente: 31, passo: 15 },
     ] },
-    { p: 0.17, d: 0.73, cor: 'medio', brilho: 0.04, formas: [
+    { p: 0.17, d: 0.73, cor: 'medio', brilho: -0.2, formas: [
       { f: 'troncosColossais', rel: 1.06, passo: 250, dens: 0.7,
         largMin: 13, largMax: 32, semente: 37, altura: [0.58, 0.85] },
       { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
     ] },
-    { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.10, formas: [
+    { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.28, formas: [
       { f: 'troncosColossais', rel: 1.08, passo: 340, dens: 0.62,
         largMin: 18, largMax: 44, semente: 43, altura: [0.8, 1.15] },
       // Raízes aéreas descendo do alto: a assinatura do sub-bosque, e o que
@@ -1109,19 +1115,19 @@ const CAMADAS = {
         largMin: 7, largMax: 20, semente: 47 },
       { f: 'galhos', rel: 0.06, passo: 380, dens: 0.5, escalaLarg: 0.9, semente: 49 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'troncosColossais', rel: 1.12, passo: 460, dens: 0.55,
         largMin: 26, largMax: 62, semente: 59, altura: [1.1, 1.5] },
       { f: 'massa', lado: 'baixo', rel: 1.10, amp: 70, escala: 0.0036, semente: 61,
         passo: 11, picos: 0.35 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
       { f: 'raizes', rel: -0.08, passo: 280, dens: 0.45, compMin: 240, compMax: 620,
         largMin: 12, largMax: 34, semente: 67 },
       { f: 'massa', lado: 'baixo', rel: 1.18, amp: 74, escala: 0.0048, semente: 71,
         passo: 10, picos: 0.45 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'troncosColossais', rel: 1.30, passo: 620, dens: 0.42,
         largMin: 40, largMax: 96, semente: 73, altura: [1.6, 2.1] },
       { f: 'massa', lado: 'baixo', rel: 1.28, amp: 62, escala: 0.0062, semente: 79,
@@ -1347,7 +1353,9 @@ export function desenharBrilhoDeFundo(render, sala, mundo) {
     const cx = l.x + dir.x * raio * 0.35;
     const cy = l.y + dir.y * raio * 0.42;
     const g = ctx.createRadialGradient(cx, cy, raio * 0.05, cx, cy, raio);
-    const forca = (l.intensidade ?? 1) * lerp(0.16, 0.30, t.pureza ?? 0);
+    // 0,16 no estado poluído somava ~12 níveis no centro do halo: a poça de
+    // luz que deveria ser o ponto focal da sala não existia.
+    const forca = (l.intensidade ?? 1) * lerp(0.3, 0.44, t.pureza ?? 0);
     g.addColorStop(0, rgba(t.luz, forca));
     g.addColorStop(0.45, rgba(t.luz, forca * 0.34));
     g.addColorStop(1, rgba(t.luz, 0));
@@ -1398,9 +1406,9 @@ export function desenharRaios(render, sala, mundo) {
       // não declarar `feixe`. Ao tirar esse fator, manter os mesmos números
       // aqui triplicava a luz — e numa área restaurada, com brilhoBloom 0.85,
       // o feixe estourava num borrão branco sem forma nenhuma.
-      feixeLuz(ctx, x, yBoca, comp, 230, ang, t.luz, inten * 0.11);
-      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.12);
-      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.15);
+      feixeLuz(ctx, x, yBoca, comp, 230, ang, t.luz, inten * 0.2);
+      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.22);
+      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.26);
       poeiraNoFeixe(ctx, t, x, yBoca, comp, 210, ang, inten, tempo, i);
     }
     ctx.globalCompositeOperation = 'source-over';
@@ -1495,7 +1503,10 @@ export function desenharParallax(render, sala, mundo) {
 
     // Véu só nas junções que precisam: uma névoa de tela cheia por camada é
     // meio megapixel de overdraw cada e lava o primeiro plano.
-    const veu = s.veu != null ? s.veu : (i % 2 === 0 ? lerp(0.26, 0.05, i / (camadas.length - 1)) : 0);
+    /* Três véus de bruma empilhados davam 31% de bruma chapada sobre a faixa
+       central da tela — justamente onde ficam o horizonte e os troncos
+       médios. Era a definição de faixa morta. Composto agora dá ~11%. */
+    const veu = s.veu != null ? s.veu : (i % 2 === 0 ? lerp(0.14, 0.03, i / (camadas.length - 1)) : 0);
     if (veu > 0) render.velarProfundidade(veu);
 
     if (i === quandoRaios) desenharRaios(render, sala, mundo);
@@ -1945,7 +1956,9 @@ export function desenharHorizonte(render, sala, mundo) {
       const y0 = yH + h * (banda === 0 ? 0.008 : 0.028);
       const desl = camera.viewX * p;
       const s = conf.semente + banda * 101;
-      ctx.fillStyle = cor(tema, 'distante', d, banda === 0 ? 0.16 : 0.04);
+      // A mata do horizonte tem que ser MAIS ESCURA que o clarão em que ela
+      // se recorta. Clarear a silhueta (era +0.16) apaga o recorte.
+      ctx.fillStyle = cor(tema, 'distante', d, banda === 0 ? -0.06 : -0.14);
 
       // 1 · a massa
       ctx.beginPath();

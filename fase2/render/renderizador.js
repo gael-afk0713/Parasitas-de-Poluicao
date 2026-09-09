@@ -28,7 +28,7 @@
    `shadowBlur` do canvas (que é por objeto, caríssimo, e não vaza).
    ========================================================================= */
 
-import { clamp01, rgba, misturarHex, lerp } from '../core/mat.js';
+import { clamp, clamp01, rgba, misturarHex, lerp } from '../core/mat.js';
 
 /** Escala do buffer de luz. 0.5 = metade da resolução em cada eixo.
  *  Borrão não precisa de resolução; isso corta o custo do bloom em 4x. */
@@ -220,7 +220,9 @@ export class Renderizador {
     cena.save();
     cena.setTransform(1, 0, 0, 1, 0, 0);
     cena.globalCompositeOperation = 'soft-light';
-    cena.globalAlpha = 0.38;
+    // 0,38 comia 20-40% do alcance no terço externo do quadro, somado à
+    // vinheta. O comentário acima já dizia 5-11%; o número não seguiu.
+    cena.globalAlpha = 0.26;
     cena.fillStyle = tema.luzAmbiente;
     cena.fillRect(0, 0, w, h);
     cena.restore();
@@ -334,8 +336,13 @@ export class Renderizador {
    */
   alturaHorizonte(alturaMundo = 2000) {
     const h = this.tela.altura;
-    const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo - h));
-    return h * lerp(0.50, 0.68, alturaRel);
+    /* Ancorado no NÍVEL DO OLHO, não na altura absoluta dentro da sala.
+       Com `lerp(0.50, 0.68, alturaRel)`, numa sala alta e estreita com o
+       jogador no fundo o horizonte ia parar em 0,68·h — que naquelas salas
+       está ATRÁS do terreno. A segunda sala do jogo não mostrava céu, nem
+       horizonte, nem sol, nem feixe: só névoa. */
+    const alturaRel = clamp01(this.camera.viewY / Math.max(1, alturaMundo));
+    return h * clamp(0.58 - alturaRel * 0.18, 0.30, 0.62);
   }
 
   desenharCeu(alturaMundo = 2000, tempo = 0, angLuz = 0.22) {
@@ -354,11 +361,18 @@ export class Renderizador {
 
       // 1 · base — o zênite é o ponto mais escuro do céu, e é dele que sai a
       //     amplitude de valor que faz o horizonte parecer luminoso.
+      /* As paradas eram FIXAS (0.38 / 0.78 / 1) enquanto a linha do horizonte
+         varia entre 0,30·h e 0,62·h. Consequência: `ceuBase`, a cor mais
+         clara do céu, só era pintada em y = h — que está sempre coberto pelo
+         terreno. A cor mais clara do arquivo nunca aparecia na tela. Agora as
+         paradas seguem o horizonte e o pico cai EM CIMA da linha. */
+      const yh = clamp(yHorizonte / h, 0.25, 0.85);
       const g = ctx.createLinearGradient(0, 0, 0, h);
       g.addColorStop(0, misturarHex(tema.ceuTopo, tema.primeiroPlano, 0.22));
-      g.addColorStop(0.38, tema.ceuTopo);
-      g.addColorStop(0.78, misturarHex(tema.ceuTopo, tema.ceuBase, 0.72));
-      g.addColorStop(1, tema.ceuBase);
+      g.addColorStop(yh * 0.42, tema.ceuTopo);
+      g.addColorStop(yh * 0.88, misturarHex(tema.ceuTopo, tema.ceuBase, 0.78));
+      g.addColorStop(yh, tema.ceuBase);
+      g.addColorStop(1, misturarHex(tema.ceuBase, tema.ceuTopo, 0.5));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
 
@@ -457,10 +471,13 @@ export class Renderizador {
          o véu é quase nada em cima, cheio na faixa do horizonte, e cai de
          novo embaixo — onde o que se vê já está perto. */
       const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, rgba(tema.bruma, 0.06));
-      g.addColorStop(0.32, rgba(tema.bruma, 0.34));
-      g.addColorStop(0.62, rgba(tema.bruma, 1));
-      g.addColorStop(1, rgba(tema.bruma, 0.62));
+      /* O stop do meio era bruma PURA e opaca. Com três véus empilhados isso
+         dava ~31% de bruma chapada sobre a faixa central da tela — o miolo do
+         quadro perdia contraste inteiro e virava papa. */
+      g.addColorStop(0, rgba(tema.bruma, 0.04));
+      g.addColorStop(0.32, rgba(tema.bruma, 0.2));
+      g.addColorStop(0.62, rgba(tema.bruma, 0.55));
+      g.addColorStop(1, rgba(tema.bruma, 0.28));
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
     });

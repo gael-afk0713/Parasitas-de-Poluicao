@@ -101,26 +101,49 @@ export const AREAS = {
     nomeRestaurado: 'Sub-bosque Vivo',
     ordem: 1,
     poluido: {
-      ceuTopo: '#141a22', ceuBase: '#3d4650',
-      bruma: '#515c68',
+      /* A ESCADA DE VALOR ESTAVA INVERTIDA, e era a causa raiz de a área
+         inteira ler como caverna por mais que o vocabulário de formas fosse
+         todo de floresta.
+
+         Medindo em luminância Rec.709 o que os números antigos produziam
+         depois de `corDeProfundidade`: o plano DISTANTE saía em 108 e o céu
+         entre 25 e 69. Ao ar livre isso é fisicamente impossível — silhueta
+         contra céu é sempre mais escura que o céu — e o que o olho lê quando
+         o fundo é claro e o céu é escuro é exatamente "caverna com luz vindo
+         do fundo". Pior: `bruma` (91) era mais clara que `ceuBase` (69), e
+         como `corDeProfundidade` puxa tudo pra `bruma`, quanto mais longe
+         mais claro, sem teto: o horizonte virava uma barra luminosa
+         atravessando a tela.
+
+         Agora o céu é a coisa mais clara (a regra que já estava escrita no
+         topo deste arquivo e que os números desmentiam), `bruma` fica SEMPRE
+         abaixo de `ceuBase`, e a bruma cai de 0.60 pra 0.44 pra as camadas
+         não convergirem todas pro mesmo tom.
+
+         E o TERRENO tinha `borda` (40) duas vezes e meia mais clara que o
+         próprio corpo (16): uma massa mais escura que o próprio contorno lê
+         como buraco recortado, não como rocha. A borda virou tinta escura, o
+         corpo subiu e a crista subiu mais. */
+      ceuTopo: '#1b2430', ceuBase: '#7d8896',
+      bruma: '#68727f',
       distante: '#141a23', medio: '#0f141b', proximo: '#0a0e14',
-      terreno: '#0c1016', terrenoFundo: '#05070b',
-      borda: '#222933', crista: '#39404a',
+      terreno: '#1a222c', terrenoFundo: '#080c11',
+      borda: '#080b10', crista: '#4e5866',
       primeiroPlano: '#03050a',
-      luz: '#8a7f52', luzAmbiente: '#181d27',
-      particula: '#4d545f', acento: '#6b6244',
-      densidadeBruma: 0.60, vinheta: 0.78, saturacao: 0.38, brilhoBloom: 0.22,
+      luz: '#c8b878', luzAmbiente: '#181d27',
+      particula: '#6a7280', acento: '#8a7d55',
+      densidadeBruma: 0.44, vinheta: 0.52, saturacao: 0.38, brilhoBloom: 0.34,
     },
     restaurado: {
       ceuTopo: '#071820', ceuBase: '#17414a',
       bruma: '#2a6b6a',
       distante: '#112e37', medio: '#0c2229', proximo: '#07161c',
-      terreno: '#09181e', terrenoFundo: '#040d11',
-      borda: '#1e4846', crista: '#5fc9a8',
+      terreno: '#12313a', terrenoFundo: '#041014',
+      borda: '#05141a', crista: '#7fdcc0',
       primeiroPlano: '#020a0d',
       luz: '#7fe8c4', luzAmbiente: '#0f332e',
       particula: '#8fe0c0', acento: '#48d9a8',
-      densidadeBruma: 0.42, vinheta: 0.58, saturacao: 0.92, brilhoBloom: 0.72,
+      densidadeBruma: 0.42, vinheta: 0.44, saturacao: 0.92, brilhoBloom: 0.72,
     },
   },
 

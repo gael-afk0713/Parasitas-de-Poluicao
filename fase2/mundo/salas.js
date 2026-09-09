@@ -168,9 +168,10 @@ export class Sala {
 
     // `ceuAberto: false` na definição mantém a sala fechada (interior de
     // verdade: dentro de uma chaminé, dentro do Coração).
-    const linhas = def.ceuAberto === false
-      ? normalizarMapa(def.mapa)
-      : abrirCeu(normalizarMapa(def.mapa));
+    const mapaAbriuCeu = def.ceuAberto !== false;
+    const linhas = mapaAbriuCeu
+      ? abrirCeu(normalizarMapa(def.mapa))
+      : normalizarMapa(def.mapa);
     this.objetos = [];
 
     // Extrai objetos e substitui por vazio ANTES de montar o terreno.
@@ -196,7 +197,15 @@ export class Sala {
 
     this._encostarNoChao();
 
-    this.luzes = def.luzes || [];
+    /* As luzes vinham CRUAS do `def`, sem o deslocamento do céu.
+       `abrirCeu` acrescenta ALTURA_CEU fileiras no topo do mapa, empurrando
+       toda a geometria 384 px pra baixo — os objetos acompanham porque são
+       extraídos das linhas já expandidas, mas as luzes não passavam por
+       lugar nenhum. Toda luz de sala aberta ficava 12 tiles acima de onde foi
+       escrita: a poça de brilho de fundo caía metade fora do quadro e as
+       salas iniciais ficaram sem foco de luz nenhum. */
+    const deslocLuz = mapaAbriuCeu ? ALTURA_CEU * TILE : 0;
+    this.luzes = (def.luzes || []).map((l) => ({ ...l, y: l.y + deslocLuz }));
     this.portas = this.objetos.filter((o) => o.tipo.startsWith('porta-'));
     this.inicio = this.objetos.find((o) => o.tipo === 'inicio') || {
       x: this.largura / 2, y: this.altura / 2,

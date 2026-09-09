@@ -880,12 +880,16 @@ export class ArteJogador {
     // 1. Halo grande e fraco: é o que ILUMINA A CENA em volta dele. Sem
     //    isso, andar num lugar escuro não muda nada e o mundo parece um
     //    quadro de fundo, não um lugar em que se está.
+    /* O halo caiu de 0,34 para 0,24 e o núcleo de 0,55 para 0,40 quando a
+       paleta subiu de valor: com `luz` mais clara e `brilhoBloom` maior, o
+       herói estourava numa bola branca e a própria silhueta dele — que é o
+       que o jogador precisa ler — sumia dentro do próprio brilho. */
     const raioBase = lerp(120, 190, this.floracao);
     luzRadial(ctx, j.centroX, j.centroY - 6, raioBase, tema.luz,
-      0.34 + this.floracao * 0.2 + j.brilho * 0.25);
+      0.24 + this.floracao * 0.2 + j.brilho * 0.25);
 
     // 2. Núcleo quente e pequeno: mantém o corpo nítido dentro do halo.
-    luzRadial(ctx, j.centroX, j.centroY - 10, 26, '#ffffff', 0.55);
+    luzRadial(ctx, j.centroX, j.centroY - 10, 26, '#ffffff', 0.4);
 
     // 3. Marcas acesas.
     if (this.floracao > 0.05) {
