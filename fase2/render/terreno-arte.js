@@ -31,7 +31,7 @@ export class ArteTerreno {
     this._cachePureza = -1;
   }
 
-  invalidar() { this._cacheMusgo = null; }
+  invalidar() { this._cacheMusgo = null; this._cacheSalientes = undefined; }
 
   /* --------------------------------------------------------------------- */
 
@@ -259,24 +259,37 @@ export class ArteTerreno {
       // Face de cima: a linha que o jogador realmente pisa. É o elemento mais
       // claro de toda a cena depois do próprio Guardião — legibilidade de
       // affordance vence sutileza de atmosfera, sempre.
-      ctx.strokeStyle = rgba(misturarHex(tema.crista, '#ffffff', 0.4),
-        lerp(0.85, 0.72, pureza));
-      ctx.lineWidth = 2.4;
+      /* A face de cima tinha 2,4 px de aresta dura, valor altíssimo e era
+         idêntica em toda plataforma da sala: lia como barra cromada de
+         interface. O valor fica (legibilidade de apoio vale mais que
+         sutileza), mas o traço passa a ser desenhado em pedaços de alfa
+         irregular, com um deslocamento de ruído — mantém a linha e tira o
+         acabamento de UI. */
+      ctx.lineWidth = 1.6;
       ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x0 + 1, y + 1);
-      ctx.quadraticCurveTo((x0 + x1) / 2, y + 1 + arco, x1 - 1, y + 1);
-      ctx.stroke();
+      const corTopo = misturarHex(tema.crista, '#ffffff', 0.4);
+      const passosTopo = Math.max(3, Math.round(largura / 18));
+      for (let i = 0; i < passosTopo; i++) {
+        const u0 = i / passosTopo, u1 = (i + 1) / passosTopo;
+        const n = hash2(f.cx0 + i, f.cy, s + 7);
+        ctx.strokeStyle = rgba(corTopo, lerp(0.85, 0.72, pureza) * lerp(0.45, 1, n));
+        ctx.beginPath();
+        ctx.moveTo(x0 + 1 + largura * u0, topoY(x0 + largura * u0) + (n - 0.5));
+        ctx.lineTo(x0 + 1 + largura * u1, topoY(x0 + largura * u1) + (n - 0.5));
+        ctx.stroke();
+      }
 
       // Sombra projetada logo abaixo: descola a viga do fundo e reforça que
       // existe VÃO ali embaixo (por onde dá pra passar).
       ctx.save();
       ctx.globalAlpha = 0.5;
       ctx.strokeStyle = tema.ceuTopo;
-      ctx.lineWidth = 5;
+      // Era o MESMO retângulo desfocado sob todas as plataformas da sala.
+      const hs = hash2(f.cx0, f.cy, s + 13);
+      ctx.lineWidth = lerp(4, 8, hs);
       ctx.beginPath();
-      ctx.moveTo(x0 + 4, y + espessura + 4);
-      ctx.lineTo(x1 - 4, y + espessura + 4);
+      ctx.moveTo(x0 + 4, y + espessura + lerp(3, 7, hs));
+      ctx.lineTo(x1 - 4, y + espessura + lerp(3, 7, hs));
       ctx.stroke();
       ctx.restore();
 
@@ -685,7 +698,64 @@ export class ArteTerreno {
     ctx.stroke(path);
     ctx.restore();
 
+    this._salientes(ctx, tema);
     this._musgo(ctx, tema, this.terreno.arestasSuperiores(0.5), pureza);
+  }
+
+  /**
+   * Pedras e tocos encravados na beirada.
+   *
+   * O contorno sai de uma escada de tiles ortogonal com 4 px de ruído e um
+   * Chaikin por cima: o resultado é um retângulo de canto arredondado, sem
+   * uma diagonal, sem saliência, sem nada que quebre a linha. É o que mais
+   * separa "tilemap desenhado" de "terreno".
+   *
+   * Estas formas são puro desenho — vão POR CIMA do contorno e não tocam a
+   * colisão, então nenhuma delas pode virar degrau falso para o jogador: são
+   * baixas de propósito, e sempre menores que a altura de um passo.
+   */
+  _salientes(ctx, tema) {
+    if (!this._cacheSalientes) {
+      const p = new Path2D();
+      let tem = false;
+      for (const faixa of this.terreno.arestasSuperiores(0.5)) {
+        let percorrido = 0;
+        let proxima = hash2(Math.round(faixa[0].x), Math.round(faixa[0].y), 71) * 90;
+        for (let i = 0; i < faixa.length - 1; i++) {
+          const a = faixa[i], b = faixa[i + 1];
+          const dx = b.x - a.x, dy = b.y - a.y;
+          const seg = Math.hypot(dx, dy) || 0.001;
+          while (proxima <= percorrido + seg) {
+            const t = (proxima - percorrido) / seg;
+            const bx = a.x + dx * t, by = a.y + dy * t;
+            const h = hash2(Math.round(bx), Math.round(by), 73);
+            const h2 = hash2(Math.round(by), Math.round(bx), 79);
+            proxima += lerp(70, 170, h2);
+            if (h > 0.62) continue;
+            const larg = lerp(9, 26, h2);
+            const alt = lerp(5, 14, h);
+            const nx = dy / seg, ny = -dx / seg;
+            const tx = dx / seg, ty = dy / seg;
+            // Meia-cúpula irregular assentada na aresta, um pouco enterrada.
+            p.moveTo(bx - tx * larg, by - ny * 1 - ty * larg);
+            for (let k = 1; k <= 7; k++) {
+              const u = k / 8;
+              const rr = alt * Math.sin(u * Math.PI) * lerp(0.7, 1.25, hash2(k, Math.round(bx), 83));
+              p.lineTo(bx + tx * larg * (u * 2 - 1) + nx * rr,
+                by + ty * larg * (u * 2 - 1) + ny * rr);
+            }
+            p.lineTo(bx + tx * larg, by + ty * larg);
+            p.closePath();
+            tem = true;
+          }
+          percorrido += seg;
+        }
+      }
+      this._cacheSalientes = tem ? p : null;
+    }
+    if (!this._cacheSalientes) return;
+    ctx.fillStyle = misturarHex(tema.terreno, tema.primeiroPlano, 0.5);
+    ctx.fill(this._cacheSalientes);
   }
 
   /**

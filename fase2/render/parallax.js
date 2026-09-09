@@ -692,10 +692,16 @@ function troncosColossais(ctx, a, s) {
   const faixaAltura = s.altura ?? [1.5, 1.5];
 
   for (let x = x0; x <= a.x1; x += passo) {
+    /* Árvore nasce em BOSQUE, não em fileira. O laço anda numa grade fixa de
+       `passo` e o jitter era de só ±0,35·passo: na camada mais densa isso dá
+       uns dez troncos quase equidistantes atravessando a tela, e o olho acha
+       o ritmo em meio segundo. O ruído de baixa frequência abre clareiras
+       inteiras e o jitter dobrado desfaz o resto da grade. */
+    if (ruido1(x * 0.0009, s.semente + 41) < 0.34) continue;
     const h = hash2(x, s.semente, 263);
     if (h > (s.dens ?? 0.7)) continue;
     const h2 = hash2(x, s.semente + 1, 269);
-    const px = x + (h2 - 0.5) * passo * 0.7;
+    const px = x + (h2 - 0.5) * passo * 1.6;
     const rBase = lerp(s.largMin ?? 26, s.largMax ?? 90, h2);
     // Altura própria por tronco: uma fileira de troncos de mesma altura lê
     // como cerca, não como floresta.
@@ -722,8 +728,11 @@ function troncosColossais(ctx, a, s) {
        desenhado". */
     // Tronco grosso entorta menos que tronco fino — e é o grosso que fica
     // perto da câmera, onde uma curva exagerada denuncia na hora.
-    const curva = (hash2(x, s.semente + 23, 331) - 0.5) * rBase * 2.4
-      / (1 + rBase / 34);
+    /* Amplitude ATADA à própria espessura. Solta, o desvio chegava a quase
+       duas vezes a meia-largura do tronco: o afilamento somado à curva
+       produzia crescentes finos que leem como lâmina, não como árvore. */
+    const curva = (hash2(x, s.semente + 23, 331) - 0.5) * rBase
+      / (1 + rBase / 50);
     const yMeio = yb - alturaTronco * 0.52;
     const rMeio = lerp(rBase * 0.86, rTopo, 0.45);
     /** Eixo do tronco em `t` (0 = base, 1 = topo). */
@@ -746,12 +755,17 @@ function troncosColossais(ctx, a, s) {
     /* TOPO QUEBRADO. Uma em cada três termina em lasca em vez de ponta lisa —
        é o detalhe que diz "esta árvore morreu de pé" sem textura nenhuma. */
     if (hash2(x, s.semente + 29, 337) < 0.34) {
-      const lasca = rTopo * 1.25;
-      for (let k = 0; k <= 6; k++) {
-        const t = k / 6;
+      // Número de lascas e fase da alternância variam por árvore — com N e
+      // fase fixos dava pra contar quatro topos idênticos na mesma tela.
+      const hl = hash2(x, s.semente + 43, 349);
+      const lasca = rTopo * lerp(0.9, 1.6, hl);
+      const N = 4 + Math.floor(hl * 5);
+      const fase = hl > 0.5 ? 1 : 0;
+      for (let k = 0; k <= N; k++) {
+        const t = k / N;
         const hk = hash2(x + k * 11, s.semente + 31, 341);
         ctx.lineTo(px - rTopo + inclina + rTopo * 2 * t,
-          topo - lasca * (k % 2 === 0 ? 0.35 + hk * 0.65 : hk * 0.3));
+          topo - lasca * (k % 2 === fase ? 0.35 + hk * 0.65 : hk * 0.3));
       }
     } else {
       ctx.lineTo(px + rTopo + inclina, topo);
@@ -1126,6 +1140,19 @@ const CAMADAS = {
         largMin: 12, largMax: 34, semente: 67 },
       { f: 'massa', lado: 'baixo', rel: 1.18, amp: 74, escala: 0.0048, semente: 71,
         passo: 10, picos: 0.45 },
+    ] },
+    /* MEIO-CAMPO. Não havia NADA com paralaxe entre 0,28 e 1,0 atravessando o
+       espaço de jogo: as camadas distantes ficavam lá atrás, as próximas
+       apareciam só como dois verticais pretos nas bordas, e sem nada
+       ocluindo nada não há profundidade — só camadas empilhadas.
+
+       E a composição inteira era ortogonal: uns trinta verticais paralelos,
+       três horizontais e nenhuma diagonal. `galhos` com espessura 3,2 vira um
+       TRONCO TOMBADO arqueando por 900 px — a diagonal que faltava. */
+    { p: 0.72, d: 0.16, cor: 'proximo', brilho: -0.50, veu: 0, formas: [
+      { f: 'raizes', rel: -0.15, passo: 190, dens: 0.62, compMin: 380, compMax: 900,
+        largMin: 9, largMax: 22, semente: 83 },
+      { f: 'galhos', rel: 0.52, passo: 900, dens: 0.35, escalaLarg: 3.2, semente: 89 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'troncosColossais', rel: 1.30, passo: 620, dens: 0.42,
