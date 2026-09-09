@@ -93,6 +93,36 @@ export class Paineis {
     else if (!this.aberto) { this.abrir('pausa'); this.laco.pausado = true; }
   }
 
+  /**
+   * Liga os deslizadores de som. Guarda em `localStorage` porque volume é
+   * preferência de pessoa, não de save: quem baixou o som numa sessão não
+   * quer subir de novo na próxima, e nem sempre é o mesmo save.
+   */
+  ligarSom(audio) {
+    this.audio = audio;
+    const par = [
+      ['vol-mestre', 'fase2:volume', 0.7, (v) => audio.definirVolume(v)],
+      ['vol-musica', 'fase2:volumeMusica', 0.6, (v) => audio.definirVolumeMusica(v)],
+    ];
+    for (const [id, chave, padrao, aplicar] of par) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      let v = padrao;
+      try {
+        const guardado = localStorage.getItem(chave);
+        if (guardado != null) v = Math.min(1, Math.max(0, parseFloat(guardado)));
+      } catch { /* modo privado: fica no padrão */ }
+      if (!Number.isFinite(v)) v = padrao;
+      el.value = String(Math.round(v * 100));
+      aplicar(v);
+      el.addEventListener('input', () => {
+        const novo = el.valueAsNumber / 100;
+        aplicar(novo);
+        try { localStorage.setItem(chave, String(novo)); } catch { /* idem */ }
+      });
+    }
+  }
+
   _preencherPausa() {
     const m = this.mundo;
     const def = (id, valor) => { const e = document.getElementById(id); if (e) e.textContent = valor; };

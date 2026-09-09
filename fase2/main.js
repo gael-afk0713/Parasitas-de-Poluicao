@@ -86,6 +86,7 @@ laco.iniciar();
 // progresso. É o mesmo padrão da Fase 1 — nunca deixar a tela esperando a rede.
 const save = new Save(mundo);
 paineis = new Paineis(mundo, laco, { aoSalvar: (motivo) => save.salvar(motivo) });
+paineis.ligarSom(audio);
 save.iniciar()
   .then((restaurou) => {
     save.ligarGatilhos();

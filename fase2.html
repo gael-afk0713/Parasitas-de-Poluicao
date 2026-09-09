@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=3">
-<link rel="stylesheet" href="fase2.css?v=4">
+<link rel="stylesheet" href="fase2.css?v=5">
 </head>
 <body class="fase2-body">
 
@@ -47,6 +47,21 @@
         <li><span>Fragmentos</span><strong id="pausa-fragmentos">0</strong></li>
         <li><span>Habilidades</span><strong id="pausa-habilidades">nenhuma</strong></li>
       </ul>
+      <!-- Som: um jogo de atmosfera sem como abaixar o volume é um jogo que
+           você joga em silêncio. Dois controles só, no lugar onde a pessoa já
+           vai quando quer mexer em alguma coisa. -->
+      <div class="painel-som">
+        <label class="painel-som-linha" for="vol-mestre">
+          <span>Som</span>
+          <input type="range" id="vol-mestre" min="0" max="100" value="70"
+                 aria-label="Volume geral">
+        </label>
+        <label class="painel-som-linha" for="vol-musica">
+          <span>Música</span>
+          <input type="range" id="vol-musica" min="0" max="100" value="60"
+                 aria-label="Volume da música">
+        </label>
+      </div>
       <p class="painel-status" id="status-pausa"></p>
       <div class="config-acoes">
         <button class="painel-voltar" id="btn-pausa-salvar">Salvar agora</button>
@@ -111,6 +126,6 @@
     </div>
   </div>
 
-<script type="module" src="fase2/main.js?v=27"></script>
+<script type="module" src="fase2/main.js?v=28"></script>
 </body>
 </html>
