@@ -1143,31 +1143,31 @@ const CAMADAS = {
      que dá nome à fase não mostrava água nenhuma, e a faixa do meio da tela
      ficava vazia. -------------------------------------------------------- */
   varzea: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.21, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.52, amp: 96, escala: 0.0009, semente: 101, passo: 18 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.13, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.60, amp: 86, escala: 0.0016, semente: 103, passo: 16 },
       { f: 'troncos', rel: 0.58, passo: 340, dens: 0.6, compMin: 90, compMax: 200, semente: 107 },
       { f: 'juncos', rel: 0.60, passo: 70, dens: 0.7, compMin: 34, compMax: 90, escalaLarg: 0.6, semente: 109 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.66, amp: 74, escala: 0.0024, semente: 113, passo: 14 },
       { f: 'juncos', rel: 0.66, passo: 84, dens: 0.78, compMin: 56, compMax: 150, escalaLarg: 0.8, semente: 127 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'agua', rel: 0.70, altura: 420, semente: 131 },
       { f: 'troncos', rel: 0.70, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.82, amp: 66, escala: 0.0034, semente: 139, passo: 12 },
       { f: 'juncos', rel: 0.82, passo: 96, dens: 0.8, compMin: 90, compMax: 250, semente: 149 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 60, escala: 0.0046, semente: 151, passo: 11 },
       { f: 'troncos', rel: 0.90, passo: 520, dens: 0.5, compMin: 200, compMax: 380, semente: 157 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'juncos', rel: 1.06, passo: 140, dens: 0.6, compMin: 180, compMax: 420, escalaLarg: 1.6, semente: 163 },
     ] },
   ],
@@ -1191,14 +1191,14 @@ const CAMADAS = {
      assunto desta área — caíam todas abaixo da borda de baixo do quadro e
      nunca apareciam. O que sobrava na tela eram só os troncos finos. */
   clareira: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
       // A borda da mata no horizonte: baixa, densa, quase dissolvida na bruma.
       { f: 'troncosColossais', rel: 0.86, passo: 110, dens: 0.9,
         largMin: 4, largMax: 11, semente: 201, altura: [0.26, 0.40] },
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 70, escala: 0.0009, semente: 203,
         passo: 18, picos: 0.5 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 0.88, passo: 165, dens: 0.78,
         largMin: 7, largMax: 18, semente: 207, altura: [0.38, 0.58] },
       // As chaminés começam a aparecer ENTRE as árvores, não no lugar delas.
@@ -1206,7 +1206,7 @@ const CAMADAS = {
         escalaLarg: 0.6, torcao: 0.2, semente: 211 },
       { f: 'fumaca', rel: 0.62, passo: 300, dens: 0.4, semente: 213 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'troncosColossais', rel: 0.90, passo: 300, dens: 0.5,
         largMin: 12, largMax: 28, semente: 215, altura: [0.55, 0.8] },
       { f: 'massa', lado: 'baixo', rel: 0.88, amp: 82, escala: 0.0022, semente: 217,
@@ -1215,23 +1215,23 @@ const CAMADAS = {
       { f: 'chamines', rel: 0.84, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
         escalaLarg: 0.8, torcao: 0.22, semente: 227 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'esteiras', rel: 0.62, passo: 480, dens: 0.7, escalaLarg: 0.85, semente: 229 },
       { f: 'massa', lado: 'baixo', rel: 0.80, amp: 80, escala: 0.003, semente: 233, passo: 13, picos: 0.6 },
       { f: 'escombros', rel: 0.80, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'cabos', rel: 0.16, passo: 300, dens: 0.72, escalaLarg: 1, semente: 241 },
       { f: 'chamines', rel: 0.86, passo: 420, dens: 0.42, altMin: 260, altMax: 520,
         escalaLarg: 1.15, torcao: 0.24, semente: 251 },
       { f: 'massa', lado: 'baixo', rel: 0.88, amp: 78, escala: 0.0042, semente: 257, passo: 11, picos: 0.7 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
       { f: 'esteiras', rel: 0.82, passo: 620, dens: 0.5, escalaLarg: 1.2, semente: 263 },
       { f: 'massa', lado: 'baixo', rel: 0.98, amp: 70, escala: 0.0055, semente: 269, passo: 10, picos: 0.6 },
       { f: 'escombros', rel: 0.98, passo: 230, dens: 0.55, escalaLarg: 1.2, semente: 271 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'cabos', rel: -0.10, passo: 380, dens: 0.5, escalaLarg: 1.8, semente: 277 },
       { f: 'escombros', rel: 1.12, passo: 300, dens: 0.45, escalaLarg: 1.8, semente: 281 },
     ] },
@@ -1239,31 +1239,31 @@ const CAMADAS = {
 
   /* --- DOSSEL: a árvore-mãe, troncos colossais e folhagem ---------------- */
   dossel: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
       { f: 'troncosColossais', rel: 1.35, passo: 300, dens: 0.85, largMin: 40, largMax: 110, semente: 301 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 1.4, passo: 340, dens: 0.7, largMin: 30, largMax: 90, semente: 307 },
       { f: 'folhagem', rel: 0.22, passo: 210, dens: 0.8, rMin: 70, rMax: 180, semente: 311 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'galhos', rel: 0.20, passo: 380, dens: 0.7, escalaLarg: 0.7, semente: 313 },
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 88, escala: 0.0021, semente: 317, passo: 14 },
       { f: 'folhagem', rel: 0.30, passo: 250, dens: 0.72, rMin: 60, rMax: 150, semente: 331 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'troncosColossais', rel: 1.5, passo: 420, dens: 0.55, largMin: 46, largMax: 130, semente: 337 },
       { f: 'galhos', rel: 0.36, passo: 440, dens: 0.65, escalaLarg: 0.9, semente: 347 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.04, amp: 74, escala: 0.0034, semente: 349, passo: 12 },
       { f: 'folhagem', rel: 0.14, passo: 300, dens: 0.66, rMin: 90, rMax: 220, semente: 353 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
       { f: 'troncosColossais', rel: 1.6, passo: 560, dens: 0.4, largMin: 60, largMax: 170, semente: 359 },
       { f: 'massa', lado: 'baixo', rel: 1.14, amp: 66, escala: 0.005, semente: 367, passo: 11 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'galhos', rel: -0.12, passo: 520, dens: 0.5, escalaLarg: 1.6, semente: 373 },
       { f: 'folhagem', rel: -0.16, passo: 400, dens: 0.5, rMin: 120, rMax: 280, semente: 379 },
     ] },
@@ -1286,18 +1286,18 @@ const CAMADAS = {
      só que aqui ele é violeta e a luz vem de baixo, do próprio Coração, o que
      inverte a leitura e é o que dá o desconforto. -------------------------- */
   coracao: [
-    { p: 0.045, d: 1.00, cor: 'distante', brilho: 0.22, formas: [
+    { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
       // Linha do horizonte: árvores doentes, baixas, quase dissolvidas.
       { f: 'troncosColossais', rel: 1.04, passo: 130, dens: 0.85,
         largMin: 5, largMax: 14, semente: 401, altura: [0.24, 0.40] },
       { f: 'organico', rel: 1.12, passo: 300, dens: 0.9, rMin: 120, rMax: 300, semente: 403 },
     ] },
-    { p: 0.095, d: 0.87, cor: 'distante', brilho: 0.14, formas: [
+    { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 1.06, passo: 190, dens: 0.7,
         largMin: 8, largMax: 22, semente: 407, altura: [0.36, 0.56] },
       { f: 'organico', rel: 1.14, passo: 260, dens: 0.85, rMin: 110, rMax: 280, semente: 409 },
     ] },
-    { p: 0.17, d: 0.72, cor: 'medio', brilho: 0.04, formas: [
+    { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'troncosColossais', rel: 1.08, passo: 320, dens: 0.55,
         largMin: 14, largMax: 34, semente: 417, altura: [0.5, 0.78] },
       { f: 'organico', rel: 1.16, passo: 240, dens: 0.8, rMin: 90, rMax: 240, semente: 419 },
@@ -1305,20 +1305,20 @@ const CAMADAS = {
       { f: 'raizes', rel: -0.04, passo: 300, dens: 0.32, compMin: 120, compMax: 300,
         largMin: 10, largMax: 26, semente: 421 },
     ] },
-    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.10, formas: [
+    { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'organico', rel: 1.02, passo: 300, dens: 0.7, rMin: 100, rMax: 260, semente: 431 },
       { f: 'organico', rel: 1.2, passo: 280, dens: 0.7, rMin: 110, rMax: 270, semente: 433 },
     ] },
-    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.20, formas: [
+    { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'troncosColossais', rel: 1.14, passo: 480, dens: 0.45,
         largMin: 26, largMax: 60, semente: 437, altura: [0.9, 1.3] },
       { f: 'organico', rel: 1.1, passo: 320, dens: 0.75, rMin: 130, rMax: 300, semente: 439 },
     ] },
-    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.34, formas: [
+    { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
       { f: 'organico', rel: 1.18, passo: 340, dens: 0.6, rMin: 120, rMax: 290, semente: 443 },
       { f: 'organico', rel: 1.3, passo: 360, dens: 0.6, rMin: 140, rMax: 320, semente: 449 },
     ] },
-    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.48, veu: 0, formas: [
+    { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'organico', rel: 1.34, passo: 420, dens: 0.5, rMin: 170, rMax: 380, semente: 457 },
     ] },
   ],

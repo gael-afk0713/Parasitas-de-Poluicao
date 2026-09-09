@@ -55,6 +55,22 @@ const CHAVES_COR = [
   'terreno', 'terrenoFundo', 'borda', 'crista', 'primeiroPlano',
   'luz', 'luzAmbiente', 'particula', 'acento',
 ];
+/* REGRA DE VALOR — vale para as cinco áreas, nos dois estados.
+
+   Em ordem de luminância, do mais claro pro mais escuro:
+     ceuBase  >  bruma  >  crista  >  terreno  >  distante ...  >  borda
+
+   Os dois pontos que já foram violados uma vez e custaram caro:
+
+   1. `bruma` NUNCA acima de `ceuBase`. `corDeProfundidade` mistura tudo em
+      direção a `bruma` conforme a distância, sem teto — se a bruma é mais
+      clara que o céu, quanto mais longe mais claro, e o fundo distante fica
+      mais claro que o céu. Fundo claro com céu escuro lê como CAVERNA, por
+      mais que o vocabulário de formas seja todo de floresta.
+
+   2. `borda` é TINTA, mais escura que `terreno`. Uma massa mais escura que o
+      próprio contorno lê como buraco recortado, não como rocha.
+   -------------------------------------------------------------------- */
 const CHAVES_NUM = ['densidadeBruma', 'vinheta', 'saturacao', 'brilhoBloom'];
 
 /* =========================================================================
@@ -164,22 +180,22 @@ export const AREAS = {
          alto e amarela na linha do horizonte (ar podre visto contra a luz),
          enquanto o chão fica no oliva escuro. A distância entre esses dois
          extremos é o que faz cada silhueta ter contra o que se recortar. */
-      ceuTopo: '#101a1c', ceuBase: '#59583a',
-      bruma: '#5e6446',
+      ceuTopo: '#16242a', ceuBase: '#8d8b5e',
+      bruma: '#767252',
       distante: '#171d18', medio: '#111511', proximo: '#0a0d0a',
-      terreno: '#0d100d', terrenoFundo: '#060806',
-      borda: '#242a20', crista: '#4a5535',
+      terreno: '#1b2119', terrenoFundo: '#080b08',
+      borda: '#080a07', crista: '#5c6a41',
       primeiroPlano: '#030503',
-      luz: '#a09a4c', luzAmbiente: '#1a1f18',
-      particula: '#565c46', acento: '#6d7a30',
-      densidadeBruma: 0.56, vinheta: 0.76, saturacao: 0.42, brilhoBloom: 0.26,
+      luz: '#c9c169', luzAmbiente: '#1a1f18',
+      particula: '#6d7358', acento: '#8a9a3e',
+      densidadeBruma: 0.44, vinheta: 0.52, saturacao: 0.42, brilhoBloom: 0.30,
     },
     restaurado: {
       ceuTopo: '#07182a', ceuBase: '#17475f',
       bruma: '#2a6d80',
       distante: '#133a48', medio: '#0e2b37', proximo: '#081c26',
-      terreno: '#0a1e28', terrenoFundo: '#040f16',
-      borda: '#1e4f58', crista: '#68d4e8',
+      terreno: '#123441', terrenoFundo: '#04121a',
+      borda: '#05161d', crista: '#8ce2f2',
       primeiroPlano: '#020a10',
       luz: '#a8ecff', luzAmbiente: '#0e3543',
       particula: '#a2dced', acento: '#4fc4e0',
@@ -205,22 +221,22 @@ export const AREAS = {
          MATIZ, não só de valor, que faz a área parar de ler como um chapado
          sépia. A bruma caiu de 0.56 pra 0.47 para os planos próximos
          continuarem escuros em vez de convergirem todos pro mesmo tom. */
-      ceuTopo: '#171218', ceuBase: '#6b3a15',
-      bruma: '#6b4520',
+      ceuTopo: '#1b1620', ceuBase: '#a05a20',
+      bruma: '#875730',
       distante: '#1f1610', medio: '#180e07', proximo: '#0e0804',
-      terreno: '#120c07', terrenoFundo: '#080502',
-      borda: '#37220f', crista: '#6b3a22',
+      terreno: '#241709', terrenoFundo: '#0a0603',
+      borda: '#0a0603', crista: '#8a5030',
       primeiroPlano: '#050301',
-      luz: '#d08a30', luzAmbiente: '#2a1a0c',
-      particula: '#7a5a3a', acento: '#c2481a',
-      densidadeBruma: 0.47, vinheta: 0.80, saturacao: 0.60, brilhoBloom: 0.36,
+      luz: '#eda94a', luzAmbiente: '#2a1a0c',
+      particula: '#8f6a44', acento: '#d2521c',
+      densidadeBruma: 0.42, vinheta: 0.54, saturacao: 0.60, brilhoBloom: 0.40,
     },
     restaurado: {
       ceuTopo: '#131a10', ceuBase: '#3a4820',
       bruma: '#556a2c',
       distante: '#232c14', medio: '#1a2110', proximo: '#11160a',
-      terreno: '#121809', terrenoFundo: '#080c05',
-      borda: '#31461c', crista: '#8fbf5a',
+      terreno: '#22300f', terrenoFundo: '#080c05',
+      borda: '#080d04', crista: '#a7d472',
       primeiroPlano: '#050703',
       luz: '#d8c878', luzAmbiente: '#243015',
       particula: '#a8b878', acento: '#7ab84a',
@@ -240,22 +256,22 @@ export const AREAS = {
     nomeRestaurado: 'Dossel Aceso',
     ordem: 4,
     poluido: {
-      ceuTopo: '#1e2126', ceuBase: '#4e545c',
-      bruma: '#6a7079',
+      ceuTopo: '#232830', ceuBase: '#98a0aa',
+      bruma: '#7c838d',
       distante: '#24272b', medio: '#1a1c20', proximo: '#111316',
-      terreno: '#121417', terrenoFundo: '#08090b',
-      borda: '#2a2e33', crista: '#454a51',
+      terreno: '#242830', terrenoFundo: '#0a0b0d',
+      borda: '#080a0c', crista: '#5f666f',
       primeiroPlano: '#050607',
-      luz: '#9aa0a8', luzAmbiente: '#232629',
-      particula: '#6e737a', acento: '#5e646c',
-      densidadeBruma: 0.74, vinheta: 0.66, saturacao: 0.18, brilhoBloom: 0.30,
+      luz: '#d2d8e0', luzAmbiente: '#232629',
+      particula: '#868d96', acento: '#6e757e',
+      densidadeBruma: 0.50, vinheta: 0.50, saturacao: 0.18, brilhoBloom: 0.36,
     },
     restaurado: {
       ceuTopo: '#0e1c10', ceuBase: '#33501e',
       bruma: '#4d7030',
       distante: '#243516', medio: '#1a2810', proximo: '#111b0a',
-      terreno: '#101a09', terrenoFundo: '#070d04',
-      borda: '#2e4a18', crista: '#b8d94a',
+      terreno: '#1e3110', terrenoFundo: '#070d04',
+      borda: '#060c04', crista: '#cae65e',
       primeiroPlano: '#040802',
       luz: '#f0e08a', luzAmbiente: '#22350f',
       particula: '#d8dc90', acento: '#e0c040',
@@ -275,22 +291,22 @@ export const AREAS = {
     nomeRestaurado: 'O Coração Desperto',
     ordem: 5,
     poluido: {
-      ceuTopo: '#120a1e', ceuBase: '#331550',
-      bruma: '#46206b',
+      ceuTopo: '#17102a', ceuBase: '#6e2ea8',
+      bruma: '#5a2489',
       distante: '#1b0c29', medio: '#14081e', proximo: '#0d0514',
-      terreno: '#100718', terrenoFundo: '#07030d',
-      borda: '#2e1444', crista: '#5f2280',
+      terreno: '#1e0e2c', terrenoFundo: '#08040f',
+      borda: '#08040f', crista: '#7e3aa4',
       primeiroPlano: '#030108',
-      luz: '#a83fd0', luzAmbiente: '#1f0c30',
-      particula: '#7e46a0', acento: '#d02f96',
-      densidadeBruma: 0.54, vinheta: 0.84, saturacao: 0.85, brilhoBloom: 0.56,
+      luz: '#c65de8', luzAmbiente: '#1f0c30',
+      particula: '#9055b8', acento: '#e63fa6',
+      densidadeBruma: 0.44, vinheta: 0.58, saturacao: 0.85, brilhoBloom: 0.56,
     },
     restaurado: {
       ceuTopo: '#33223f', ceuBase: '#f0b096',
       bruma: '#f7cdb2',
       distante: '#2b4239', medio: '#1e302a', proximo: '#14211d',
-      terreno: '#141f1b', terrenoFundo: '#0a110e',
-      borda: '#33564a', crista: '#c8e8d0',
+      terreno: '#23342d', terrenoFundo: '#0a110e',
+      borda: '#0a110e', crista: '#d8f0dd',
       primeiroPlano: '#050b08',
       luz: '#e8f4e0', luzAmbiente: '#2a4238',
       particula: '#d8ecdc', acento: '#8fe0b8',
