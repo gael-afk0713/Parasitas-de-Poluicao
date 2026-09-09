@@ -422,8 +422,10 @@ export class Sombra {
       ctx.lineWidth = 4;
       traçar(false);
       ctx.stroke();
-      ctx.strokeStyle = rgba(misturarHex(tema.bruma, '#ffffff', 0.3), 0.62);
-      ctx.lineWidth = 1.5;
+      // Contra o primeiro plano quase preto o anel escuro não faz nada, e é
+      // só este que segura a leitura — a 1,5 px ele some a 1x de zoom.
+      ctx.strokeStyle = rgba(misturarHex(tema.bruma, '#ffffff', 0.3), 0.7);
+      ctx.lineWidth = 1.9;
       traçar(false);
       ctx.stroke();
     }

@@ -929,15 +929,21 @@ export class ArteJogador {
        paleta subiu de valor: com `luz` mais clara e `brilhoBloom` maior, o
        herói estourava numa bola branca e a própria silhueta dele — que é o
        que o jogador precisa ler — sumia dentro do próprio brilho. */
+    /* O halo é compensado pelo BLOOM da área. Sem isso, numa área restaurada
+       (brilhoBloom 0,72 contra 0,34 da poluída) o mesmo alfa vira o dobro de
+       luz na tela, e o herói — que já é a coisa mais clara — estoura numa
+       bola branca justamente na hora em que o jogador deveria estar vendo o
+       mundo voltar a ter cor. */
     const raioBase = lerp(120, 190, this.floracao);
+    const compensa = lerp(1, 0.58, clamp01(tema.brilhoBloom ?? 0.3));
     luzRadial(ctx, j.centroX, j.centroY - 6, raioBase, tema.luz,
-      0.24 + this.floracao * 0.2 + j.brilho * 0.25);
+      (0.24 + this.floracao * 0.2 + j.brilho * 0.25) * compensa);
 
     /* 2. Núcleo quente e pequeno: mantém o corpo nítido dentro do halo.
        Centrado em −10 com raio 26 ele cobria exatamente a faixa dos joelhos
        aos pés, e lavava de volta pra cinza médio as pernas que `_pernas`
        calcula escuras — o passe de luz desfazendo o trabalho do desenho. */
-    luzRadial(ctx, j.centroX, j.centroY - 18, 24, '#ffffff', 0.24);
+    luzRadial(ctx, j.centroX, j.centroY - 18, 24, '#ffffff', 0.24 * compensa);
 
     // 3. Marcas acesas.
     if (this.floracao > 0.05) {

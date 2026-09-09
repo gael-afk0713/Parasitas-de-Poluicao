@@ -121,6 +121,34 @@ export function direcaoLuzArea(areaId) {
 }
 
 /* =========================================================================
+   VENTO
+   -------------------------------------------------------------------------
+   Toda planta da cena já balançava — cada uma com a sua própria senóide, na
+   sua própria fase. O resultado é vinte objetos oscilando em desacordo, que é
+   exatamente a leitura de "vinte animações" em vez de "um lugar com ar".
+
+   Aqui existe UM vento, e ele:
+     · varia devagar (ruído de baixa frequência), então há calmaria e rajada;
+     · VIAJA pela cena — a rajada chega antes na esquerda e depois na direita,
+       e é esse atraso que faz o olho ler a onda atravessando a floresta;
+     · é global: o mesmo valor entra no galho, na folha, no junco e na moita
+       do primeiro plano, então tudo se dobra junto.
+
+   O que cada planta mantém de próprio é a RIGIDEZ — junco fino deita, tronco
+   grosso quase não se mexe. É a diferença de resposta ao mesmo vento que dá
+   escala às coisas.
+   ========================================================================= */
+
+/** Força do vento em `x`, de ~-1,2 a ~1,8. Determinística, sem estado. */
+export function vento(tempo, x = 0) {
+  // A rajada percorre a cena a ~600 px/s.
+  const fase = tempo - x / 600;
+  const base = ruido1(fase * 0.09, 991) * 2 - 1;
+  const rajada = Math.pow(clamp01(ruido1(fase * 0.16 + 40, 997) * 1.7 - 0.55), 2);
+  return base * 0.5 + rajada * 1.25;
+}
+
+/* =========================================================================
    3 · AMBIENTE DE DESENHO
    -------------------------------------------------------------------------
    Objeto único reaproveitado entre camadas: zero alocação por quadro.
@@ -129,10 +157,10 @@ export function direcaoLuzArea(areaId) {
 const _amb = {
   camera: null, tema: null, tempo: 0, pureza: 0, ang: 0,
   p: 1, x0: 0, x1: 0, vw: 0, vh: 0, ancora: 0,
-  cor: '#000', corBase: '#000', corTras: '#000',
+  cor: '#000', corAlto: '#000', corBase: '#000', corTras: '#000',
 };
 
-function prepararAmb(camera, sala, tema, tempo, p, c, cBase, cTras, ang) {
+function prepararAmb(camera, sala, tema, tempo, p, c, cAlto, cBase, cTras, ang) {
   const vw = camera.largura / camera.zoom;
   _amb.camera = camera; _amb.tema = tema; _amb.tempo = tempo;
   _amb.pureza = tema.pureza ?? 0; _amb.ang = ang;
@@ -145,8 +173,29 @@ function prepararAmb(camera, sala, tema, tempo, p, c, cBase, cTras, ang) {
   // recebe translate(-viewY*p), a camada se desloca a p·(altura da câmera) —
   // que é exatamente o parallax vertical que faltava.
   _amb.ancora = sala.altura * 0.5;
-  _amb.cor = c; _amb.corBase = cBase; _amb.corTras = cTras;
+  _amb.cor = c; _amb.corAlto = cAlto; _amb.corBase = cBase; _amb.corTras = cTras;
   return _amb;
+}
+
+/**
+ * Degradê vertical do plano, do ZÊNITE ao chão.
+ *
+ * `corDeProfundidade` mistura em direção à `bruma` proporcional à DISTÂNCIA e
+ * só a ela — não à altura na tela. Mas atravessar 40 px de ar olhando pra
+ * cima não é a mesma coisa que atravessar o horizonte inteiro: no alto do
+ * quadro a silhueta distante saía com o DOBRO do brilho do céu que ela cruza
+ * (medido: elementos até 68 contra céu 33), e os galhos das camadas de fundo
+ * liam como arranhões pálidos na lente.
+ *
+ * Devolve um `CanvasGradient` — só serve pra `fillStyle`/`strokeStyle`. Quem
+ * precisa de hex (ajustarBrilho, misturarHex, rgba) continua usando `a.cor`.
+ */
+function corVertical(ctx, a, yTopo, yBase) {
+  if (!(yBase > yTopo + 1)) return a.cor;
+  const g = ctx.createLinearGradient(0, yTopo, 0, yBase);
+  g.addColorStop(0, a.corAlto);
+  g.addColorStop(1, a.cor);
+  return g;
 }
 
 /** `rel` 0 = topo da viewport, 1 = base — relativo à âncora da sala. */
@@ -368,6 +417,7 @@ function juncos(ctx, a, s) {
   for (let x = x0; x <= a.x1; x += passo) {
     const h = hash2(x, s.semente, 113);
     if (h > (s.dens ?? 0.75)) continue;
+    const ventoAqui = vento(t, x);
     const cx = x + (hash2(x, s.semente + 1, 127) - 0.5) * passo * 0.8;
     const n = 2 + ((hash2(x, s.semente + 2, 131) * 4) | 0);
     for (let i = 0; i < n; i++) {
@@ -375,9 +425,14 @@ function juncos(ctx, a, s) {
       const comp = lerp(s.compMin ?? 60, s.compMax ?? 190, hi);
       const larg = lerp(2, 6, hi) * (s.escalaLarg ?? 1);
       const bx = cx + (hi - 0.5) * passo * 0.5;
-      // Vento: só a ponta se move, a base fica presa — é o que dá "planta".
-      const vento = Math.sin(t * lerp(0.5, 1.1, hi) + hi * TAU) * comp * 0.13
-        + (hi - 0.5) * comp * 0.34;
+      /* Só a ponta se move, a base fica presa — é o que dá "planta". A
+         oscilação própria continua (ela é o tremor de folha), mas quem manda
+         na amplitude é o vento global: junco fino deita bem mais que talo
+         grosso, e é essa diferença de resposta que dá escala. */
+      const rigidez = lerp(1.5, 0.55, hi);
+      const vento = Math.sin(t * lerp(0.5, 1.1, hi) + hi * TAU) * comp * 0.06
+        + ventoAqui * comp * 0.13 / rigidez
+        + (hi - 0.5) * comp * 0.2;
       ctx.beginPath();
       ctx.moveTo(bx - larg, yb);
       ctx.quadraticCurveTo(bx - larg * 0.4 + vento * 0.35, yb - comp * 0.6, bx + vento, yb - comp);
@@ -754,7 +809,7 @@ function troncosColossais(ctx, a, s) {
     const eixo = (t) => px + curva * Math.sin(t * Math.PI) + inclina * t * t;
     const xMeio = eixo(0.52);
 
-    ctx.fillStyle = a.cor;
+    ctx.fillStyle = corVertical(ctx, a, topo, yb + 80);
     ctx.beginPath();
     ctx.moveTo(px - rBase * 1.9, yb + 80);
     // contraforte esquerdo → meio desviado → topo
@@ -821,12 +876,15 @@ function troncosColossais(ctx, a, s) {
       const nGalhos = 4 + Math.floor(hash2(x, s.semente + 7, 283) * 4);
       // Viés lateral por árvore: algumas cresceram tortas pro mesmo lado.
       const vies = (hash2(x, s.semente + 37, 347) - 0.5) * 1.1;
-      ctx.fillStyle = a.cor;
+      // Galho lá no alto é onde o problema mais aparecia: eles cruzam o céu.
+      ctx.fillStyle = corVertical(ctx, a, topo - a.vh * 0.25, topo + rBase * 3);
 
+      const ventoTopo = vento(a.tempo, px) * lerp(0.11, 0.03, clamp01(rBase / 60));
       const fitaGalho = (bx, by, ang, comp, larg, nivel) => {
         const N = 6;
-        // Galho seco cai com o próprio peso: curva pra baixo na ponta.
-        const arco = 0.5 + nivel * 0.35;
+        // Galho seco cai com o próprio peso: curva pra baixo na ponta. E a
+        // ponta dobra com o vento — a base, presa ao tronco, quase não.
+        const arco = 0.5 + nivel * 0.35 + ventoTopo * (1 + nivel);
         const ponto = (t) => {
           const aa = ang + arco * t * t * 0.55;
           return [bx + Math.cos(aa) * comp * t, by + Math.sin(aa) * comp * t];
@@ -882,6 +940,7 @@ function troncosColossais(ctx, a, s) {
          só e o contorno da massa fica irregular. */
       if (vivo > 0.45) {
         ctx.globalAlpha = (vivo - 0.45) * 1.2;
+        ctx.fillStyle = corVertical(ctx, a, topo - rBase * 3, topo + rBase * 2);
         const rc = rBase * lerp(1.5, 3.0, vivo);
         ctx.save();
         // Achatamento POR ÁRVORE: com 0.7 fixo e 5-7 lobos, seis copas na
@@ -928,7 +987,9 @@ function galhos(ctx, a, s) {
   const yb = yDe(a, s.rel);
   const t = a.tempo;
 
-  ctx.strokeStyle = a.cor;
+  // Estes atravessam o céu: são o caso mais visível da silhueta distante
+  // ficando mais clara que o ar que ela cruza.
+  ctx.strokeStyle = corVertical(ctx, a, yb - a.vh * 0.34, yb + a.vh * 0.3);
   ctx.lineCap = 'round';
   for (let x = x0; x <= a.x1; x += passo) {
     const h = hash2(x, s.semente, 277);
@@ -938,7 +999,9 @@ function galhos(ctx, a, s) {
     const bx = x + passo * lerp(0.5, 1.1, h2);
     const ay = yb + (h - 0.5) * a.vh * 0.28;
     const arco = lerp(40, 150, h2) * (h > 0.5 ? 1 : -1);
-    const balanco = Math.sin(t * 0.35 + h * TAU) * 4;
+    // Galho grosso é rígido: responde pouco, mas responde ao MESMO vento.
+    const balanco = Math.sin(t * 0.35 + h * TAU) * 2
+      + vento(t, x) * lerp(9, 3, h) * (s.escalaLarg ?? 1 > 1 ? 0.4 : 1);
 
     ctx.lineWidth = lerp(4, 16, h) * (s.escalaLarg ?? 1);
     ctx.beginPath();
@@ -979,9 +1042,11 @@ function folhagem(ctx, a, s) {
     const px = x + (h2 - 0.5) * passo * 0.8;
     const py = yb + (h - 0.5) * a.vh * 0.3;
     const r = lerp(s.rMin ?? 60, s.rMax ?? 170, h2);
-    const balanco = Math.sin(t * lerp(0.22, 0.45, h) + h * TAU) * r * 0.03;
+    // Massa de folha é o que mais responde: leve e com muita área.
+    const balanco = Math.sin(t * lerp(0.22, 0.45, h) + h * TAU) * r * 0.015
+      + vento(t, px) * r * 0.07;
 
-    ctx.fillStyle = a.cor;
+    ctx.fillStyle = corVertical(ctx, a, py - r, py + r);
     ctx.beginPath();
     const n = 18;
     for (let i = 0; i <= n; i++) {
@@ -1539,13 +1604,16 @@ export function desenharParallax(render, sala, mundo) {
   for (let i = 0; i < camadas.length; i++) {
     const s = camadas[i];
     const c = cor(tema, s.cor, s.d, s.brilho);
+    // No zênite se atravessa pouca atmosfera: a mesma camada precisa ficar
+    // MAIS ESCURA lá em cima, senão a silhueta fica mais clara que o céu.
+    const cAlto = cor(tema, s.cor, s.d * 0.22, s.brilho - 0.22);
     // A base da camada é mais lavada que o topo: a bruma se acumula embaixo e
     // é isso que derrete um plano no seguinte em vez de deixar borda de adesivo.
     const cBase = cor(tema, s.cor, Math.min(1, s.d * 1.34 + 0.04), s.brilho + 0.06);
     const cTras = corTras;
 
     render.camada(s.p, (ctx, t, camera) => {
-      const a = prepararAmb(camera, sala, t, tempo, s.p, c, cBase, cTras, ang);
+      const a = prepararAmb(camera, sala, t, tempo, s.p, c, cAlto, cBase, cTras, ang);
       for (let k = 0; k < s.formas.length; k++) {
         const f = s.formas[k];
         const fn = FORMAS[f.f];
@@ -1804,7 +1872,11 @@ function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, refX, tempo, tema) {
         const alt = vh * lerp(0.16, 0.34, h3);
         for (let i = 0; i < 3; i++) {
           const hi = hash2(x + i * 11, 829, 5);
-          const incl = (hi - 0.5) * 1.5 + Math.sin(tempo * 0.4 + hi * TAU) * 0.05;
+          /* A moita do primeiro plano é a coisa mais próxima da câmera: é
+             nela que a rajada tem que ser mais visível, senão o vento fica
+             sendo uma coisa que só acontece no fundo. */
+          const incl = (hi - 0.5) * 1.5 + Math.sin(tempo * 0.4 + hi * TAU) * 0.03
+            + vento(tempo, px) * lerp(0.26, 0.1, hi);
           const c = alt * lerp(0.6, 1.15, hi);
           const w = c * 0.26;
           ctx.beginPath();
