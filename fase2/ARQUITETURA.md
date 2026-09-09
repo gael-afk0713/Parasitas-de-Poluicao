@@ -224,3 +224,61 @@ Em ordem de impacto:
    mas com períodos DIFERENTES, senão a cena pulsa junto e parece mecânica.
 6. **Movimento vende peso.** Squash/stretch proporcional ao impacto, hitstop
    no acerto, recuo da câmera. Sem isso o controle parece "de papel".
+
+### Erros que já custaram caro (não repetir)
+
+Cada um destes chegou a ficar semanas na tela. Todos são de CALIBRAGEM, não
+de arquitetura — o sistema estava certo e os números estavam errados. Se algo
+"parece feio" e você não sabe por quê, comece medindo luminância.
+
+1. **A escada de valor invertida.** O plano distante saía em luminância 108
+   contra um céu de 25–69, e `bruma` era mais clara que `ceuBase`. Como
+   `corDeProfundidade` mistura tudo em direção à `bruma` sem teto, quanto mais
+   longe mais claro. Fundo claro com céu escuro **lê como caverna**, por mais
+   que o vocabulário de formas seja todo de floresta — foi por isso que a
+   correção de "não é subterrâneo" regrediu três vezes. A ordem obrigatória
+   está escrita no topo de `paleta.js`:
+   `ceuBase > bruma > crista > terreno > distante … > borda`.
+
+2. **Contorno mais claro que o preenchimento.** No terreno, `borda` era duas
+   vezes e meia mais clara que `terreno`. Massa mais escura que o próprio
+   contorno lê como buraco recortado, não como rocha. `borda` é TINTA.
+
+3. **Paradas de gradiente fixas com âncora variável.** As paradas do céu eram
+   0.38 / 0.78 / 1 enquanto a linha do horizonte varia de 0.30·h a 0.62·h:
+   `ceuBase`, a cor mais clara do arquivo, só era pintada em `y = h` — sempre
+   coberto pelo terreno. Nunca apareceu na tela.
+
+4. **Uma silhueta = UM contorno.** Nos parasitas, corpo e cada tentáculo eram
+   traçados e contornados separadamente, mais um "fio de luz" por tentáculo:
+   dezesseis linhas claras internas num bicho de 26 px. A criatura lia como um
+   diagrama de si mesma. Junte tudo num `Path2D` e contorne uma vez só.
+
+5. **Contorno claro resolve METADE do problema.** Ele separa a criatura do
+   fundo escuro e a apaga contra o céu. Contorno claro **por dentro** + anel
+   escuro **por fora** (ou uma auréola escura) cobre os dois casos.
+
+6. **O HUD não pode tirar a estrutura do tema.** As cores do tema foram
+   desenhadas pro mundo, onde tudo é escuro de propósito: com elas o contraste
+   do HUD variava de 1,17:1 a 10,4:1 dependendo da sala. Contraste é função de
+   um PAR FIXO (`--paper`/`--soot`); o tema entra só como matiz e acento.
+
+7. **Espessura constante lê como antena.** Vale pra galho, tentáculo, cauda,
+   perna e golpe: se não afina, não é orgânico. E `lineCap:'round'` em
+   segmentos encadeados deixa uma bolota em cada junção, que vira "junta".
+
+8. **Espaçamento regular denuncia mais rápido que qualquer outra coisa.**
+   Árvore, tufo de musgo, dente de manto, vulto de horizonte: se nascem numa
+   grade, o olho acha o ritmo em meio segundo por mais que a forma varie. A
+   correção é sempre a mesma — um ruído de baixa frequência que abre
+   clareiras, mais jitter maior que a metade do passo.
+
+9. **Um efeito só no passe emissivo pode não existir.** O emissivo é
+   multiplicado por `brilhoBloom`, que numa área poluída vale 0.22: o Canto —
+   a habilidade central do jogo — saía com ~9% de alfa espalhados num borrão.
+   Se o efeito precisa ser VISTO, desenhe na cena; o emissivo é só o glow.
+
+10. **Guarda em quem dispara transição.** `Transicao.cortar` zera o próprio
+    relógio a cada chamada. Qualquer coisa chamada por PASSO (e não por
+    evento) que dispare uma transição trava o jogo: o fade nunca termina.
+    Foi o que acontecia ao morrer.
