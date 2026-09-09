@@ -96,8 +96,13 @@ export class Sombra {
       const f = nTent === 1 ? 0.5 : i / (nTent - 1);
       const h = hash2(obj.cx + i, obj.cy, 23);
       return {
-        ang: lerp(-Math.PI * 0.88, -Math.PI * 0.34, f) * espalha
-             - (1 - espalha) * Math.PI / 2 + (h - 0.5) * 0.16,
+        /* Faixa escolhida pra `cos(ang)` ficar SEMPRE positivo (0,15 a 0,81):
+           o desenho insere os chifres no lado direito do capuz, e um chifre
+           com cosseno negativo desenhava um esporão atravessando o corpo. A
+           varredura pra trás (que é quem dá a direção) entra depois, no
+           desenho, e aí sim pode cruzar pro outro lado. */
+        ang: lerp(-1.42, -0.62, f) * espalha - (1 - espalha) * 1.02
+             + (h - 0.5) * 0.16,
         comp: Math.min(this.raio * 0.9, (forma.compTentaculo ?? 11)
           * lerp(1.15, 0.55, Math.sin(f * Math.PI)) * (0.85 + h * 0.3)),
         fase: h * TAU,
@@ -119,10 +124,18 @@ export class Sombra {
       const f = nOlhos === 1 ? 0.5 : i / (nOlhos - 1);
       const lado = f < 0.5 ? -1 : 1;
       return {
+        /* `alt` era 0,52·raio: 13,5 px num corpo de 29 de altura, ou seja 47%
+           da criatura em branco puro — na Sombra do Hollow Knight é menos de
+           3%. E o topo da fenda caía a 0,15 px da borda do capuz, então o
+           contorno APARAVA os olhos e eles liam como furo.
+
+           O giro também estava invertido: com os topos convergindo pro centro
+           o resultado é olho triste, não carranca. Carranca é o oposto — os
+           topos abrem e as pontas internas descem. */
         dx: nOlhos === 1 ? 0 : lado * this.raio * 0.36,
-        dy: -this.raio * 0.62,
-        alt: this.raio * 0.52,
-        giro: -lado * 0.28,
+        dy: -this.raio * 0.5,
+        alt: this.raio * 0.34,
+        giro: lado * 0.3,
         fase: hash2(obj.cx, obj.cy + i, 29) * TAU,
       };
     });
@@ -132,22 +145,41 @@ export class Sombra {
        piso. Este deslocamento apoia a ponta da barra exatamente nos pés.
        Quem flutua não precisa (e não deve) ser apoiado. */
     this.deslocDesenhoY = (this.temManto && this.gravidade)
-      ? this.altura / 2 - this.raio * 2.4 : 0;
+      ? this.altura / 2 - this.raio * 1.7 : 0;
 
     // Piscada: um piscar vale mais que qualquer tremeluzir. Dessincronizado
     // por criatura, senão a sala inteira pisca junto.
     this._proxPiscada = 1 + hash2(obj.cx, obj.cy, 43) * 5;
     this._piscando = 0;
+
+    /* `dir` troca de sinal num quadro só, e com ele a inclinação do corpo
+       (0,24 rad) e o arrasto da barra (5,7 px) davam um POP sem antecipação
+       — na única ação legível que o Errante tem. `dirSuave` faz a virada
+       durar uns 0,25 s de manto arrastando, que é a antecipação que o jogador
+       precisa pra reagir. */
+    this.dirSuave = this.dir;
   }
 
   get centroX() { return this.x + this.largura / 2; }
   get centroY() { return this.y + this.altura / 2; }
 
+  /**
+   * Caixa de DANO — segue o capuz, não a caixa de colisão.
+   *
+   * Com `deslocDesenhoY` apoiando a barra do manto no chão, o capuz sobe: no
+   * Errante o rosto inteiro ficava ACIMA da caixa antiga, e o golpe só
+   * contava quando cruzava o manto. Num bicho em que o rosto é a âncora de
+   * leitura e o alvo natural do olho, isso é mira mentindo. A área continua
+   * praticamente a mesma; o que muda é ficar em cima do que se está mirando.
+   */
   caixa() {
-    // Um pouco menor que o desenho: a hitbox generosa a favor do jogador é a
-    // diferença entre "encostei de raspão" e "foi injusto".
-    const m = 5;
-    return { x: this.x + m, y: this.y + m, largura: this.largura - m * 2, altura: this.altura - m * 2 };
+    const cy = this.centroY + this.deslocDesenhoY;
+    return {
+      x: this.centroX - this.raio * 0.82 * this.escalaX,
+      y: cy - this.raio * 1.0 * this.escalaY,
+      largura: this.raio * 1.64 * this.escalaX,
+      altura: this.raio * 2.0 * this.escalaY,
+    };
   }
 
   /* -------------------------------------------------------------- passo -- */
@@ -155,6 +187,7 @@ export class Sombra {
   atualizar(dt, mundo) {
     this.t += dt;
     this.piscarDano = Math.max(0, this.piscarDano - dt);
+    this.dirSuave = damp(this.dirSuave, this.dir, 0.09, dt);
 
     // Piscar > tremeluzir: o alfa dos olhos era uma senoide permanente, que
     // lê como vaga-lume. Uma piscada curta e rara lê como encarada.
@@ -300,7 +333,7 @@ export class Sombra {
   _massa(ctx, tema, cx, cy, ferida) {
     const r = this.raio * (1 + this.telegrafo * 0.18);
     const cor = ferida ? '#ffffff' : misturarHex(tema.primeiroPlano, tema.ceuTopo, 0.4);
-    const inclina = this.dir * 0.12 + Math.sin(this.t * 0.8) * 0.05;
+    const inclina = this.dirSuave * 0.2 + Math.sin(this.t * 0.8) * 0.05;
 
     ctx.save();
     ctx.translate(cx, cy);
@@ -311,48 +344,71 @@ export class Sombra {
 
     /** Cunha preenchida no lugar do traço de 4 segmentos: ponta de verdade,
      *  sem as bolotas de `lineCap` que viravam juntas de dedo. */
+    /* Cada chifre é um SUBCAMINHO próprio, não um desvio inserido no contorno
+       do capuz. Inserido, um chifre varrido pra trás fazia o traçado cruzar o
+       corpo inteiro; e o remendo que existia — desenhar só os de cosseno
+       positivo — apagava o chifre de QUATRO das seis espécies, incluindo o
+       grosso e assimétrico do Cuspidor, que é o telégrafo dele.
+
+       Como o contorno é traçado ANTES do preenchimento, a parte do chifre que
+       cai dentro do corpo é coberta pelo fill e só o que sobra pra fora
+       aparece — que é exatamente o desejado. */
     const chifre = (t) => {
       const a = t.ang + Math.sin(this.t * t.vel + t.fase) * 0.42
-        - this.dir * 0.30;                       // varrido pra trás = direção
+        - this.dirSuave * 0.55;                  // varrido pra trás = direção
       const comp = t.comp * (1 + this.telegrafo * 0.35);
       const bx = Math.cos(a) * r * 0.72, by = Math.sin(a) * r * 0.72;
       const px = bx + Math.cos(a) * comp, py = by + Math.sin(a) * comp * 0.9;
       const nx = -Math.sin(a) * r * 0.26, ny = Math.cos(a) * r * 0.26;
       const mx = bx + Math.cos(a + t.curva * 0.35) * comp * 0.55;
       const my = by + Math.sin(a + t.curva * 0.35) * comp * 0.5;
-      ctx.lineTo(bx - nx, by - ny);
+      ctx.moveTo(bx - nx, by - ny);
       ctx.quadraticCurveTo(mx - nx * 0.4, my - ny * 0.4, px, py);
       ctx.quadraticCurveTo(mx + nx * 0.4, my + ny * 0.4, bx + nx, by + ny);
+      ctx.closePath();
     };
 
-    const traçar = () => {
+    /**
+     * @param {boolean} comBarra  inclui os dentes do manto.
+     *
+     * O CONTORNO usa `false` e o PREENCHIMENTO usa `true`. Contornar os
+     * dentes fazia o terço de baixo da criatura virar um zigue-zague branco:
+     * o vão entre dentes é 5,5 px e o contorno de dois tons come 2,75 de cada
+     * lado, então não sobrava preto nenhum dentro do dente. Era o mesmo
+     * defeito das "dezesseis linhas claras", só que mudou de endereço.
+     */
+    const traçar = (comBarra) => {
       ctx.beginPath();
       ctx.moveTo(0, -r * 1.15);                                  // topo do capuz
-      // lado direito do capuz, com os chifres saindo dele
-      for (const t of this.tentaculos) if (Math.cos(t.ang) > 0) chifre(t);
       ctx.bezierCurveTo(r * 0.46 + onda(1, 0), -r * 1.05, r * 0.92 + onda(2, 1), -r * 0.7, r, -0.08 * r);
-      if (this.temManto) {
+      if (this.temManto && comBarra) {
         ctx.bezierCurveTo(r * 1.04, r * 0.54, r * 0.9, r * 0.9, r * 0.84, r * 1.1);
-        /* BARRA DO MANTO. Eram sete dentes iguais de ~5 px num vão de ±0,6 r
-           — mais estreito que o corpo — pendurados sob uma tigela: lia como
-           vaso de grama. Quatro dentes DESIGUAIS, num vão de ±0,84 r e três
-           vezes mais longos, leem como pano rasgado; e o arrasto pro lado
-           oposto ao movimento codifica a direção de graça. */
+        /* BARRA DO MANTO. Eram sete dentes iguais de ~5 px num vão mais
+           estreito que o corpo, pendurados sob uma tigela: lia como vaso de
+           grama. Cinco dentes DESIGUAIS num vão maior leem como pano rasgado,
+           e o arrasto pro lado oposto ao movimento codifica a direção de
+           graça. O comprimento caiu (chegavam a 35 px num corpo de raio 13,
+           atravessando a linha do chão). */
         for (let i = 2; i >= -2; i--) {
           const hd = hash2(this.cxInicial + i, this.cyInicial, 41);
-          const x = i * r * 0.42;
-          const L = 1.55 + hd * 0.85;
-          ctx.lineTo(x - this.dir * r * 0.22,
-            r * L + Math.sin(i * 2.1 + this.t * 2.2) * r * 0.30);
+          const x = i * r * 0.52;
+          const L = 0.95 + hd * 0.55;
+          ctx.lineTo(x - this.dirSuave * r * 0.22,
+            r * L + Math.sin(i * 2.1 + this.t * 2.2) * r * 0.18);
           ctx.lineTo(x - r * 0.16, r * 1.02 + Math.sin(i * 1.7 + this.t) * r * 0.10);
         }
+        ctx.bezierCurveTo(-r * 0.9, r * 0.9, -r * 1.04, r * 0.54, -r, -0.08 * r);
+      } else if (this.temManto) {
+        ctx.bezierCurveTo(r * 1.04, r * 0.54, r * 0.9, r * 0.9, r * 0.84, r * 1.05);
+        ctx.lineTo(-r * 0.84, r * 1.05);
         ctx.bezierCurveTo(-r * 0.9, r * 0.9, -r * 1.04, r * 0.54, -r, -0.08 * r);
       } else {
         ctx.bezierCurveTo(r * 1.02, r * 0.6, r * 0.6, r * 1.05, 0, r * 1.05);
         ctx.bezierCurveTo(-r * 0.6, r * 1.05, -r * 1.02, r * 0.6, -r, -0.08 * r);
       }
-      ctx.bezierCurveTo(-r * 0.92 + onda(2, 3), -r * 0.7, -r * 0.46 + onda(1, 4), -r * 1.05, 0, -r * 1.15);
+      ctx.bezierCurveTo(-r * 0.92 + onda(2, 3), -r * 0.7, -r * 0.46 + onda(1, 4), -r * 1.15, 0, -r * 1.15);
       ctx.closePath();
+      for (const t of this.tentaculos) chifre(t);
     };
 
     /* CONTORNO DE DOIS TONS. O halo antigo era `bruma+acento` a 0,30 de alfa:
@@ -364,15 +420,15 @@ export class Sombra {
       ctx.lineJoin = 'round';
       ctx.strokeStyle = rgba(tema.primeiroPlano, 0.85);
       ctx.lineWidth = 4;
-      traçar();
+      traçar(false);
       ctx.stroke();
       ctx.strokeStyle = rgba(misturarHex(tema.bruma, '#ffffff', 0.3), 0.62);
       ctx.lineWidth = 1.5;
-      traçar();
+      traçar(false);
       ctx.stroke();
     }
     ctx.fillStyle = cor;
-    traçar();
+    traçar(true);
     ctx.fill();
     ctx.restore();
   }
@@ -383,7 +439,7 @@ export class Sombra {
    */
   _olhos(ctx, tema, cx, cy, ferida) {
     const r = this.raio;
-    const inclina = this.dir * 0.12 + Math.sin(this.t * 0.8) * 0.05;
+    const inclina = this.dirSuave * 0.2 + Math.sin(this.t * 0.8) * 0.05;
     const piscada = this._piscando > 0 ? clamp01(this._piscando / 0.06) : 0;
 
     ctx.save();
@@ -395,7 +451,10 @@ export class Sombra {
     ctx.globalAlpha = ferida ? 0.9 : 0.92;
     for (const o of this.olhos) {
       ctx.save();
-      ctx.translate(o.dx * this.dir, o.dy);
+      // O par inteiro anda pra FRENTE do capuz. Fendas simétricas e centradas
+      // dizem "olhando pra você" e apagam a direção; num inimigo que patrulha
+      // e vira na beirada, saber pra que lado ele anda é informação de jogo.
+      ctx.translate(o.dx * this.dir + this.dirSuave * r * 0.22, o.dy);
       ctx.rotate(o.giro * this.dir);
       ctx.beginPath();
       ctx.ellipse(0, 0, r * 0.18,
@@ -432,7 +491,11 @@ export class Sombra {
     ctx.save();
     ctx.translate(this.centroX, cy);
     ctx.fillStyle = '#ffffff';
-    ctx.globalAlpha = (0.55 + this.telegrafo * 0.45) * (1 - piscada);
+    /* A regra "luz = perigo" tinha sido aplicada à auréola de acento mas não
+       às FENDAS, que continuavam a 0,55 fixo — o parasita virava o segundo
+       emissor mais forte da cena e invertia a hierarquia de luz do jogo
+       inteiro. Sai de 0,18 e só sobe com o telégrafo. */
+    ctx.globalAlpha = (0.18 + this.telegrafo * 0.62) * (1 - piscada);
     for (const o of this.olhos) {
       ctx.beginPath();
       ctx.ellipse(o.dx * this.dir, o.dy, this.raio * 0.2, o.alt * 1.2, 0, 0, TAU);
@@ -729,9 +792,13 @@ const PAVIO = 0.85;
 export class Estopim extends Sombra {
   constructor(obj) {
     super(obj, {
-      // CÍRCULO perfeito e SEM chifre nenhum: a coisa que só incha e estoura.
+      /* Errante e Estopim eram a MESMA criatura: 1 px de raio de diferença e
+         um chifre. E o Estopim faz o dobro de dano e explode. Agora é uma
+         esfera inchada e LISA — sem manto, sem chifre — que é a leitura
+         "isto vai estourar". */
       vida: 1, raio: 12, largura: 28, altura: 28,
       tentaculos: 0, olhos: 2, dano: 2,
+      escalaX: 1.18, escalaY: 1.18, temManto: false,
     });
     this.vel = 88;
     this.raioPercepcao = 210;

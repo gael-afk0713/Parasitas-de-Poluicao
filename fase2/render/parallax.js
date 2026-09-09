@@ -150,7 +150,17 @@ function prepararAmb(camera, sala, tema, tempo, p, c, cBase, cTras, ang) {
 }
 
 /** `rel` 0 = topo da viewport, 1 = base — relativo à âncora da sala. */
-function yDe(a, rel) { return a.ancora + (rel - 0.5) * a.vh; }
+function yDe(a, rel) {
+  const y = a.ancora + (rel - 0.5) * a.vh;
+  /* GUARDA. A âncora é o meio da SALA, então numa sala alta a linha de chão
+     de um plano vai parar bem abaixo da borda de baixo da tela — e a camada
+     inteira some. Era o caso das Raízes: as cinco `massa` nunca eram
+     desenhadas, e os contrafortes dos troncos (onde está todo o trabalho de
+     forma) ficavam de 150 a 240 px fora do quadro, o que fazia toda árvore
+     ler como poste cortado. Nenhuma linha de chão passa de 5% abaixo da
+     borda. */
+  return Math.min(y, a.camera.viewY * a.p + a.vh * 1.05);
+}
 
 /* =========================================================================
    4 · FORMAS
@@ -297,20 +307,25 @@ function arcos(ctx, a, s) {
  * stroke de largura fixa não afina, e raiz que não afina é cano.
  */
 function fitaRaiz(ctx, px, yTopo, comp, larg, curva, passos) {
+  /* Duas senóides incomensuráveis e um expoente de afilamento sorteado: com
+     uma senóide só, mesma fase e mesmo expoente, toda raiz da tela era a
+     MESMA lente afilada — quinze delas lado a lado leem como marca de garra,
+     não como raiz. */
+  const fase = curva * 3;
+  const exp = 0.45 + Math.abs(curva) * 0.9;
+  const eixo = (t) => px + Math.sin(t * 2.3 + fase) * curva * 46
+    + Math.sin(t * 5.7 + fase * 2.4) * curva * 14 + t * curva * 26;
   ctx.beginPath();
   for (let i = 0; i <= passos; i++) {
     const t = i / passos;
-    const x = px + Math.sin(t * 2.3 + curva * 3) * curva * 46 + t * curva * 26;
-    const y = yTopo + comp * t;
-    const w = larg * Math.pow(1 - t, 0.62);
+    const w = larg * Math.pow(1 - t, exp);
+    const x = eixo(t), y = yTopo + comp * t;
     if (i === 0) ctx.moveTo(x - w, y); else ctx.lineTo(x - w, y);
   }
   for (let i = passos; i >= 0; i--) {
     const t = i / passos;
-    const x = px + Math.sin(t * 2.3 + curva * 3) * curva * 46 + t * curva * 26;
-    const y = yTopo + comp * t;
-    const w = larg * Math.pow(1 - t, 0.62);
-    ctx.lineTo(x + w, y);
+    const w = larg * Math.pow(1 - t, exp);
+    ctx.lineTo(eixo(t) + w, yTopo + comp * t);
   }
   ctx.closePath();
   ctx.fill();
@@ -869,16 +884,19 @@ function troncosColossais(ctx, a, s) {
         ctx.globalAlpha = (vivo - 0.45) * 1.2;
         const rc = rBase * lerp(1.5, 3.0, vivo);
         ctx.save();
+        // Achatamento POR ÁRVORE: com 0.7 fixo e 5-7 lobos, seis copas na
+        // mesma tela viravam seis couve-flores idênticas em fileira.
+        const hAch = hash2(x, s.semente + 47, 353);
         ctx.translate(px + inclina, topo - rBase * 0.4);
-        ctx.scale(1, 0.7);
+        ctx.scale(1, lerp(0.5, 0.95, hAch));
         ctx.beginPath();
-        const nLobos = 5 + Math.floor(hash2(x, s.semente + 11, 307) * 3);
+        const nLobos = 4 + Math.floor(hash2(x, s.semente + 11, 307) * 7);
         for (let i = 0; i < nLobos; i++) {
           const hl = hash2(x + i * 29, s.semente + 13, 311);
           const hl2 = hash2(x - i * 7, s.semente + 17, 313);
           const ang = (i / nLobos) * TAU + hl * 0.8;
-          const dist = rc * lerp(0.22, 0.78, hl2);
-          const rr = rc * lerp(0.40, 0.76, hl);
+          const dist = rc * lerp(0.18, 1.1, hl2);
+          const rr = rc * lerp(0.32, 0.8, hl);
           const lx = Math.cos(ang) * dist, ly = Math.sin(ang) * dist - rc * 0.15;
           ctx.moveTo(lx + rr, ly);
           ctx.arc(lx, ly, rr, 0, TAU);
@@ -1102,26 +1120,37 @@ const CAMADAS = {
      25-69 — o fundo mais claro que o céu, que é a assinatura visual de
      caverna. A escada agora é decrescente do céu pro primeiro plano, que é
      como perspectiva atmosférica funciona ao ar livre. */
+  /* Os `rel` daqui foram corrigidos DEPOIS da Várzea e da Clareira, e por
+     isso ficaram errados por mais tempo: com a âncora no meio da sala e as 12
+     fileiras que o `abrirCeu` acrescenta, tudo que tinha `rel` acima de 1.0
+     caía de 150 a 240 px ABAIXO da borda de baixo da tela.
+
+     Consequência medida: as cinco `massa` desta área NUNCA eram desenhadas, e
+     os contrafortes dos troncos — onde está todo o trabalho de forma — também
+     não. Sobrava o meio reto do tronco, e é por isso que a floresta lia como
+     um monte de postes flutuando sobre uma faixa de cor chapada.
+
+     Estas são as três primeiras salas do jogo. */
   raizes: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
-      { f: 'massa', lado: 'baixo', rel: 1.16, amp: 44, escala: 0.0011, semente: 19, passo: 18 },
-      { f: 'troncosColossais', rel: 1.02, passo: 120, dens: 0.92,
+      { f: 'massa', lado: 'baixo', rel: 0.66, amp: 44, escala: 0.0011, semente: 19, passo: 18 },
+      { f: 'troncosColossais', rel: 0.62, passo: 120, dens: 0.92,
         largMin: 5, largMax: 13, semente: 11, altura: [0.30, 0.46] },
     ] },
     { p: 0.095, d: 0.88, cor: 'distante', brilho: -0.12, formas: [
-      { f: 'troncosColossais', rel: 1.04, passo: 170, dens: 0.82,
+      { f: 'troncosColossais', rel: 0.66, passo: 170, dens: 0.82,
         largMin: 8, largMax: 20, semente: 23, altura: [0.42, 0.62] },
       { f: 'galhos', rel: 0.20, passo: 260, dens: 0.55, escalaLarg: 0.45, semente: 29 },
-      { f: 'massa', lado: 'baixo', rel: 1.18, amp: 56, escala: 0.0017, semente: 31, passo: 15 },
+      { f: 'massa', lado: 'baixo', rel: 0.70, amp: 56, escala: 0.0017, semente: 31, passo: 15 },
     ] },
     { p: 0.17, d: 0.73, cor: 'medio', brilho: -0.2, formas: [
-      { f: 'troncosColossais', rel: 1.06, passo: 250, dens: 0.7,
+      { f: 'troncosColossais', rel: 0.70, passo: 250, dens: 0.7,
         largMin: 13, largMax: 32, semente: 37, altura: [0.58, 0.85] },
       { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
     ] },
     { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.28, formas: [
-      { f: 'troncosColossais', rel: 1.08, passo: 340, dens: 0.62,
+      { f: 'troncosColossais', rel: 0.74, passo: 340, dens: 0.62,
         largMin: 18, largMax: 44, semente: 43, altura: [0.8, 1.15] },
       // Raízes aéreas descendo do alto: a assinatura do sub-bosque, e o que
       // impede a faixa vertical de virar só "cerca de postes".
@@ -1130,15 +1159,15 @@ const CAMADAS = {
       { f: 'galhos', rel: 0.06, passo: 380, dens: 0.5, escalaLarg: 0.9, semente: 49 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
-      { f: 'troncosColossais', rel: 1.12, passo: 460, dens: 0.55,
+      { f: 'troncosColossais', rel: 0.80, passo: 460, dens: 0.55,
         largMin: 26, largMax: 62, semente: 59, altura: [1.1, 1.5] },
-      { f: 'massa', lado: 'baixo', rel: 1.10, amp: 70, escala: 0.0036, semente: 61,
+      { f: 'massa', lado: 'baixo', rel: 0.80, amp: 70, escala: 0.0036, semente: 61,
         passo: 11, picos: 0.35 },
     ] },
     { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
       { f: 'raizes', rel: -0.08, passo: 280, dens: 0.45, compMin: 240, compMax: 620,
         largMin: 12, largMax: 34, semente: 67 },
-      { f: 'massa', lado: 'baixo', rel: 1.18, amp: 74, escala: 0.0048, semente: 71,
+      { f: 'massa', lado: 'baixo', rel: 0.86, amp: 74, escala: 0.0048, semente: 71,
         passo: 10, picos: 0.45 },
     ] },
     /* MEIO-CAMPO. Não havia NADA com paralaxe entre 0,28 e 1,0 atravessando o
@@ -1152,12 +1181,12 @@ const CAMADAS = {
     { p: 0.72, d: 0.16, cor: 'proximo', brilho: -0.50, veu: 0, formas: [
       { f: 'raizes', rel: -0.15, passo: 190, dens: 0.62, compMin: 380, compMax: 900,
         largMin: 9, largMax: 22, semente: 83 },
-      { f: 'galhos', rel: 0.52, passo: 900, dens: 0.35, escalaLarg: 3.2, semente: 89 },
+      { f: 'galhos', rel: 0.52, passo: 820, dens: 0.5, escalaLarg: 3.2, semente: 89 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
-      { f: 'troncosColossais', rel: 1.30, passo: 620, dens: 0.42,
+      { f: 'troncosColossais', rel: 0.90, passo: 620, dens: 0.42,
         largMin: 40, largMax: 96, semente: 73, altura: [1.6, 2.1] },
-      { f: 'massa', lado: 'baixo', rel: 1.28, amp: 62, escala: 0.0062, semente: 79,
+      { f: 'massa', lado: 'baixo', rel: 0.90, amp: 62, escala: 0.0062, semente: 79,
         passo: 10, picos: 0.35 },
     ] },
   ],
@@ -1612,8 +1641,15 @@ export function desenharPrimeiroPlano(render, mundo) {
     // primeiro plano ficava opaco e o cobria.
     const j = mundo.jogador;
     const refX = (j ? j.centroX : camera.viewX + vw * 0.5) * P;
-    const yBase = sala.altura * 0.5 + vh * 0.5;
-    const yTopo = sala.altura * 0.5 - vh * 0.5;
+    /* Moldura é elemento de QUADRO: cola na borda da tela, sempre. Ancorada
+       no meio da sala, ela flutuava — em `raizes-02` a base caía a 571 px com
+       um degrau de 46 níveis numa reta perfeita de 640 px (a aresta mais
+       forte do quadro inteiro), e o topo ia parar 228 px ACIMA da tela, então
+       aquela sala simplesmente não tinha copa. Duas salas vizinhas nem
+       estavam emolduradas do mesmo jeito. Isto mata o parallax vertical da
+       moldura, que é o certo. */
+    const yBase = camera.viewY * P + vh;
+    const yTopo = camera.viewY * P;
 
     ctx.fillStyle = t.primeiroPlano;
     ctx.strokeStyle = t.primeiroPlano;

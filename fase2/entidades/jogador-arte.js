@@ -36,7 +36,11 @@ import { luzRadial } from '../render/renderizador.js';
    (orelhas, cauda), pra dar presença sem punir o jogador com hitbox grande. */
 const ALTURA_CORPO = 26;   // do chão ao topo da cabeça
 const RAIO_CABECA = 9.5;
-const CY_CABECA = -34;     // centro da cabeça em relação aos pés
+/* A cabeça ocupava 48% da figura (o Ori fica em ~33%) e o topo do tronco
+   ficava ACIMA do queixo, então não havia pescoço: a faixa branca que sobrava
+   dos lados do queixo lia como gola. Crânio a 80% e centro 1 px mais alto
+   abrem 2 px de fresta, que é o que o olho lê como pescoço. */
+const CY_CABECA = -35;     // centro da cabeça em relação aos pés
 
 export class ArteJogador {
   constructor() {
@@ -101,14 +105,28 @@ export class ArteJogador {
       this.caudaIniciada = true;
     }
 
+    /* O elo 0 é CRAVADO na âncora. Com ele preso só por mola, o deslocamento
+       de equilíbrio deixava a cauda descolar do corpo — a 232 px/s ela nascia
+       4,5 px longe das costas e lia como objeto solto, não como parte do
+       personagem. */
+    this.cauda[0].x = ancoraX;
+    this.cauda[0].y = ancoraY;
     let alvoX = ancoraX, alvoY = ancoraY;
     const n = this.cauda.length;
-    for (let i = 0; i < n; i++) {
+    for (let i = 1; i < n; i++) {
       const s = this.cauda[i];
       const f = i / (n - 1);
-      // Rigidez cai ao longo da cauda: a base acompanha, a ponta chicoteia.
-      const rigidez = lerp(420, 120, f);
-      const amort = lerp(18, 9, f);
+      /* Mola bem mais macia. Com rigidez 420 o deslocamento de equilíbrio de
+         cada elo era de 0,1 px na base: o viés que devia curvar a cauda em C
+         era, na prática, código morto — a cauda ficava reta nos dois extremos
+         (um toco de 3 px parada, um espeto de 24 px correndo). */
+      const rigidez = lerp(240, 70, f);
+      const amort = lerp(13, 7, f);
+
+      // O viés entra ANTES da mola: assim ela persegue a curva enviesada, que
+      // é o que faz o arco aparecer em repouso.
+      alvoY -= lerp(1.9, 0.5, f);
+      alvoX -= j.direcao * lerp(1.0, 0.25, f);
 
       /* CURVA DE REPOUSO. Antes eram mola sem comprimento de repouso + peso
          340: o equilíbrio era "pendurada reta pra baixo" e qualquer
@@ -128,14 +146,8 @@ export class ArteJogador {
       s.x += s.vx * dt;
       s.y += s.vy * dt;
 
-      // Viés: pra cima e pra trás, é o que fecha o C.
-      alvoY -= lerp(2.6, 0.8, f);
-      alvoX -= j.direcao * lerp(1.4, 0.4, f);
-
       // Trava de comprimento: cada elo não se afasta mais que L do anterior.
-      // 4,6 dava vão máximo de 32 px — a cauda podia ficar mais comprida que
-      // o personagem inteiro.
-      const L = 3.2;
+      const L = 2.5;
       const dx = s.x - alvoX, dy = s.y - alvoY;
       const d = Math.hypot(dx, dy);
       if (d > L) { s.x = alvoX + (dx / d) * L; s.y = alvoY + (dy / d) * L; }
@@ -206,8 +218,15 @@ export class ArteJogador {
 
     const pose = this._pose(j);
 
+    /* BOB. `esticar/achatar` só disparam em pulo, aterrissagem e investida: o
+       quadril ficava cravado o tempo todo e os pés pedalavam, que é a
+       definição de deslizar. Dois picos por ciclo de passada. */
+    const ampCorrida = j.estado === ESTADOS.CORRENDO
+      ? clamp(Math.abs(j.vx) / 232, 0, 1) : 0;
+    const bob = Math.abs(Math.sin(j.faseAndar)) * 1.8 * ampCorrida;
+
     ctx.save();
-    ctx.translate(j.centroX, j.pesY);
+    ctx.translate(j.centroX, j.pesY - bob);
     ctx.rotate(j.inclinacao + pose.tombo);
     ctx.scale(j.direcao * j.esticar, j.achatar);
 
@@ -352,7 +371,9 @@ export class ArteJogador {
     traçar(1.3);
     ctx.fill();
     ctx.globalAlpha = 1;
-    ctx.fillStyle = misturarHex(cores.claro, cores.meio, 0.5);
+    // Mais apagada que orelha e cabeça: quase branca, a cauda virava a
+    // terceira lâmina clara irradiando do personagem.
+    ctx.fillStyle = misturarHex(cores.meio, cores.sombra, 0.55);
     traçar(1);
     ctx.fill();
     ctx.restore();
@@ -395,6 +416,15 @@ export class ArteJogador {
         peY = -Math.max(0, c) * 5 * amp;
         joelhoX = dxQuadril + s * 3.5 * amp;
         joelhoY = -6 - Math.max(0, c) * 2 * amp;
+        /* CONTRAPPOSTO parado. Com `amp = 0` as duas pernas viravam tubos
+           verticais idênticos — pose de soldado, o oposto de apelo. O offset
+           de quadril sozinho não resolvia: o joelho e o pé é que precisam
+           discordar. */
+        if (amp < 0.02) {
+          joelhoY = atras ? -5.5 : -6.8;
+          joelhoX = dxQuadril + (atras ? -0.8 : 0.6);
+          peX = dxQuadril + (atras ? -1.6 : 0.8);
+        }
       }
 
       // Coxa grossa, canela fina: espessura constante lê como macarrão.
@@ -426,7 +456,8 @@ export class ArteJogador {
   }
 
   _corpo(ctx, j, cores, tema, pose = {}) {
-    const respiro = Math.sin(this.respiro * 1.9) * 0.5;
+    // ±0,5 px é sub-pixel a 1x, ou seja, o personagem parado era uma estátua.
+    const respiro = Math.sin(this.respiro * 1.9) * 1.2;
 
     // Tronco: gota invertida, ombros estreitos, quadril arredondado.
     //
@@ -464,12 +495,19 @@ export class ArteJogador {
        branco sobre branco e não fazia nada. Na cor da luz da área ela vira
        rebote do ambiente, integra o personagem à cena, e ainda muda de cor
        quando o mundo restaura. */
+    /* A luz de borda continuava traçada sobre a silhueta ANTIGA: com a pinça
+       nova, a borda do tronco na cintura está em x = −3,9, e esta curva
+       passava por −5,6. Sobrava ~1,7 px de linha dourada boiando no vazio ao
+       lado do corpo — a coisa mais saturada do personagem, no lado da sombra,
+       lendo como alça ou bug de render. Redesenhada sobre os pontos reais,
+       mais fina, com menos croma e bem menos alfa. */
     ctx.save();
-    ctx.strokeStyle = rgba(tema.luz, 0.7);
-    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = rgba(misturarHex(tema.luz, '#ffffff', 0.55), 0.32);
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(-5.2, -11.5);
-    ctx.bezierCurveTo(-6.2, -18, -5.8, -25, 0, -27 - respiro);
+    ctx.moveTo(-5.2, -11.2);
+    ctx.bezierCurveTo(-4.6, -15.5, -4.0, -17.5, -4.0, -19);
+    ctx.bezierCurveTo(-4.4, -23, -3.2, -26.2, 0, -27 - respiro);
     ctx.stroke();
     // Aresta escura do lado de dentro — o "core shadow" que faz a forma virar.
     ctx.strokeStyle = rgba(cores.escuro, 0.25);
@@ -482,12 +520,12 @@ export class ArteJogador {
 
     // Sombra projetada da cabeça no peito: separa cabeça de corpo na hora.
     ctx.save();
-    ctx.strokeStyle = rgba(cores.escuro, 0.32);
-    ctx.lineWidth = 3;
+    ctx.strokeStyle = rgba(cores.escuro, 0.3);
+    ctx.lineWidth = 1.4;
     ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-4.2, -25.6);
-    ctx.quadraticCurveTo(0, -23.2, 4.2, -25.6);
+    ctx.moveTo(-3.8, -26);
+    ctx.quadraticCurveTo(0, -24.2, 3.8, -26);
     ctx.stroke();
     ctx.restore();
 
@@ -568,7 +606,8 @@ export class ArteJogador {
   }
 
   _cabeca(ctx, j, cores, tema, pose = {}) {
-    const flutuar = Math.sin(this.respiro * 2.1) * 0.6;
+    // Em CONTRAFASE com o tronco: a cabeça atrasando o corpo é o que dá peso.
+    const flutuar = Math.sin(this.respiro * 1.9 + Math.PI * 0.65) * 0.9;
     const cy = CY_CABECA + flutuar + (pose.cabecaY ?? 0);
     const cxOff = pose.cabecaX ?? 0;
 
@@ -589,11 +628,11 @@ export class ArteJogador {
     g.addColorStop(1, cores.meio);
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(-10.5, cy - 4);
-    ctx.bezierCurveTo(-10.5, cy - 12.5, 10.5, cy - 12.5, 10.5, cy - 4);
-    ctx.bezierCurveTo(10.5, cy + 2.5, 8, cy + 6.5, 6.5, cy + 8);
-    ctx.bezierCurveTo(4, cy + 10, -2.5, cy + 9.5, -5, cy + 6.5);
-    ctx.bezierCurveTo(-8.5, cy + 3.5, -10.5, cy + 1, -10.5, cy - 4);
+    ctx.moveTo(-8.4, cy - 3.2);
+    ctx.bezierCurveTo(-8.4, cy - 10, 8.4, cy - 10, 8.4, cy - 3.2);
+    ctx.bezierCurveTo(8.4, cy + 2, 6.4, cy + 5.2, 5.2, cy + 6.4);
+    ctx.bezierCurveTo(3.2, cy + 8, -2, cy + 7.6, -4, cy + 5.2);
+    ctx.bezierCurveTo(-6.8, cy + 2.8, -8.4, cy + 0.8, -8.4, cy - 3.2);
     ctx.closePath();
     ctx.fill();
 
@@ -603,8 +642,8 @@ export class ArteJogador {
     ctx.strokeStyle = rgba(cores.escuro, 0.22);
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.moveTo(-9.6, cy - 2);
-    ctx.quadraticCurveTo(-8.6, cy + 4, -5, cy + 6.4);
+    ctx.moveTo(-7.7, cy - 1.6);
+    ctx.quadraticCurveTo(-6.9, cy + 3.2, -4, cy + 5.1);
     ctx.stroke();
     ctx.restore();
 
@@ -632,12 +671,18 @@ export class ArteJogador {
        dois é VALOR e profundidade, não ângulo. (A versão anterior a essa
        tinha o problema oposto e se fundia numa lâmina só; a correção foi na
        direção errada.) 2,30 e 2,55 = 42° e 56°, leque de 14°. */
-    const BASE_ANG = [2.30, 2.55];
+    /* Segunda tentativa. Com [2.30, 2.55] o leque fechou pra 14°, mas ninguém
+       checou onde as PONTAS caíam: a 2,73 px uma da outra, com bases a 7,9 px
+       — um V que FECHA, ou seja, uma peça só com um entalhe. Um par lê como
+       par quando as pontas ficam pelo menos tão separadas quanto as bases.
+       Mesmo ângulo pras duas e comprimentos diferentes resolve, e de quebra
+       encurta a orelha, que tinha metade do tamanho do corpo. */
+    const BASE_ANG = [2.34, 2.34];
     for (let i = 1; i >= 0; i--) {
       const o = this.orelhas[i];
       const atras = i === 1;
-      const comprimento = atras ? 17 : 23;
-      const largura = atras ? 2.8 : 3.8;
+      const comprimento = atras ? 14 : 17;
+      const largura = atras ? 2.4 : 3.2;
       ctx.save();
       // Bases afastadas na horizontal também, não só no ângulo: é o que dá o
       // "V" visto de três quartos em vez de duas linhas saindo do mesmo ponto.
@@ -701,17 +746,17 @@ export class ArteJogador {
        expressão — nenhuma. Sobem pro terço superior, ganham inclinação de
        verdade e o de trás encolhe bem mais: diferença grande de tamanho é o
        que vende três-quartos. */
-    const CY_OLHO = cy - 2.6;
+    const CY_OLHO = cy - 2.1;
     const olho = (dx, escala, giro) => {
       ctx.fillStyle = cores.escuro;
       ctx.beginPath();
-      ctx.ellipse(dx, CY_OLHO, 3.4 * escala, 5 * escala * abertura, giro, 0, TAU);
+      ctx.ellipse(dx, CY_OLHO, 2.9 * escala, 4.3 * escala * abertura, giro, 0, TAU);
       ctx.fill();
       if (abertura > 0.5 && escala > 0.8) {
         // Reflexo só no olho da frente e pequeno, senão vira olho de desenho fofo.
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.ellipse(dx + 1.1, CY_OLHO - 0.6, 0.8, 0.9, 0, 0, TAU);
+        ctx.ellipse(dx + 0.9, CY_OLHO - 0.5, 0.7, 0.8, 0, 0, TAU);
         ctx.fill();
       }
     };
@@ -719,8 +764,8 @@ export class ArteJogador {
     // O VÃO entre as duas amêndoas é metade do reconhecimento do rosto: sem
     // ele os dois viram uma máscara escura só, ainda mais com a sobrancelha
     // logo acima.
-    olho(-3.4, 0.66, 0.22);   // olho de trás: bem menor, dá perspectiva de 3/4
-    olho(3.6, 1, -0.30);
+    olho(-2.8, 0.66, 0.22);   // olho de trás: bem menor, dá perspectiva de 3/4
+    olho(2.9, 1, -0.30);
 
     /* SOBRANCELHA. Uma massa escura acompanhando o topo dos dois olhos. É a
        mudança de uma linha que tira o rosto de "vazio" e põe um olhar nele —
@@ -731,8 +776,8 @@ export class ArteJogador {
       ctx.lineWidth = 1.8;
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(-5.6, CY_OLHO - 3.2);
-      ctx.quadraticCurveTo(0, CY_OLHO - 5.4, 6.4, CY_OLHO - 3.8);
+      ctx.moveTo(-4.6, CY_OLHO - 2.7);
+      ctx.quadraticCurveTo(0, CY_OLHO - 4.5, 5.2, CY_OLHO - 3.1);
       ctx.stroke();
       ctx.restore();
     }
@@ -888,8 +933,11 @@ export class ArteJogador {
     luzRadial(ctx, j.centroX, j.centroY - 6, raioBase, tema.luz,
       0.24 + this.floracao * 0.2 + j.brilho * 0.25);
 
-    // 2. Núcleo quente e pequeno: mantém o corpo nítido dentro do halo.
-    luzRadial(ctx, j.centroX, j.centroY - 10, 26, '#ffffff', 0.4);
+    /* 2. Núcleo quente e pequeno: mantém o corpo nítido dentro do halo.
+       Centrado em −10 com raio 26 ele cobria exatamente a faixa dos joelhos
+       aos pés, e lavava de volta pra cinza médio as pernas que `_pernas`
+       calcula escuras — o passe de luz desfazendo o trabalho do desenho. */
+    luzRadial(ctx, j.centroX, j.centroY - 18, 24, '#ffffff', 0.24);
 
     // 3. Marcas acesas.
     if (this.floracao > 0.05) {

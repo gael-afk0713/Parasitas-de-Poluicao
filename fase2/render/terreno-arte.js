@@ -40,9 +40,14 @@ export class ArteTerreno {
     const alturaMundo = this.terreno.alturaPx;
 
     // --- 1. massa ------------------------------------------------------
-    // 0,16 dava ~16 níveis de luminância de alcance no corpo INTEIRO da
-    // rocha: sem alcance não há material, só uma mancha.
-    const g = ctx.createLinearGradient(0, camera.viewY, 0, camera.viewY + camera.altura);
+    /* O degradê do corpo é de TELA, não da forma: uma rampa única aplicada a
+       todo o terreno faz um pilar ficar claro no topo e escuro na base
+       independentemente da forma dele — a definição de extrusão lisa. Encurtar
+       a rampa pro terço de baixo deixa a maior parte da rocha em `terreno`
+       chapado e passa o trabalho de volume pra oclusão e pra crosta, que
+       seguem a SILHUETA. */
+    const g = ctx.createLinearGradient(
+      0, camera.viewY + camera.altura * 0.58, 0, camera.viewY + camera.altura);
     g.addColorStop(0, misturarHex(tema.terreno, tema.crista, 0.4));
     g.addColorStop(0.45, tema.terreno);
     g.addColorStop(1, tema.terrenoFundo);
@@ -553,12 +558,17 @@ export class ArteTerreno {
         if (h > 0.55) continue;
         const h2 = hash2(x, y, this.semente + 17);
         ctx.fillStyle = h2 > 0.5
-          ? rgba(tema.terrenoFundo, 0.48)
-          : rgba(misturarHex(tema.terreno, tema.crista, 0.35), 0.34);
+          ? rgba(tema.terrenoFundo, 0.36)
+          : rgba(misturarHex(tema.terreno, tema.crista, 0.35), 0.24);
+        /* Jitter MAIOR que o passo e faixa de raio quadrática. Com jitter de
+           meio passo e raio numa faixa estreita, as manchas formavam uma
+           treliça de 30 px — a autocorrelação das arestas da cena tinha pico
+           exatamente nesse lag, e na tela viravam seixos idênticos dentro da
+           rocha. */
         ctx.beginPath();
         ctx.ellipse(
-          x + (h - 0.5) * passo, y + (h2 - 0.5) * passo,
-          lerp(10, 28, h), lerp(7, 17, h2),
+          x + (h - 0.5) * passo * 2.8, y + (h2 - 0.5) * passo * 2.8,
+          lerp(4, 26, h * h), lerp(3, 15, h2 * h2),
           (h - 0.5) * 1.2, 0, TAU
         );
         ctx.fill();
@@ -643,7 +653,12 @@ export class ArteTerreno {
   _pathCristas() {
     if (this._cristasPronto) return this._cristasPronto;
     const p = new Path2D();
-    for (const faixa of this.terreno.arestasSuperiores(0.5)) {
+    /* 0.5 aceita aresta até 60° da horizontal. Num canto arredondado pelo
+       Chaikin isso inclui o filete inteiro, que desce pelas laterais e pela
+       barriga da peça: a luz de crista dava a volta em tudo e virava o
+       "contorno de PowerPoint" que o cabeçalho deste arquivo diz evitar.
+       0.86 é ~30°, que é onde a luz do céu realmente bate. */
+    for (const faixa of this.terreno.arestasSuperiores(0.86)) {
       p.moveTo(faixa[0].x, faixa[0].y);
       for (let i = 1; i < faixa.length; i++) p.lineTo(faixa[i].x, faixa[i].y);
     }
@@ -668,7 +683,11 @@ export class ArteTerreno {
     ctx.strokeStyle = misturarHex(tema.terreno, tema.crista, lerp(0.7, 0.85, pureza));
     // Largura ímpar de propósito: metade do traço fica fora da silhueta e é
     // cortada pelo clip, então a "profundidade" real é metade do valor.
-    const passos = [[54, 0.1], [34, 0.17], [18, 0.26], [8, 0.4]];
+    /* Larguras em proporção ao tile. Um traço de 54 px num braço de terreno
+       de 1 tile (32 px) inunda a peça inteira de cima a baixo — e era isso
+       que fazia pilar e viga lerem como cano de PVC estofado. */
+    const k = this.terreno.tile / 32;
+    const passos = [[26 * k, 0.1], [16 * k, 0.17], [9 * k, 0.26], [4 * k, 0.4]];
     for (const [larg, alfa] of passos) {
       ctx.globalAlpha = alfa * lerp(0.85, 1.25, pureza);
       ctx.lineWidth = larg;
@@ -754,7 +773,9 @@ export class ArteTerreno {
       this._cacheSalientes = tem ? p : null;
     }
     if (!this._cacheSalientes) return;
-    ctx.fillStyle = misturarHex(tema.terreno, tema.primeiroPlano, 0.5);
+    // Mais CLARO que o corpo, não mais escuro: pedra encravada recebe a mesma
+    // luz do céu que a superfície. Escura, ela lia como buraco.
+    ctx.fillStyle = misturarHex(tema.terreno, tema.crista, 0.3);
     ctx.fill(this._cacheSalientes);
   }
 
@@ -851,12 +872,22 @@ export class ArteTerreno {
              15 px de piso mantém vão visível entre um e outro. */
           proximoTufo += lerp(38, 15, densidade) * lerp(0.45, 2, h2);
 
+          /* Portão de baixa frequência ANTES do sorteio de densidade. Com
+             espaçamento médio de ~18 px numa borda de 1280, saíam uns setenta
+             leques iguais em fila: um pente. O ruído abre trechos de borda
+             pelada, que é o que faz o musgo ler como manchas de vegetação. */
+          if (ruido1(bx * 0.006, this.semente + 91) < 0.42) {
+            proximoTufo += 45;
+            continue;
+          }
           if (h > densidade * 0.9) continue;
 
           const nLaminas = 3 + Math.floor(h2 * 4);
           // Faixa de altura mais larga: tufo todo do mesmo tamanho é o que
           // mais rápido denuncia repetição numa borda longa.
-          const alturaTufo = lerp(4, 19, h) * densidade;
+          // Faixa bem mais larga, e quadrática: a maioria baixa, uns poucos
+          // altos. Faixa estreita é o que faz todo tufo parecer o mesmo.
+          const alturaTufo = lerp(3, 34, h * h) * densidade;
 
           for (let k = 0; k < nLaminas; k++) {
             const kf = nLaminas === 1 ? 0 : k / (nLaminas - 1) - 0.5;   // -0.5..0.5
