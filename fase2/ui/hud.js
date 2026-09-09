@@ -326,12 +326,14 @@ export class Hud {
     const w = ctx.measureText(nome).width;
     // A borda da placa alinha com a borda da máscara (x0 - r*0.62).
     const x = 31 * k, y = 64 * k;
-    ctx.fillStyle = placa(0.55);
+    ctx.fillStyle = placa(0.68);
     ctx.fillRect(x - 9 * k, y - 9 * k, w + 18 * k, 18 * k);
     ctx.strokeStyle = tinta(tema, 0.16);
     ctx.lineWidth = 1;
     ctx.strokeRect(x - 8.5 * k, y - 8.5 * k, w + 17 * k, 17 * k);
-    ctx.fillStyle = tinta(tema, 0.62);
+    // 0,62 sobre a placa de breu ainda ficava no limite do legível — e o chip
+    // só existe por seis segundos, então tem que ser lido de primeira.
+    ctx.fillStyle = tinta(tema, 0.78);
     ctx.fillText(nome, x, y);
     ctx.letterSpacing = '0px';
     ctx.restore();
