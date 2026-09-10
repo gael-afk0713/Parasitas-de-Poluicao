@@ -251,6 +251,31 @@ export class TelaMapa {
         ctx.fillRect(-s, -s, s * 2, s * 2);
         ctx.restore();
       }
+      /* PARASITAS QUE SOBRARAM.
+         Sem isto, a trava da semente vira adivinhação: o jogador lê "falta 1
+         parasita nesta área" e não tem como saber em qual das oito salas ele
+         está — e na clareira o último mora atrás de um portão que só abre com
+         o planeio, habilidade de outra área. Um pontinho por criatura viva
+         transforma "não pode ainda" em "é ali".
+         Até quatro pontos; acima disso vira número, senão a sala some sob a
+         própria marcação. */
+      const vivos = this.mundo.parasitasVivosNaSala?.(def.id) ?? 0;
+      if (vivos > 0) {
+        ctx.fillStyle = rgba(misturarHex(temaSala.particula, '#ffffff', 0.35), 0.9);
+        const r = Math.max(1, Math.min(2.2, h * 0.09));
+        if (vivos <= 4) {
+          for (let k = 0; k < vivos; k++) {
+            ctx.beginPath();
+            ctx.arc(x + w - 6 - k * (r * 2.6), y + 6, r, 0, TAU);
+            ctx.fill();
+          }
+        } else {
+          ctx.font = `700 ${Math.max(7, Math.min(11, h * 0.3))}px "JetBrains Mono", monospace`;
+          ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+          ctx.fillText(String(vivos), x + w - 4, y + 3);
+        }
+      }
+
       // Semente ainda não colhida: o objetivo pendente, visível de longe.
       if (sala.objetos.some((o) => o.tipo === 'semente') && pureza < 0.9) {
         ctx.strokeStyle = temaSala.acento;

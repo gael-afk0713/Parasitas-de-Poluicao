@@ -167,6 +167,17 @@ export class Mundo {
     }
   }
 
+  /** Quantos parasitas ainda respiram numa sala. Usado pelo mapa. */
+  parasitasVivosNaSala(salaId) {
+    if (!salaId) return 0;
+    let vivos = 0;
+    for (const o of carregarSala(salaId).objetos) {
+      if (!TIPOS_PARASITA.has(o.tipo)) continue;
+      if (!this.parasitaEstaMorto(salaId, o.cx, o.cy)) vivos++;
+    }
+    return vivos;
+  }
+
   /**
    * Quantos parasitas ainda respiram na área inteira.
    *
