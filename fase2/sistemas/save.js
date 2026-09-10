@@ -166,23 +166,30 @@ export class Save {
   async salvar(motivo = 'manual') {
     const progresso = this.mundo.paraSave();
     const serializado = JSON.stringify(progresso);
-    if (serializado === this._ultimoSerializado) return false;
 
-    /* A cópia local vai SEMPRE, e antes da nuvem: é síncrona, não pode
-       falhar por rede, e é ela que salva o caso mais comum de perda — fechar
-       a aba. O `beforeunload` dispara `salvar`, mas a escrita no Firestore é
-       assíncrona e o navegador mata a aba antes de ela terminar; o
-       `localStorage` já gravou nesse ponto. */
-    const local = gravarLocal(this.info, progresso);
-    if (local) this._ultimoLocal = serializado;
+    /* DOIS DESTINOS, DUAS GUARDAS SEPARADAS.
+       `_ultimoSerializado` é o que a NUVEM já tem; `_ultimoLocal` é o que
+       este navegador já tem. Misturar os dois cria um pulo silencioso: um
+       `salvar` com a nuvem indisponível marcava `_ultimoSerializado`, e a
+       primeira gravação remota depois disso seria descartada como "nada
+       mudou" — o progresso ficaria só no navegador sem ninguém perceber.
+
+       A cópia local vai SEMPRE, e antes da nuvem: é síncrona, não falha por
+       rede, e é ela que cobre o caso mais comum de perda — fechar a aba. O
+       `beforeunload` chama `salvar`, mas a escrita no Firestore é assíncrona
+       e o navegador mata a aba antes de ela terminar; o `localStorage` já
+       gravou nesse ponto. */
+    let local = false;
+    if (serializado !== this._ultimoLocal) {
+      local = gravarLocal(this.info, progresso);
+      if (local) this._ultimoLocal = serializado;
+    }
 
     if (!this.disponivel || !this._ref) {
-      if (local) {
-        this._ultimoSerializado = serializado;
-        this._estado('salvo neste navegador');
-      }
+      if (local) this._estado('salvo neste navegador');
       return local;
     }
+    if (serializado === this._ultimoSerializado) return false;
 
     // Uma gravação por vez. Se pedirem outra no meio, marca pendente e
     // repete ao terminar — sem isso, dois `updateDoc` simultâneos podem
