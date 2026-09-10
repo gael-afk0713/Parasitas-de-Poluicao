@@ -505,7 +505,26 @@ export class Sombra {
       traçar(false);
       ctx.stroke();
     }
-    ctx.fillStyle = cor;
+    /* O CORPO NÃO É UMA MANCHA CHAPADA.
+       Medido na sala de abertura: corpo em luminância 20-25 contra fundo
+       10-18. Dez níveis de diferença é invisível — o que lia da criatura era
+       a fenda (241) e um fio de contorno; o resto do bicho, incluindo o
+       tamanho dele, o jogador adivinhava. Num jogo em que a caixa de dano é o
+       corpo, isso é informação de combate faltando, não só estética.
+
+       A saída não é clarear a criatura (ela é um buraco no mundo, e precisa
+       continuar sendo): é dar VOLUME. O capuz recebe a luz do céu no alto e
+       apaga na barra do manto, e isso separa a silhueta do primeiro plano
+       preto sem acender nada. */
+    if (ferida) {
+      ctx.fillStyle = cor;
+    } else {
+      const g = ctx.createLinearGradient(0, -r * 1.15, 0, r * 2.2);
+      g.addColorStop(0, misturarHex(tema.primeiroPlano, tema.ceuBase, 0.2));
+      g.addColorStop(0.42, cor);
+      g.addColorStop(1, tema.primeiroPlano);
+      ctx.fillStyle = g;
+    }
     traçar(true);
     ctx.fill();
     ctx.restore();
