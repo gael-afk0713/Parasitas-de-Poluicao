@@ -188,7 +188,7 @@ function quadro(alpha, dtReal) {
   });
 
   // 7 · terreno (inclui plataformas e perigos)
-  render.camada(1, (ctx) => mundo.arteTerreno.desenhar(ctx, tema, camera));
+  render.camada(1, (ctx) => mundo.arteTerreno.desenhar(ctx, tema, camera, laco.tempo));
   render.emissivo(1, (ctx) => {
     mundo.arteTerreno.desenharLuz(ctx, tema);
     mundo.arteTerreno.desenharLuzEspeciais(ctx, tema, camera, laco.tempo);

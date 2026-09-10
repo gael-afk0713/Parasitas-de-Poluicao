@@ -1010,16 +1010,43 @@ function galhos(ctx, a, s) {
     ctx.stroke();
 
     ctx.lineWidth = Math.max(1.2, lerp(4, 16, h) * 0.35);
+    const pontas = [];
     for (let i = 1; i < 5; i++) {
       const tt = i / 5;
       const hx = hash2(x + i * 29, s.semente + 2, 283);
       const gx = lerp(ax, bx, tt);
       const gy = ay + arco * (2 * tt * (1 - tt)) * 2 + arco * 0.25 * tt * tt;
+      const px = gx + (hx - 0.5) * 70;
+      const py = gy + lerp(40, 110, hx) + balanco;
       ctx.beginPath();
       ctx.moveTo(gx, gy);
-      ctx.quadraticCurveTo(gx + (hx - 0.5) * 40, gy + lerp(20, 60, hx),
-        gx + (hx - 0.5) * 70, gy + lerp(40, 110, hx) + balanco);
+      ctx.quadraticCurveTo(gx + (hx - 0.5) * 40, gy + lerp(20, 60, hx), px, py);
       ctx.stroke();
+      pontas.push([px, py, hx]);
+    }
+
+    /* FOLHA NA PONTA — só quando a área restaura.
+       A restauração mudava a PALETA e mais nada: a mesma sala poluída com
+       outro filtro de cor. O galho continuava sendo um graveto pelado nos
+       dois estados, e era isso que fazia a cura ler como troca de tema em
+       vez de vida voltando. Aqui a ponta seca ganha um tufo, e o tufo só
+       existe acima de 30% de pureza: forma NOVA, não cor nova. */
+    if (a.pureza > 0.3) {
+      const vivo = clamp01((a.pureza - 0.3) / 0.55);
+      ctx.save();
+      ctx.globalAlpha = vivo * 0.85;
+      ctx.fillStyle = ctx.strokeStyle;
+      for (const [px, py, hx] of pontas) {
+        const r = lerp(6, 20, hx) * vivo * (s.escalaLarg ?? 1);
+        for (let k = 0; k < 3; k++) {
+          const ang = hx * TAU + k * 2.1 + vento(t, px) * 0.12;
+          ctx.beginPath();
+          ctx.ellipse(px + Math.cos(ang) * r * 0.55, py + Math.sin(ang) * r * 0.4,
+            r, r * 0.45, ang * 0.5, 0, TAU);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
     }
   }
 }

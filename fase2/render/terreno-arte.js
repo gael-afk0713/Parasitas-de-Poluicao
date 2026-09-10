@@ -21,6 +21,9 @@ import {
 } from '../core/mat.js';
 import { caminhoDe, luzRadial } from './renderizador.js';
 import { VAZIO, PLATAFORMA, PERIGO, AGUA } from '../mundo/terreno.js';
+// O mesmo campo de vento do parallax: a samambaia do chão deita na mesma
+// rajada que a folhagem do fundo, senão o primeiro plano lê como maquete.
+import { vento } from './parallax.js';
 
 export class ArteTerreno {
   /** @param {import('../mundo/terreno.js').Terreno} terreno */
@@ -35,11 +38,15 @@ export class ArteTerreno {
     this._cacheMusgo = null;
     this._cacheSalientes = undefined;
     this._cacheEncontros = undefined;
+    this._cacheFetos = null;
   }
 
   /* --------------------------------------------------------------------- */
 
-  desenhar(ctx, tema, camera) {
+  desenhar(ctx, tema, camera, tempo = 0) {
+    // Guardado porque `_cristas`/`_samambaias` estão vários níveis abaixo e
+    // passar tempo por toda a cadeia só pra folha balançar não vale a assinatura.
+    this._tempo = tempo;
     const path = this.terreno.path();
     const alturaMundo = this.terreno.alturaPx;
 
@@ -754,6 +761,102 @@ export class ArteTerreno {
 
     this._salientes(ctx, tema);
     this._musgo(ctx, tema, this.terreno.arestasSuperiores(0.5), pureza);
+    this._samambaias(ctx, tema, pureza);
+  }
+
+  /**
+   * SAMAMBAIAS — a forma que só existe com o mundo restaurado.
+   *
+   * A restauração era um filtro de cor: a mesma sala, mesma silhueta, outra
+   * paleta. Medido, o quadro restaurado e o poluído eram quase idênticos em
+   * FORMA — e o jogo inteiro se chama "traga a cor de volta", o que torna
+   * essa a promessa mais importante da fase.
+   *
+   * Uma fronde tem contorno que nada mais na cena tem: um eixo em arco com
+   * folíolos que encolhem até a ponta. Ela aparece a partir de 22% de pureza
+   * e cresce com ela — então o jogador vê a sala mudar de SILHUETA, não de
+   * filtro. E deita no mesmo vento do parallax.
+   *
+   * As âncoras saem das arestas pisáveis uma vez por sala; o que muda por
+   * quadro é quantas desenham e de que tamanho, que é barato.
+   */
+  _samambaias(ctx, tema, pureza) {
+    if (pureza < 0.22) return;
+    if (!this._cacheFetos) {
+      const pts = [];
+      for (const faixa of this.terreno.arestasSuperiores(0.86)) {
+        let percorrido = 0;
+        let proxima = 40 + hash2(Math.round(faixa[0].x), Math.round(faixa[0].y), 137) * 120;
+        for (let i = 0; i < faixa.length - 1; i++) {
+          const a = faixa[i], b = faixa[i + 1];
+          const seg = Math.hypot(b.x - a.x, b.y - a.y) || 0.001;
+          while (percorrido + seg > proxima) {
+            const u = (proxima - percorrido) / seg;
+            const x = a.x + (b.x - a.x) * u, y = a.y + (b.y - a.y) * u;
+            /* TOUCEIRA. Sem esta peneira a samambaia nascia a cada ~110 px em
+               TODA aresta pisável da sala, e o resultado é uma franja: uma
+               orla decorativa correndo por baixo de cada plataforma, com o
+               mesmo passo, que denuncia geração tanto quanto o musgo contínuo
+               que já foi corrigido antes por este mesmo motivo. Planta cresce
+               onde pegou — em moita, com vãos pelados entre elas. */
+            if (hash2(Math.round(x / 150), Math.round(y / 90), 151) > 0.52) {
+              proxima += 60 + hash2(Math.round(x), Math.round(y), 149) * 120;
+              continue;
+            }
+            pts.push({ x, y, h: hash2(Math.round(x), Math.round(y), 139) });
+            proxima += 26 + hash2(Math.round(x), Math.round(y), 149) * 120;
+          }
+          percorrido += seg;
+        }
+      }
+      this._cacheFetos = pts;
+    }
+    if (!this._cacheFetos.length) return;
+
+    const abre = clamp01((pureza - 0.22) / 0.6);
+    const cor = misturarHex(tema.crista, tema.acento, lerp(0.3, 0.72, pureza));
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = cor;
+    for (const f of this._cacheFetos) {
+      // Nem toda âncora abre de uma vez: as de hash baixo brotam primeiro.
+      const meu = clamp01((abre - f.h * 0.55) / 0.45);
+      if (meu <= 0.02) continue;
+      // Faixa larga de tamanho: fronde nova de 8 px ao lado de uma de 38 é o
+      // que faz ler como moita em vez de escova.
+      // Piso de 15: abaixo disso os folíolos ficam com 2 px e a fronde lê
+      // como pente, não como samambaia.
+      const comp = lerp(15, 40, f.h * f.h) * meu;
+      const lado = f.h < 0.5 ? -1 : 1;
+      const dobra = vento(this._tempo ?? 0, f.x) * 0.16;
+      const curva = lado * lerp(0.35, 0.85, f.h) + dobra;
+
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(f.x, f.y + 1);
+      const pontaX = f.x + curva * comp;
+      const pontaY = f.y - comp;
+      ctx.quadraticCurveTo(f.x + curva * comp * 0.15, f.y - comp * 0.7, pontaX, pontaY);
+      ctx.stroke();
+
+      // Folíolos: encolhem até a ponta. É esse gradiente que faz "fronde".
+      ctx.lineWidth = 1.1;
+      const n = 4 + Math.round(f.h * 3);
+      for (let i = 1; i <= n; i++) {
+        const tt = i / (n + 1);
+        const ex = f.x + curva * comp * (0.15 * 2 * tt * (1 - tt) + tt * tt);
+        const ey = f.y - comp * tt;
+        const lf = comp * 0.34 * (1 - tt * 0.85);
+        for (const sgn of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(ex, ey);
+          ctx.quadraticCurveTo(ex + sgn * lf * 0.7, ey - lf * 0.1,
+            ex + sgn * lf, ey + lf * 0.35);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
   }
 
   /**
@@ -1014,13 +1117,18 @@ export class ArteTerreno {
              tufos se encostavam e a borda inteira virava um PENTE contínuo —
              que é justamente o que o agrupamento em tufos existe pra evitar.
              15 px de piso mantém vão visível entre um e outro. */
-          proximoTufo += lerp(38, 15, densidade) * lerp(0.45, 2, h2);
+          /* Segunda passada no mesmo problema. Com 15 px de piso em pureza
+             alta e tufos de 7 px de base, o vão médio caía pra ~8 px: o pente
+             voltou, agora sob a samambaia nova. O piso alto continua e o
+             sorteio ficou mais largo — o que separa moita de escova é o
+             tamanho dos VÃOS, não o dos tufos. */
+          proximoTufo += lerp(38, 24, densidade) * lerp(0.45, 2.4, h2);
 
           /* Portão de baixa frequência ANTES do sorteio de densidade. Com
              espaçamento médio de ~18 px numa borda de 1280, saíam uns setenta
              leques iguais em fila: um pente. O ruído abre trechos de borda
              pelada, que é o que faz o musgo ler como manchas de vegetação. */
-          if (ruido1(bx * 0.006, this.semente + 91) < 0.42) {
+          if (ruido1(bx * 0.006, this.semente + 91) < 0.5) {
             proximoTufo += 45;
             continue;
           }
@@ -1031,7 +1139,9 @@ export class ArteTerreno {
           // mais rápido denuncia repetição numa borda longa.
           // Faixa bem mais larga, e quadrática: a maioria baixa, uns poucos
           // altos. Faixa estreita é o que faz todo tufo parecer o mesmo.
-          const alturaTufo = lerp(3, 34, h * h) * densidade;
+          // Expoente 1,5 em vez de 2: sem tantos tufos de 3 px, que a essa
+          // escala não leem como planta e sim como serrilha na borda.
+          const alturaTufo = lerp(5, 36, Math.pow(h, 1.5)) * densidade;
 
           for (let k = 0; k < nLaminas; k++) {
             const kf = nLaminas === 1 ? 0 : k / (nLaminas - 1) - 0.5;   // -0.5..0.5
