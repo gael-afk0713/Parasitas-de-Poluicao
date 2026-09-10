@@ -15,7 +15,7 @@
    ========================================================================= */
 
 import {
-  fundirColineares, reamostrarCaminho, chaikin, areaPoligono, ruido1, clamp,
+  fundirColineares, reamostrarCaminho, chaikin, areaPoligono, ruido1, clamp, lerp,
 } from '../core/mat.js';
 
 export const TILE = 32;
@@ -337,13 +337,56 @@ export class Terreno {
       const cantos = fundirColineares(emPx);
       const uniforme = reamostrarCaminho(cantos, this.tile * 0.44);
 
-      const amp = this.tile * 0.13;   // < 1/7 do tile: o desenho nunca sugere
-                                      // um apoio que a física não tem
+      /* AMPLITUDE POR ORIENTAÇÃO.
+         Era 0,13 do tile em todo lugar — ±2 px, e o Chaikin ainda alisa isso.
+         O resultado é o retângulo de canto arredondado que faz a sala inteira
+         ler como cano de plástico: o mesmo raio de canto em toda peça, sem
+         uma reentrância.
+
+         Os ±2 px existem por um motivo válido, mas o motivo só vale numa
+         direção: numa face PISÁVEL, desenhar acima da colisão sugere apoio
+         que a física não tem, e desenhar abaixo faz o jogador flutuar. Em
+         PAREDE e TETO nada disso acontece — no máximo o personagem encosta
+         2 px dentro da pedra, que ninguém percebe.
+
+         Então a amplitude passa a seguir a orientação do segmento: quase nada
+         no chão, quatro vezes mais na parede. E o deslocamento vai pela
+         NORMAL, não em x e y independentes, senão a face de cima se mexe
+         mesmo quando a intenção era mexer só a lateral. */
+      const ampChao = this.tile * 0.11;
+      const ampParede = this.tile * 0.34;
+      const N = uniforme.length;
+      /* A orientação é medida numa JANELA LARGA, não entre os dois vizinhos
+         imediatos. Na ponta de uma viga a tangente vira de horizontal para
+         vertical em dois pontos, e com a amplitude seguindo isso de perto o
+         ruído dispara ali e desenha um ESPETO saindo pro ar — pior que feio:
+         é rocha desenhada onde não há colisão, justamente na quina em que o
+         jogador tenta pisar. A janela espalha a transição por ~6 pontos e a
+         ponta volta a ser ponta. */
+      const J = 3;
       const ondulado = uniforme.map((p, i) => {
+        const a = uniforme[(i - 1 + N) % N];
+        const b = uniforme[(i + 1) % N];
+        const tx = b.x - a.x, ty = b.y - a.y;
+        const len = Math.hypot(tx, ty) || 1;
+
+        let soma = 0;
+        for (let k = -J; k <= J; k++) {
+          const u = uniforme[(i - 1 + k + N) % N];
+          const v = uniforme[(i + 1 + k + N) % N];
+          const dx = v.x - u.x, dy = v.y - u.y;
+          const l = Math.hypot(dx, dy) || 1;
+          soma += 1 - Math.abs(dx) / l;   // 0 = horizontal, 1 = vertical
+        }
+        const vertical = soma / (J * 2 + 1);
+        const amp = lerp(ampChao, ampParede, vertical * vertical);
         const fase = i * 0.31;
         const n = ruido1(fase, this.semente) - 0.5;
-        const n2 = ruido1(fase * 2.3 + 31, this.semente + 7) - 0.5;
-        return { x: p.x + n * amp, y: p.y + n2 * amp };
+        const n2 = ruido1(fase * 0.37 + 31, this.semente + 7) - 0.5;
+        // Duas escalas: a lenta dá a ondulação grande da parede, a rápida a
+        // aspereza. Só a lenta sobrevive ao Chaikin em peça pequena.
+        const d = (n * 0.45 + n2 * 1.15) * amp;
+        return { x: p.x + (ty / len) * d, y: p.y + (-tx / len) * d };
       });
 
       const pontos = chaikin(ondulado, 2);
