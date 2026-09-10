@@ -237,6 +237,41 @@ export class ArteTerreno {
     this._sombraProjetada(ctx, tema, faixas);
     const pureza = tema.pureza ?? 0;
 
+    /* CORPO D'ÁGUA: UM CAMINHO POR POÇA, UM `fill` SÓ.
+       As duas versões anteriores desenhavam faixa por faixa com alfa menor
+       que 1 e +1 px de sobreposição "pra não deixar fresta". Com alfa, o
+       pixel sobreposto é pintado DUAS vezes: sobrava uma linha a cada 32 px
+       atravessando a poça inteira, e de longe a água lia como persiana — ou
+       como scanline de tubo, que é a última coisa que este jogo quer parecer.
+
+       Retângulos exatos (as bordas de tile são inteiras, então não há
+       antisserrilhado a costurar) somados num `Path2D` e preenchidos de uma
+       vez: composita uma vez só, e a fresta que o +1 px existia pra tapar não
+       chega a existir.
+
+       O degradê é ancorado na SUPERFÍCIE de cada poça, não no tile — linhas
+       vizinhas da mesma poça compartilham o mesmo gradiente por construção. */
+    const poças = new Map();
+    for (const f of faixas) {
+      let prof = 0;
+      for (let cy = f.cy - 1; cy >= 0 && t.em(f.cx0, cy) === AGUA; cy--) prof++;
+      const ySup = (f.cy - prof) * t.tile;
+      let caminho = poças.get(ySup);
+      if (!caminho) { caminho = new Path2D(); poças.set(ySup, caminho); }
+      caminho.rect(f.cx0 * t.tile, f.cy * t.tile,
+        (f.cx1 + 1 - f.cx0) * t.tile, t.tile);
+    }
+    ctx.save();
+    for (const [ySup, caminho] of poças) {
+      const g = ctx.createLinearGradient(0, ySup, 0, ySup + t.tile * 8);
+      g.addColorStop(0, rgba(misturarHex(tema.luz, tema.bruma, 0.35), 0.23));
+      g.addColorStop(0.55, rgba(misturarHex(tema.luz, tema.bruma, 0.72), 0.3));
+      g.addColorStop(1, rgba(misturarHex(tema.luz, tema.bruma, 0.96), 0.36));
+      ctx.fillStyle = g;
+      ctx.fill(caminho);
+    }
+    ctx.restore();
+
     for (const f of faixas) {
       const x0 = f.cx0 * t.tile;
       const x1 = (f.cx1 + 1) * t.tile;
@@ -599,24 +634,18 @@ export class ArteTerreno {
       // O gradiente vai do claro no topo ao escuro no fundo em CADA faixa, o
       // que dá a sensação de profundidade acumulando: quanto mais fundo, mais
       // opaco, como água de verdade.
-      // Cor PLANA por linha, escolhida pela profundidade real abaixo da
-      // lâmina. Antes cada linha desenhava seu próprio gradiente de claro a
-      // escuro dentro do tile, e a fronteira entre linhas virava uma costura
-      // visível — o corpo d'água saía listrado de alto a baixo. Com cor plana
-      // por linha e escurecimento acumulando com a profundidade, o degradê
-      // aparece na coluna inteira e não sobra emenda nenhuma.
-      let prof = 0;
-      for (let cy = f.cy - 1; cy >= 0 && t.em(f.cx0, cy) === AGUA; cy--) prof++;
-      const k = clamp01(prof / 7);
+      /* UM DEGRADÊ POR POÇA, EM COORDENADA ABSOLUTA.
+         A tentativa anterior trocou o degradê-por-tile (que costurava dentro
+         do tile) por COR PLANA por linha. Não resolveu: com a profundidade
+         quantizada em `prof/7`, cada linha de 32 px ganhava um tom e um alfa
+         diferentes do vizinho, e uma poça de 9 tiles saía com nove degraus
+         horizontais atravessando ela inteira — de longe lê como persiana, ou
+         como scanline de tubo, e é a primeira coisa que se vê na sala.
 
-      ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.fillStyle = rgba(misturarHex(tema.luz, tema.bruma, lerp(0.35, 0.95, k)),
-        lerp(0.42, 0.62, k));
-      // +1 px de sobreposição pra não deixar fresta por arredondamento.
-      ctx.fillRect(x0, y, x1 - x0, t.tile + 1);
-      ctx.restore();
-
+         A correção é ancorar o degradê na SUPERFÍCIE da poça, não no tile:
+         linhas vizinhas da mesma poça produzem exatamente o mesmo gradiente,
+         então a emenda deixa de existir por construção — o recorte muda, o
+         degradê não. */
       if (!superficie) continue;
 
       // --- superfície ----------------------------------------------------
