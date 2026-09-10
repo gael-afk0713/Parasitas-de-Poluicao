@@ -34,11 +34,22 @@ export class ArteTerreno {
     this._cachePureza = -1;
   }
 
+  /**
+   * Joga fora tudo que foi pré-calculado a partir da geometria da sala.
+   *
+   * Hoje ninguém chama: `ArteTerreno` nasce junto com a sala e o terreno não
+   * muda em runtime. Fica completo de propósito — no dia em que existir
+   * terreno destrutível, o cache que ficar de fora daqui vira um pedaço de
+   * sala que continua desenhado depois de ter deixado de existir, e esse é o
+   * tipo de defeito que ninguém liga ao cache.
+   */
   invalidar() {
-    this._cacheMusgo = null;
     this._cacheSalientes = undefined;
     this._cacheEncontros = undefined;
     this._cacheFetos = null;
+    this._musgoPronto = null;
+    this._contornoPronto = null;
+    this._cristasPronto = null;
   }
 
   /* --------------------------------------------------------------------- */
@@ -171,6 +182,29 @@ export class ArteTerreno {
    * iluminada, e a de baixo é esfarrapada e aberta — a forma diz "isto
    * segura você, mas não te barra".
    */
+  /**
+   * Onde a peça começa e termina NA TELA.
+   *
+   * Duas regras, e as duas custaram bug:
+   *
+   * 1. O recuo é sempre PRA DENTRO. A primeira versão sorteava de -6 a +10 px
+   *    e desenhava até 10 px de plataforma que não era sólida — com tile de
+   *    32 e caixa do jogador de 22, um terço de tile de chão falso: ele pousa
+   *    no que vê e atravessa. Desenhar mais CURTO que a colisão erra pro lado
+   *    perdoável (sobra beirada invisível onde ainda dá pra ficar); desenhar
+   *    mais comprido erra pro lado que parece defeito do jogo.
+   * 2. Isto é uma função, não duas linhas repetidas. O passe emissivo
+   *    continuava traçando o brilho da face de `x0` a `x1` enquanto o corpo
+   *    já estava em `bx0..bx1`, e sobrava um fio de luz pendurado no ar.
+   */
+  static _extremosPlataforma(f, tile, semente) {
+    const x0 = f.cx0 * tile, x1 = (f.cx1 + 1) * tile;
+    return {
+      bx0: x0 + lerp(0, 5, hash2(f.cx0, f.cy, semente + 19)),
+      bx1: x1 - lerp(0, 5, hash2(f.cx1, f.cy, semente + 23)),
+    };
+  }
+
   desenharPlataformas(ctx, tema, camera) {
     const t = this.terreno;
     const faixas = this._faixas(camera, PLATAFORMA);
@@ -207,13 +241,23 @@ export class ArteTerreno {
          nenhuma plataforma da sala começa e termina onde a grade manda. */
       const hEsp = hash2(f.cx0, f.cy, s + 17);
       const espessura = t.tile * (ehTronco ? 0.46 : 0.4) * lerp(0.78, 1.22, hEsp);
-      const recuoE = lerp(-6, 10, hash2(f.cx0, f.cy, s + 19));
-      const recuoD = lerp(-6, 10, hash2(f.cx1, f.cy, s + 23));
-      const bx0 = x0 - recuoE, bx1 = x1 + recuoD;
+      const { bx0, bx1 } = ArteTerreno._extremosPlataforma(f, t.tile, s);
       const larg = bx1 - bx0;
 
       const arco = Math.min(4, larg * 0.012);
-      const topoY = (px) => y + 1 + arco * Math.sin(((px - bx0) / larg) * Math.PI);
+      /* A face de cima é onde o jogador pousa: o realce de topo e os sulcos
+         precisam cair EM CIMA dela, degrau incluído. Enquanto `topoY`
+         devolvia só o arco liso, o fio de luz de 1,6 px flutuava até 2,5 px
+         fora da aresta desenhada em toda laje. */
+      const nDeg = Math.max(3, Math.round(larg / 46));
+      const degrauEm = (px) => {
+        if (ehTronco) return 0;
+        const i = Math.min(nDeg, Math.max(1, Math.ceil(((px - bx0) / larg) * nDeg)));
+        const cx = bx0 + (larg * i) / nDeg;
+        return (hash2(Math.round(cx), f.cy, s + 29) - 0.5) * 5;
+      };
+      const topoY = (px) => y + 1
+        + arco * Math.sin(((px - bx0) / larg) * Math.PI) + degrauEm(px);
       ctx.beginPath();
       ctx.moveTo(bx0, y + 1);
       if (ehTronco) {
@@ -222,12 +266,9 @@ export class ArteTerreno {
         /* LAJE: a face de cima é quebrada em degraus de 2 a 5 px. Uma aresta
            superior perfeitamente reta de 200 px é a coisa que mais denuncia
            geometria gerada — pedra não tem isso. */
-        const nDeg = Math.max(3, Math.round(larg / 46));
         for (let i = 1; i <= nDeg; i++) {
           const px = bx0 + (larg * i) / nDeg;
-          const hd = hash2(Math.round(px), f.cy, s + 29);
-          const dy = y + 1 + arco * Math.sin(((px - bx0) / larg) * Math.PI)
-            + (hd - 0.5) * 5;
+          const dy = topoY(px);
           ctx.lineTo(px - larg / nDeg * 0.12, dy);
           ctx.lineTo(px, dy);
         }
@@ -540,9 +581,10 @@ export class ArteTerreno {
     ctx.lineCap = 'round';
     for (const f of this._faixas(camera, PLATAFORMA)) {
       const y = f.cy * t.tile + 1;
+      const e = ArteTerreno._extremosPlataforma(f, t.tile, this.semente);
       ctx.beginPath();
-      ctx.moveTo(f.cx0 * t.tile, y);
-      ctx.lineTo((f.cx1 + 1) * t.tile, y);
+      ctx.moveTo(e.bx0, y);
+      ctx.lineTo(e.bx1, y);
       ctx.stroke();
     }
     ctx.restore();
@@ -815,6 +857,13 @@ export class ArteTerreno {
 
     const abre = clamp01((pureza - 0.22) / 0.6);
     const cor = misturarHex(tema.crista, tema.acento, lerp(0.3, 0.72, pureza));
+    /* Dois caminhos, dois `stroke()`. Emitindo por fronde eram 9 a 15
+       `stroke()` cada uma, e nasce ~1 fronde a cada 100 px de aresta pisável:
+       200 a 500 chamadas por quadro numa sala média. É o mesmo agrupamento
+       que o musgo já usa; o vento continua entrando porque quem varia por
+       quadro é a GEOMETRIA, e ela é remontada de qualquer jeito. */
+    const eixos = new Path2D();
+    const foliolos = new Path2D();
     ctx.save();
     ctx.lineCap = 'round';
     ctx.strokeStyle = cor;
@@ -831,16 +880,11 @@ export class ArteTerreno {
       const dobra = vento(this._tempo ?? 0, f.x) * 0.16;
       const curva = lado * lerp(0.35, 0.85, f.h) + dobra;
 
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(f.x, f.y + 1);
-      const pontaX = f.x + curva * comp;
-      const pontaY = f.y - comp;
-      ctx.quadraticCurveTo(f.x + curva * comp * 0.15, f.y - comp * 0.7, pontaX, pontaY);
-      ctx.stroke();
+      eixos.moveTo(f.x, f.y + 1);
+      eixos.quadraticCurveTo(f.x + curva * comp * 0.15, f.y - comp * 0.7,
+        f.x + curva * comp, f.y - comp);
 
       // Folíolos: encolhem até a ponta. É esse gradiente que faz "fronde".
-      ctx.lineWidth = 1.1;
       const n = 4 + Math.round(f.h * 3);
       for (let i = 1; i <= n; i++) {
         const tt = i / (n + 1);
@@ -848,14 +892,14 @@ export class ArteTerreno {
         const ey = f.y - comp * tt;
         const lf = comp * 0.34 * (1 - tt * 0.85);
         for (const sgn of [-1, 1]) {
-          ctx.beginPath();
-          ctx.moveTo(ex, ey);
-          ctx.quadraticCurveTo(ex + sgn * lf * 0.7, ey - lf * 0.1,
+          foliolos.moveTo(ex, ey);
+          foliolos.quadraticCurveTo(ex + sgn * lf * 0.7, ey - lf * 0.1,
             ex + sgn * lf, ey + lf * 0.35);
-          ctx.stroke();
         }
       }
     }
+    ctx.lineWidth = 1.5; ctx.stroke(eixos);
+    ctx.lineWidth = 1.1; ctx.stroke(foliolos);
     ctx.restore();
   }
 
@@ -869,8 +913,8 @@ export class ArteTerreno {
    *
    * @param {number} alturaDoChao  0 = tocando, 1 = longe (some)
    */
-  static contato(ctx, tema, x, y, largura, alturaDoChao = 0) {
-    const k = clamp01(1 - alturaDoChao);
+  static contato(ctx, tema, x, y, largura, alturaDoChao = 0, forca = 1) {
+    const k = clamp01(1 - alturaDoChao) * clamp01(forca);
     if (k <= 0.02) return;
     const rx = largura * lerp(0.8, 0.55, 1 - k);
     const ry = rx * 0.28;

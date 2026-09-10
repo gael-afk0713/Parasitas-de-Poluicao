@@ -206,23 +206,36 @@ function quadro(alpha, dtReal) {
      entidade, senão a sombra de um cairia por cima do corpo do outro. */
   render.camada(1, (ctx) => {
     const t = mundo.sala.terreno;
-    const sombraDe = (e, largura) => {
-      const d = t.alturaAteChao(e.centroX, e.y + (e.altura ?? 0) + 1, 6);
-      if (!Number.isFinite(d)) return;
-      ArteTerreno.contato(ctx, tema, e.centroX, e.y + (e.altura ?? 0) + d,
-        largura, clamp01(d / 90));
+    const sombraDe = (cx, pes, largura, forca) => {
+      /* Nem toda entidade tem centro: poça, onda de choque e explosão vivem
+         em coordenadas próprias. Sem este teste, `alturaAteChao(NaN, y)` cai
+         no ramo "fora do mapa é sólido" e devolve um número finito — a
+         chamada só quebra lá na frente, montando um gradiente com NaN. */
+      if (!Number.isFinite(cx) || !Number.isFinite(pes)) return;
+      const d = t.alturaAteChao(cx, pes + 1, 6);
+      /* `alturaAteChao` devolve NEGATIVO quando o ponto de partida já está
+         dentro de sólido — o que acontece fora dos limites da sala, porque lá
+         fora `em()` responde SOLIDO de propósito. Negativo é finito, então o
+         `isFinite` sozinho deixava passar uma elipse de opacidade máxima
+         boiando até um tile acima dos pés. */
+      if (!Number.isFinite(d) || d < 0) return;
+      ArteTerreno.contato(ctx, tema, cx, pes + d, largura, clamp01(d / 90), forca);
     };
     for (const e of mundo.entidades) {
-      if (e.gravidade === false || e.perigoso === false || e.morta) continue;
-      sombraDe(e, (e.largura ?? 26) * 0.9);
+      /* Quem tem sombra é quem tem CORPO apoiado, e o teste disso é ter
+         altura e não flutuar. `perigoso` não serve para isso: projétil é
+         perigoso e não tem corpo (todo tiro inimigo arrastava uma mancha pelo
+         chão), e a Mãe Afogada liga e desliga `perigoso` durante o mergulho,
+         o que fazia a sombra piscar num quadro só, sem relação com estar ou
+         não apoiada. */
+      if (e.altura === undefined || e.gravidade === false || e.morta) continue;
+      // Durante a dissolução o corpo continua na tela: a sombra tem que sumir
+      // JUNTO com ele, não no primeiro quadro da morte.
+      sombraDe(e.centroX, e.y + e.altura, (e.largura ?? 26) * 0.9,
+        1 - clamp01(e.morrendo ?? 0));
     }
     const j = mundo.jogador;
-    if (j.visivel) {
-      const d = t.alturaAteChao(j.centroX, j.pesY + 1, 6);
-      if (Number.isFinite(d)) {
-        ArteTerreno.contato(ctx, tema, j.centroX, j.pesY + d, 26, clamp01(d / 90));
-      }
-    }
+    if (j.visivel) sombraDe(j.centroX, j.pesY, 26, 1);
   });
 
   render.camada(1, (ctx) => {
