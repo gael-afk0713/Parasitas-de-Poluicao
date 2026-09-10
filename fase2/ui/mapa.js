@@ -320,6 +320,22 @@ export class TelaMapa {
     ctx.fillStyle = misturarHex('#efe8d6', tema.crista, 0.3);
     ctx.fillText(nomeArea(m.sala?.area, m.purezaDaArea(m.sala?.area ?? '')), largura / 2, 40);
 
+    /* Quantos parasitas faltam NA ÁREA.
+       A semente só abre com a área limpa, e sem este número o jogador teria
+       que voltar até a semente pra descobrir se já pode — ou, pior, vasculhar
+       salas já limpas sem saber quantas ainda devem alguma coisa. Fica no
+       mapa porque é lá que se decide pra onde ir. */
+    const faltam = m.parasitasVivosNaArea?.(m.sala?.area) ?? 0;
+    ctx.font = '600 12px "JetBrains Mono", monospace';
+    ctx.fillStyle = faltam > 0
+      ? rgba(misturarHex(tema.particula, '#ffffff', 0.3), 0.9)
+      : rgba(tema.acento, 0.95);
+    ctx.fillText(
+      faltam > 0
+        ? `${faltam} ${faltam === 1 ? 'PARASITA' : 'PARASITAS'} NESTA ÁREA`
+        : 'ÁREA LIMPA · A SEMENTE PODE SER COLHIDA',
+      largura / 2, 62);
+
     // Percentual de restauração — o único número do jogo inteiro, e ele existe
     // porque "quanto do mundo eu já trouxe de volta" é exatamente a pergunta
     // que o jogo está fazendo.

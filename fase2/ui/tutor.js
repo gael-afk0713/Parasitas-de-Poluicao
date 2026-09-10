@@ -44,8 +44,11 @@ const DICAS = [
     id: 'semente',
     ver: 'semente',
     titulo: 'Semente',
-    sub: 'alcance-a e esta sala revive',
-    dur: 4,
+    // Ensina a REGRA, não o gesto. Dizer só "alcance-a" mandava o jogador
+    // encostar nela, ver a cápsula recuar e não entender o porquê — a dica
+    // virava a origem da confusão em vez da solução dela.
+    sub: 'limpe a área dos parasitas e ela abre',
+    dur: 4.4,
   },
   {
     id: 'inimigo',

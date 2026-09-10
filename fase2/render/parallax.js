@@ -1001,7 +1001,11 @@ function galhos(ctx, a, s) {
     const arco = lerp(40, 150, h2) * (h > 0.5 ? 1 : -1);
     // Galho grosso é rígido: responde pouco, mas responde ao MESMO vento.
     const balanco = Math.sin(t * 0.35 + h * TAU) * 2
-      + vento(t, x) * lerp(9, 3, h) * (s.escalaLarg ?? 1 > 1 ? 0.4 : 1);
+      /* `s.escalaLarg ?? 1 > 1 ? 0.4 : 1` não fazia o que parece: `>` amarra
+         antes de `??`, então isso era `(s.escalaLarg ?? false) ? 0.4 : 1` —
+         qualquer valor definido caía em 0,4, inclusive as camadas finas de
+         fundo que deveriam balançar MAIS. */
+      + vento(t, x) * lerp(9, 3, h) * ((s.escalaLarg ?? 1) > 1 ? 0.4 : 1);
 
     ctx.lineWidth = lerp(4, 16, h) * (s.escalaLarg ?? 1);
     ctx.beginPath();

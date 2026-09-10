@@ -573,7 +573,14 @@ export class Jogador {
     this.x = dados.x ?? this.x;
     this.y = dados.y ?? this.y;
     this.vidaMax = dados.vidaMax ?? this.vidaMax;
-    this.vida = clamp(dados.vida ?? this.vidaMax, 0, this.vidaMax);
+    /* CARREGAR NUNCA COMEÇA MORTO.
+       O save podia ser gravado com `vida` 0 — o `beforeunload` dispara em
+       qualquer momento, inclusive no quadro em que o jogador morre, e cada
+       parasita morto agora também grava. Restaurar 0 devolvia o jogador
+       direto pra tela de morte, num laço que só o console desfazia.
+       Além disso `aplicarSave` sempre reentra pelo CHECKPOINT, e ponto de
+       descanso curar é o contrato do gênero: carregar devolve a vida cheia. */
+    this.vida = this.vidaMax;
     this.habilidades = new Set(dados.habilidades ?? []);
   }
 }
