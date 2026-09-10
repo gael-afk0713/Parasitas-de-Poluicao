@@ -299,25 +299,40 @@ export class ArteTerreno {
           ctx.lineTo(px, dy);
         }
       }
+      /* AFUNILAMENTO. Toda plataforma da sala é um retângulo de altura
+         constante, e a sala inteira lê como grade porque não existe uma única
+         DIAGONAL na tela. A face de cima não pode inclinar — é nela que o
+         jogador pousa, e mentir sobre isso é o defeito que acabou de ser
+         corrigido. Mas a BARRIGA pode: um tronco grosso numa ponta e fino na
+         outra dá a diagonal sem tocar em um pixel de colisão.
+         O lado grosso vem do hash, então metade da sala afina pra um lado. */
+      const afinaPara = hash2(f.cx0, f.cy, s + 31) < 0.5 ? 1 : -1;
+      const forcaAfina = lerp(0.12, 0.5, hash2(f.cx1, f.cy, s + 37));
+      const afinar = (px) => {
+        const u = (px - bx0) / larg;                 // 0..1
+        return 1 + (afinaPara > 0 ? (0.5 - u) : (u - 0.5)) * 2 * forcaAfina;
+      };
+
       if (ehTronco) {
         // Barriga do tronco: uma curva cheia, e as pontas descem arredondadas
         // — é a curva que faz ler como cilindro em vez de tábua.
-        ctx.quadraticCurveTo(bx1 + espessura * 0.5, y + espessura * 0.5,
-          bx1 - espessura * 0.35, y + espessura);
+        ctx.quadraticCurveTo(bx1 + espessura * 0.5, y + espessura * 0.5 * afinar(bx1),
+          bx1 - espessura * 0.35, y + espessura * afinar(bx1));
         const passos = Math.max(2, Math.round(larg / 26));
         for (let i = passos; i >= 0; i--) {
           const px = bx0 + (larg * i) / passos;
           const n = hash2(Math.round(px), f.cy, s);
-          ctx.lineTo(px, y + espessura * lerp(0.92, 1.06, n) + arco * 0.6);
+          ctx.lineTo(px, y + espessura * afinar(px) * lerp(0.92, 1.06, n) + arco * 0.6);
         }
-        ctx.quadraticCurveTo(bx0 - espessura * 0.5, y + espessura * 0.5, bx0, y + 1);
+        ctx.quadraticCurveTo(bx0 - espessura * 0.5, y + espessura * 0.5 * afinar(bx0),
+          bx0, y + 1);
       } else {
         // Laje: quebrada embaixo, com dentes maiores e desiguais.
         const passos = Math.max(2, Math.round(larg / 15));
         for (let i = passos; i >= 0; i--) {
           const px = bx0 + (larg * i) / passos;
           const n = hash2(Math.round(px), f.cy, s);
-          ctx.lineTo(px, y + espessura * lerp(0.45, 1.35, n * n) + arco * 0.6);
+          ctx.lineTo(px, y + espessura * afinar(px) * lerp(0.45, 1.35, n * n) + arco * 0.6);
         }
       }
       ctx.closePath();
