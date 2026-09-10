@@ -412,7 +412,11 @@ function juncos(ctx, a, s) {
   const x0 = Math.floor(a.x0 / passo) * passo;
   const yb = yDe(a, s.rel);
   const t = a.tempo;
-  ctx.fillStyle = a.cor;
+  /* Degradê vertical em vez de cor chapada: no alto o talo cruza menos ar e
+     precisa ficar mais escuro, senão a ponta fica mais clara que o céu que
+     ela atravessa — o mesmo motivo dos troncos. E de quebra a moita deixa de
+     ser uma mancha preta uniforme. */
+  ctx.fillStyle = corVertical(ctx, a, yb - (s.compMax ?? 190), yb);
 
   for (let x = x0; x <= a.x1; x += passo) {
     const h = hash2(x, s.semente, 113);
@@ -423,7 +427,14 @@ function juncos(ctx, a, s) {
     for (let i = 0; i < n; i++) {
       const hi = hash2(x + i * 13, s.semente + 3, 139);
       const comp = lerp(s.compMin ?? 60, s.compMax ?? 190, hi);
-      const larg = lerp(2, 6, hi) * (s.escalaLarg ?? 1);
+      /* BASE PROPORCIONAL AO COMPRIMENTO.
+         A largura era 2 a 6 px fixos, independente da altura: um junco de
+         400 px saía com 3 px de base, ou seja, um FIO. Na várzea, onde eles
+         chegam a 420, o plano médio inteiro virava um campo de agulhas
+         idênticas — lia como arranhão na lente, não como planta. Um talo real
+         tem uns 3% da própria altura na base, e é essa proporção que faz o
+         olho aceitar a forma como vegetal. */
+      const larg = Math.max(2, comp * 0.032) * (s.escalaLarg ?? 1);
       const bx = cx + (hi - 0.5) * passo * 0.5;
       /* Só a ponta se move, a base fica presa — é o que dá "planta". A
          oscilação própria continua (ela é o tremor de folha), mas quem manda
@@ -433,12 +444,41 @@ function juncos(ctx, a, s) {
       const vento = Math.sin(t * lerp(0.5, 1.1, hi) + hi * TAU) * comp * 0.06
         + ventoAqui * comp * 0.13 / rigidez
         + (hi - 0.5) * comp * 0.2;
+      /* ARCO PRÓPRIO, além do vento. Junco em repouso não é reto: ele já
+         nasce curvado pra um lado, e é a mistura de arcos diferentes dentro
+         da mesma moita que quebra a leitura de "fileira de riscos". */
+      const arco = (hash2(x + i * 7, s.semente + 5, 149) - 0.5) * comp * 0.2;
+      const px = bx + vento + arco;
       ctx.beginPath();
       ctx.moveTo(bx - larg, yb);
-      ctx.quadraticCurveTo(bx - larg * 0.4 + vento * 0.35, yb - comp * 0.6, bx + vento, yb - comp);
-      ctx.quadraticCurveTo(bx + larg * 0.4 + vento * 0.35, yb - comp * 0.6, bx + larg, yb);
+      ctx.quadraticCurveTo(bx - larg * 0.4 + (vento + arco) * 0.35, yb - comp * 0.6,
+        px, yb - comp);
+      ctx.quadraticCurveTo(bx + larg * 0.4 + (vento + arco) * 0.35, yb - comp * 0.6,
+        bx + larg, yb);
       ctx.closePath();
       ctx.fill();
+
+      /* FOLHA. Um em cada três ganha uma lâmina saindo do meio do talo e
+         caindo. É o traço que distingue junco de espinho a 1×, e some
+         sozinho nas camadas pequenas porque acompanha `comp`. */
+      if (hi > 0.62 && comp > 70) {
+        const t0 = lerp(0.35, 0.6, hi);
+        const lx = lerp(bx, px, t0), ly = yb - comp * t0;
+        const lado = hash2(x + i * 3, s.semente + 9, 151) < 0.5 ? -1 : 1;
+        /* Estreita e curta. Na primeira versão a lâmina saía com até 40% do
+           comprimento do talo e uma barriga larga: o resultado arqueava quase
+           180° e a várzea virava um campo de FOICES. Folha de junco é uma
+           fita fina que sai quase paralela e cai só na ponta. */
+        const lc = comp * lerp(0.14, 0.24, hi);
+        ctx.beginPath();
+        ctx.moveTo(lx, ly);
+        ctx.quadraticCurveTo(lx + lado * lc * 0.75, ly - lc * 0.1,
+          lx + lado * lc, ly + lc * 0.3);
+        ctx.quadraticCurveTo(lx + lado * lc * 0.42, ly + lc * 0.06,
+          lx, ly + larg * 0.5);
+        ctx.closePath();
+        ctx.fill();
+      }
     }
   }
 }
