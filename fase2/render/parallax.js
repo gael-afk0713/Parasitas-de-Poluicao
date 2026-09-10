@@ -1246,7 +1246,11 @@ const CAMADAS = {
     { p: 0.72, d: 0.16, cor: 'proximo', brilho: -0.50, veu: 0, formas: [
       { f: 'raizes', rel: -0.15, passo: 190, dens: 0.62, compMin: 380, compMax: 900,
         largMin: 9, largMax: 22, semente: 83 },
-      { f: 'galhos', rel: 0.52, passo: 820, dens: 0.5, escalaLarg: 3.2, semente: 89 },
+      /* Escala 3,2 dava vigas de 50 px atravessando o quadro inteiro de
+         ponta a ponta: as linhas mais fortes da cena eram duas horizontais
+         quase retas e de espessura constante, que é a definição de cabo
+         industrial. Menos densas e menos grossas, elas voltam a ser galho. */
+      { f: 'galhos', rel: 0.52, passo: 940, dens: 0.3, escalaLarg: 1.9, semente: 89 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
       { f: 'troncosColossais', rel: 0.90, passo: 620, dens: 0.42,

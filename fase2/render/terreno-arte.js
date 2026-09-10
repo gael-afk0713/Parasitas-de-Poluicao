@@ -31,7 +31,11 @@ export class ArteTerreno {
     this._cachePureza = -1;
   }
 
-  invalidar() { this._cacheMusgo = null; this._cacheSalientes = undefined; }
+  invalidar() {
+    this._cacheMusgo = null;
+    this._cacheSalientes = undefined;
+    this._cacheEncontros = undefined;
+  }
 
   /* --------------------------------------------------------------------- */
 
@@ -83,6 +87,9 @@ export class ArteTerreno {
 
     // --- 4. contorno ---------------------------------------------------
     this._contorno(ctx, tema);
+
+    // --- 4b. encontros de plano -----------------------------------------
+    this._encontros(ctx, tema);
 
     // --- 5 e 6. crista + musgo ------------------------------------------
     this._cristas(ctx, tema);
@@ -762,11 +769,16 @@ export class ArteTerreno {
   static contato(ctx, tema, x, y, largura, alturaDoChao = 0) {
     const k = clamp01(1 - alturaDoChao);
     if (k <= 0.02) return;
-    const rx = largura * lerp(0.75, 0.5, 1 - k);
-    const ry = rx * 0.3;
+    const rx = largura * lerp(0.8, 0.55, 1 - k);
+    const ry = rx * 0.28;
+    /* Queda LONGA. Com o degradê caindo a zero só no raio final, a borda da
+       elipse encontrava o brilho do herói num anel visível — lia como um
+       decalque, não como sombra. A opacidade cai quase toda no primeiro
+       terço e o resto é bruma. */
     const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
-    g.addColorStop(0, rgba(tema.primeiroPlano, 0.5 * k));
-    g.addColorStop(0.6, rgba(tema.primeiroPlano, 0.26 * k));
+    g.addColorStop(0, rgba(tema.primeiroPlano, 0.42 * k));
+    g.addColorStop(0.35, rgba(tema.primeiroPlano, 0.2 * k));
+    g.addColorStop(0.68, rgba(tema.primeiroPlano, 0.06 * k));
     g.addColorStop(1, rgba(tema.primeiroPlano, 0));
     ctx.save();
     ctx.translate(x, y);
@@ -775,6 +787,81 @@ export class ArteTerreno {
     ctx.beginPath();
     ctx.arc(0, 0, rx, 0, TAU);
     ctx.fill();
+    ctx.restore();
+  }
+
+  /**
+   * SAPOPEMA — o alargamento onde uma parede encontra o chão.
+   *
+   * É o que faltava pra sala parar de ler como andaime. Numa sala montada em
+   * grade, todo encontro de plano é um ângulo reto perfeito, e vinte ângulos
+   * retos perfeitos na mesma tela leem como estrutura montada, não como
+   * lugar: nada na natureza encosta em outra coisa sem engrossar no
+   * encontro. Raiz de árvore, base de pilar, pé de barranco — todos abrem.
+   *
+   * A forma é um triângulo de hipotenusa CÔNCAVA: sobe colada ao chão e só
+   * então dispara pela parede. Côncava é o que distingue "cresceu" de
+   * "chanfro de CAD". Vem escura de propósito (mistura com `borda`), porque
+   * canto interno é onde a luz do céu não chega — o mesmo traço resolve a
+   * forma e a oclusão.
+   *
+   * Puro desenho, como as `_salientes`: fica em canto CÔNCAVO, então não tem
+   * como virar degrau falso.
+   */
+  _encontros(ctx, tema) {
+    if (this._cacheEncontros === undefined) {
+      const t = this.terreno.tile;
+      const p = new Path2D();
+      const raizes = new Path2D();
+      let tem = false;
+
+      for (const faixa of this.terreno.arestasSuperiores(0.86)) {
+        for (const ponta of [faixa[0], faixa[faixa.length - 1]]) {
+          for (const lado of [-1, 1]) {
+            // Parede subindo de um lado e ar do outro: canto interno.
+            if (!this.terreno._solidoVisualPx(ponta.x + lado * t * 0.45, ponta.y - t * 0.5)) continue;
+            if (this.terreno._solidoVisualPx(ponta.x - lado * t * 0.45, ponta.y - t * 0.5)) continue;
+
+            const rx = Math.round(ponta.x), ry = Math.round(ponta.y);
+            const L = t * lerp(0.5, 1.25, hash2(rx, ry, 83));
+            const H = t * lerp(0.4, 1.05, hash2(rx, ry, 89));
+            p.moveTo(ponta.x - lado * L, ponta.y + 1);
+            p.quadraticCurveTo(
+              ponta.x - lado * L * 0.24, ponta.y - H * 0.1,
+              ponta.x - lado * 0.5, ponta.y - H
+            );
+            p.lineTo(ponta.x + lado * 2, ponta.y - H);
+            p.lineTo(ponta.x + lado * 2, ponta.y + 1);
+            p.closePath();
+
+            // Duas ou três raízes finas escorrendo pelo chão a partir do pé.
+            const n = 2 + Math.floor(hash2(rx, ry, 97) * 2);
+            for (let i = 0; i < n; i++) {
+              const h = hash2(rx + i * 7, ry, 101);
+              const comp = t * lerp(0.5, 1.6, h);
+              const y0 = ponta.y - H * lerp(0.05, 0.5, h);
+              raizes.moveTo(ponta.x - lado * 1, y0);
+              raizes.quadraticCurveTo(
+                ponta.x - lado * comp * 0.5, y0 + (ponta.y - y0) * 0.35,
+                ponta.x - lado * comp, ponta.y + lerp(-1, 1.5, h)
+              );
+            }
+            tem = true;
+          }
+        }
+      }
+      this._cacheEncontros = tem ? { p, raizes } : null;
+    }
+    if (!this._cacheEncontros) return;
+
+    const pureza = tema.pureza ?? 0;
+    ctx.save();
+    ctx.fillStyle = misturarHex(tema.terreno, tema.borda, 0.5);
+    ctx.fill(this._cacheEncontros.p);
+    ctx.strokeStyle = rgba(misturarHex(tema.terreno, tema.crista, lerp(0.25, 0.5, pureza)), 0.7);
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = 'round';
+    ctx.stroke(this._cacheEncontros.raizes);
     ctx.restore();
   }
 

@@ -119,9 +119,33 @@ export class Sombra {
 
        Duas fendas grandes, com vão escuro entre elas e inclinadas pra dentro
        (carranca). O rosto é a âncora de reconhecimento da Sombra. */
-    const nOlhos = forma.olhos ?? 2;
+    /* UM OLHO SÓ, FORA DO EIXO — o padrão da espécie.
+       Duas fendas simétricas leem como ROSTO, e rosto já é do Guardião: ele
+       tem dois olhos grandes e claros, e os parasitas tinham dois olhos
+       grandes e claros. A 26 px de tela os dois usavam o mesmo símbolo, e o
+       jogador lia "personagem" nos dois — a criatura perdia a estranheza
+       inteira antes mesmo de se mexer.
+
+       Um olho só, deslocado do centro e inclinado, não lê como rosto: lê
+       como coisa. E a posição vem do hash da criatura, então dois Errantes
+       lado a lado não são a mesma figura duas vezes. */
+    const nOlhos = forma.olhos ?? 1;
     this.olhos = Array.from({ length: nOlhos }, (_, i) => {
-      const f = nOlhos === 1 ? 0.5 : i / (nOlhos - 1);
+      if (nOlhos === 1) {
+        const hx = hash2(obj.cx, obj.cy, 61);
+        const hy = hash2(obj.cx, obj.cy, 67);
+        return {
+          // Sempre adiantado na direção do olhar — a fenda é o que diz pra
+          // que lado a criatura anda, e isso é informação de jogo.
+          dx: this.raio * lerp(0.08, 0.30, hx),
+          dy: -this.raio * lerp(0.40, 0.62, hy),
+          larg: this.raio * 0.30,
+          alt: this.raio * 0.44,
+          giro: lerp(-0.55, -0.14, hy),
+          fase: hash2(obj.cx, obj.cy + i, 29) * TAU,
+        };
+      }
+      const f = i / (nOlhos - 1);
       const lado = f < 0.5 ? -1 : 1;
       return {
         /* `alt` era 0,52·raio: 13,5 px num corpo de 29 de altura, ou seja 47%
@@ -188,6 +212,23 @@ export class Sombra {
     this.t += dt;
     this.piscarDano = Math.max(0, this.piscarDano - dt);
     this.dirSuave = damp(this.dirSuave, this.dir, 0.09, dt);
+
+    /* ECO. Duas posições que perseguem a criatura com atraso — a segunda
+       persegue a PRIMEIRA, não a criatura, então o rastro curva junto em vez
+       de sair reto.
+
+       Parada, elas alcançam a criatura e o rastro desaparece sozinho: é o
+       movimento que revela o borrão, que é o comportamento certo. Sem isso
+       toda criatura desliza pela cena sem deixar marca e a sala inteira lê
+       como um mostruário de adesivos em movimento. */
+    if (this._ecoX === undefined) {
+      this._ecoX = this.centroX; this._ecoY = this.centroY;
+      this._eco2X = this.centroX; this._eco2Y = this.centroY;
+    }
+    this._ecoX = damp(this._ecoX, this.centroX, 0.055, dt);
+    this._ecoY = damp(this._ecoY, this.centroY, 0.055, dt);
+    this._eco2X = damp(this._eco2X, this._ecoX, 0.055, dt);
+    this._eco2Y = damp(this._eco2Y, this._ecoY, 0.055, dt);
 
     // Piscar > tremeluzir: o alfa dos olhos era uma senoide permanente, que
     // lê como vaga-lume. Uma piscada curta e rara lê como encarada.
@@ -290,6 +331,7 @@ export class Sombra {
       ctx.translate(-cx, -cy);
     }
 
+    this._rastro(ctx, tema, cx, cy);
     this._aureola(ctx, tema, cx, cy);
     // Corpo e chifres num caminho SÓ; as fendas por ÚLTIMO. Antes a massa
     // vinha antes dos tentáculos e as bases dos sete convergiam exatamente
@@ -310,6 +352,35 @@ export class Sombra {
    * contorno, dá leitura nos dois fundos, e mantém a criatura sendo o que ela
    * é: um buraco no mundo.
    */
+  /**
+   * O borrão que fica pra trás quando a criatura se move.
+   *
+   * Não é a silhueta inteira repetida — a 26 px de tela isso vira três
+   * bichos, não um bicho rápido. São duas manchas do capuz, moles e sem
+   * contorno, nas posições de `_ecoX`/`_eco2X`. O alfa sai da DISTÂNCIA até a
+   * criatura, então parada ela não tem rastro nenhum e correndo o rastro
+   * estica: quem se move deixa marca, quem espreita não.
+   */
+  _rastro(ctx, tema, cx, cy) {
+    if (this._ecoX === undefined || this.morrendo > 0) return;
+    const dy = this.deslocDesenhoY + Math.sin(this.t * 3.1) * 1.6;
+    const r = this.raio;
+    ctx.save();
+    ctx.fillStyle = tema.primeiroPlano;
+    for (const [ex, ey, k] of [[this._ecoX, this._ecoY, 0.3],
+      [this._eco2X, this._eco2Y, 0.16]]) {
+      const d = Math.hypot(ex - cx, ey - (cy - dy));
+      const forca = clamp01(d / (r * 1.1));
+      if (forca < 0.04) continue;
+      ctx.globalAlpha = forca * k;
+      ctx.beginPath();
+      ctx.ellipse(ex, ey + dy, r * 0.86 * this.escalaX, r * 0.9 * this.escalaY,
+        0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   _aureola(ctx, tema, cx, cy) {
     // 2,6 de raio a 0,55 de alfa era uma mancha borrada que comia justamente
     // a borda que precisa estar nítida. Menor e mais fraca.
@@ -459,7 +530,7 @@ export class Sombra {
       ctx.translate(o.dx * this.dir + this.dirSuave * r * 0.22, o.dy);
       ctx.rotate(o.giro * this.dir);
       ctx.beginPath();
-      ctx.ellipse(0, 0, r * 0.18,
+      ctx.ellipse(0, 0, o.larg ?? r * 0.18,
         o.alt * (1 - piscada) * (1 + this.telegrafo * 0.5), 0, 0, TAU);
       ctx.fill();
       ctx.restore();
@@ -500,7 +571,8 @@ export class Sombra {
     ctx.globalAlpha = (0.18 + this.telegrafo * 0.62) * (1 - piscada);
     for (const o of this.olhos) {
       ctx.beginPath();
-      ctx.ellipse(o.dx * this.dir, o.dy, this.raio * 0.2, o.alt * 1.2, 0, 0, TAU);
+      ctx.ellipse(o.dx * this.dir, o.dy,
+        (o.larg ?? this.raio * 0.18) * 1.1, o.alt * 1.2, 0, 0, TAU);
       ctx.fill();
     }
     ctx.restore();
@@ -538,7 +610,7 @@ export class Espreita extends Sombra {
       // Gota LISA: zero chifres e sem barra. É a única silhueta redonda do
       // bestiário, e é o que faz "aquele que flutua" ser lido de longe.
       vida: 1, raio: 11, largura: 26, altura: 26,
-      tentaculos: 0, olhos: 2, escalaX: 1.05, escalaY: 0.95,
+      tentaculos: 0, olhos: 1, escalaX: 1.05, escalaY: 0.95,
       temManto: false, gravidade: false,
     });
     this.baseY = this.y;
@@ -590,7 +662,7 @@ export class Cuspidor extends Sombra {
       // CORCUNDA: mais largo que alto, com UM chifre grosso só do lado de
       // onde sai o tiro. Assimetria é o que diz "isto aponta pra você".
       vida: 3, raio: 15, largura: 34, altura: 36,
-      tentaculos: 1, compTentaculo: 13, olhos: 2,
+      tentaculos: 1, compTentaculo: 13, olhos: 1,
       escalaX: 1.35, escalaY: 0.85, espalhaTentaculos: 0.55,
     });
     this.recarga = RECARGA_CUSPIDOR * (0.5 + hash2(obj.cx, obj.cy, 3));
@@ -665,7 +737,7 @@ export class Rastejante extends Sombra {
     super(obj, {
       // ACHATADO contra a superfície — a única silhueta larga e baixa.
       vida: 1, raio: 10, largura: 24, altura: 24,
-      tentaculos: 0, olhos: 2, escalaX: 1.6, escalaY: 0.6,
+      tentaculos: 0, olhos: 1, escalaX: 1.6, escalaY: 0.6,
       temManto: false, gravidade: false,
     });
     this.normal = 0;
@@ -799,7 +871,7 @@ export class Estopim extends Sombra {
          esfera inchada e LISA — sem manto, sem chifre — que é a leitura
          "isto vai estourar". */
       vida: 1, raio: 12, largura: 28, altura: 28,
-      tentaculos: 0, olhos: 2, dano: 2,
+      tentaculos: 0, olhos: 1, dano: 2,
       escalaX: 1.18, escalaY: 1.18, temManto: false,
     });
     this.vel = 88;
@@ -871,7 +943,7 @@ export class Tecelao extends Sombra {
     super(obj, {
       // ALTO E FINO, com um espinho reto pra cima que entra no fio.
       vida: 2, raio: 12, largura: 26, altura: 28,
-      tentaculos: 1, compTentaculo: 12, olhos: 2,
+      tentaculos: 1, compTentaculo: 12, olhos: 1,
       escalaX: 0.7, escalaY: 1.45, espalhaTentaculos: 1, gravidade: false,
     });
     this.tetoY = this.y;

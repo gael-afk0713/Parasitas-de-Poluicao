@@ -42,6 +42,24 @@ const RAIO_CABECA = 9.5;
    abrem 2 px de fresta, que é o que o olho lê como pescoço. */
 const CY_CABECA = -35;     // centro da cabeça em relação aos pés
 
+/* --------------------------------------------------------------- assinatura
+   O Guardião era branco-esverdeado sobre um mundo cinza-esverdeado: a única
+   coisa que o separava do fundo era o brilho. Isso funciona num quadro e
+   falha em todos os outros — em sala clara ele some, em sala restaurada ele
+   vira mais uma folha.
+
+   Estas duas cores são as ÚNICAS do personagem que não saem do tema. Não
+   mudam quando a área muda nem quando o mundo restaura, e nenhum outro
+   elemento da cena as usa. É por isso que funcionam: numa paleta inteira de
+   cinza-azulado frio, um âmbar quente de 9 px é reconhecível a qualquer
+   distância, em qualquer sala, e pertence só a ele.
+
+   Ficam na FAIXA DE CINTURA, que é também a fronteira entre o torso claro e
+   as pernas escuras — o mesmo traço resolve a cor de assinatura e a leitura
+   da divisão do corpo. */
+const AMBAR = '#eaa24f';
+const AMBAR_FUNDO = '#a8622a';
+
 export class ArteJogador {
   constructor() {
     /** Cauda: cadeia de molas que segue o corpo com atraso crescente. */
@@ -313,6 +331,9 @@ export class ArteJogador {
       escuro: tema.ceuTopo,
       marca: tema.crista,
       acento: tema.acento,
+      // Únicos valores do personagem que NÃO vêm do tema — ver `AMBAR`.
+      ambar: AMBAR,
+      ambarFundo: AMBAR_FUNDO,
     };
   }
 
@@ -389,8 +410,19 @@ export class ArteJogador {
        zero, nenhuma informação de forma. O truque que Ori, Rayman e Hollow
        Knight compartilham é o oposto — torso e cabeça claros, membros finos e
        ESCUROS. Trocar só a cor já muda o personagem inteiro. */
-    const pernaClara = misturarHex(cores.sombra, cores.escuro, 0.55);
-    const pernaEscura = misturarHex(cores.sombra, cores.escuro, 0.78);
+    /* ...mas membro escuro só funciona sobre fundo CLARO. Medido na sala de
+       abertura: perna em ~#2b3540 sobre terreno em ~#252c37 — sete níveis de
+       luminância de diferença, ou seja, invisível. O personagem lia como um
+       torso flutuando.
+
+       A saída não é clarear a perna (isso desfaz o contraste com o torso e a
+       traz de volta pro macarrão cinza): é dar CONTORNO. Perna escura com um
+       fio de luz em volta lê sobre qualquer fundo, claro ou escuro. */
+    const pernaClara = misturarHex(cores.sombra, cores.escuro, 0.72);
+    const pernaEscura = misturarHex(cores.sombra, cores.escuro, 0.9);
+    // Fraco de propósito: a 0,5 o fio virava um CASULO cinza em volta da
+    // perna e o membro escuro sumia dentro dele — o oposto do efeito.
+    const halo = rgba(cores.meio, 0.3);
 
     const perna = (dxQuadril, fase, atras) => {
       ctx.save();
@@ -428,21 +460,34 @@ export class ArteJogador {
       }
 
       // Coxa grossa, canela fina: espessura constante lê como macarrão.
-      ctx.lineWidth = 4.8;
-      ctx.beginPath();
-      ctx.moveTo(dxQuadril, -13);
-      ctx.quadraticCurveTo((dxQuadril + joelhoX) / 2, (joelhoY - 13) / 2 - 2,
+      const coxa = new Path2D();
+      coxa.moveTo(dxQuadril, -13);
+      coxa.quadraticCurveTo((dxQuadril + joelhoX) / 2, (joelhoY - 13) / 2 - 2,
         joelhoX, joelhoY);
-      ctx.stroke();
-      ctx.lineWidth = 2.6;
-      ctx.beginPath();
-      ctx.moveTo(joelhoX, joelhoY);
-      ctx.quadraticCurveTo(joelhoX + (peX - joelhoX) * 0.4, joelhoY + (peY - joelhoY) * 0.6,
-        peX, peY);
-      ctx.stroke();
+      const canela = new Path2D();
+      canela.moveTo(joelhoX, joelhoY);
+      canela.quadraticCurveTo(joelhoX + (peX - joelhoX) * 0.4,
+        joelhoY + (peY - joelhoY) * 0.6, peX, peY);
 
-      // Pé: gota apontando pra frente, não bola. Menos é mais nessa escala.
-      ctx.fillStyle = atras ? pernaEscura : pernaClara;
+      const corDentro = atras ? pernaEscura : pernaClara;
+      // Passada 1: o fio de luz, mesmo traçado 1,6 px mais largo. Só na
+      // perna da frente: nas duas viraria um contorno de adesivo.
+      if (!atras) {
+        ctx.strokeStyle = halo;
+        ctx.lineWidth = 5.9; ctx.stroke(coxa);
+        ctx.lineWidth = 3.7; ctx.stroke(canela);
+      }
+      // Passada 2: o membro.
+      ctx.strokeStyle = corDentro;
+      ctx.lineWidth = 4.8; ctx.stroke(coxa);
+      ctx.lineWidth = 2.6; ctx.stroke(canela);
+
+      /* Pé: gota apontando pra frente, não bola. Menos é mais nessa escala.
+         E SEM fio de luz: o pé fica sempre no chão, onde a sombra de contato
+         já separa o personagem do plano. Com o fio, os dois pés viravam dois
+         anéis claros sobrepostos e o resultado lia como um decalque oval sob
+         o herói — foi exatamente o que apareceu na primeira captura. */
+      ctx.fillStyle = corDentro;
       ctx.beginPath();
       ctx.ellipse(peX + 1, peY, 3.6, 1.7, 0, 0, TAU);
       ctx.fill();
@@ -474,9 +519,16 @@ export class ArteJogador {
        Peito 5,6 · cintura 3,9 · quadril 5,2 → peito 11,2 contra cabeça 21,
        razão 0,53, que é a faixa do Ori. E o topo desceu de −30 pra −27, o que
        abre uma fresta que o olho lê como pescoço. */
+    /* ESTRUTURA DE VALOR. O topo do tronco era `#ffffff` — o mesmo branco
+       puro do miolo da cabeça. Com dois brancos iguais encostados, cabeça e
+       torso viram uma mancha só e o olho não tem onde pousar: um personagem
+       precisa de UM ponto mais claro, e esse ponto é o rosto. Aqui o tronco
+       começa em `claro` e cai até `sombra`, o que deixa três zonas de valor
+       no corpo — rosto (mais claro), torso (médio), membros (escuro) — em
+       vez de uma rampa contínua sem hierarquia. */
     const g = ctx.createLinearGradient(0, -28, 0, -8);
-    g.addColorStop(0, '#ffffff');
-    g.addColorStop(0.42, cores.claro);
+    g.addColorStop(0, cores.claro);
+    g.addColorStop(0.42, misturarHex(cores.claro, cores.meio, 0.55));
     g.addColorStop(1, cores.sombra);
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -518,6 +570,8 @@ export class ArteJogador {
     ctx.stroke();
     ctx.restore();
 
+    this._faixa(ctx, j, cores, respiro);
+
     // Sombra projetada da cabeça no peito: separa cabeça de corpo na hora.
     ctx.save();
     ctx.strokeStyle = rgba(cores.escuro, 0.3);
@@ -556,6 +610,62 @@ export class ArteJogador {
       }
       ctx.restore();
     }
+  }
+
+  /**
+   * A faixa de cintura — a marca de assinatura do Guardião.
+   *
+   * Três coisas de uma vez, e é por isso que ela paga o custo:
+   *   - é a única cor QUENTE do personagem e da cena;
+   *   - cai exatamente na cintura, onde o torso claro encontra as pernas
+   *     escuras, e transforma um degradê difuso numa divisão nítida;
+   *   - a ponta solta pende de um lado só, o que dá ao personagem uma
+   *     assimetria fixa: ele passa a ter um "lado" reconhecível, coisa que
+   *     uma silhueta espelhada nunca tem.
+   *
+   * A ponta atrasa em relação ao corpo (mesma ideia da cauda, sem o custo de
+   * um sistema de molas): balança com a corrida e sobe na queda.
+   */
+  _faixa(ctx, j, cores, respiro) {
+    const yC = -14.4 + respiro * 0.25;
+    ctx.save();
+
+    /* Ponta solta, de um lado só, DESENHADA PRIMEIRO pra passar por trás da
+       banda. O atraso vem da velocidade horizontal e da vertical: correndo
+       ela fica pra trás, caindo ela sobe. */
+    const arrasto = clamp(-j.vx / 240, -1.2, 1.2);
+    const sobe = clamp(j.vy / 700, -0.9, 0.9);
+    const bal = Math.sin(this.respiro * 2.4) * 0.5 + Math.sin(j.faseAndar) * 0.9;
+    const px = -4.1 + arrasto * 3.4 + bal * 0.7;
+    const py = yC + 7.2 - sobe * 3.4;
+    ctx.fillStyle = cores.ambarFundo;
+    ctx.beginPath();
+    ctx.moveTo(-4.2, yC - 0.6);
+    ctx.quadraticCurveTo(px + 1.6, yC + 3.2, px, py);
+    ctx.quadraticCurveTo(px + 2.6, yC + 3.4, -2.4, yC + 1.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Banda: uma fita estreita atravessando o quadril, levemente inclinada.
+    // Reta demais lê como cinto de segurança; a inclinação é o que faz pano.
+    ctx.fillStyle = cores.ambar;
+    ctx.beginPath();
+    ctx.moveTo(-4.4, yC - 1.3);
+    ctx.quadraticCurveTo(0, yC + 0.4, 4.4, yC - 2.2);
+    ctx.lineTo(4.4, yC + 0.2);
+    ctx.quadraticCurveTo(0, yC + 2.8, -4.4, yC + 1.2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Aresta escura embaixo: sem ela a faixa lê como adesivo, não como pano.
+    ctx.strokeStyle = rgba(cores.ambarFundo, 0.8);
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-4.4, yC + 1.2);
+    ctx.quadraticCurveTo(0, yC + 2.8, 4.4, yC + 0.2);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   _bracos(ctx, j, cores, pose = {}) {
@@ -707,11 +817,25 @@ export class ArteJogador {
         -largura * 0.9, comprimento * 0.88,
         -largura * 0.6, comprimento
       );
-      ctx.bezierCurveTo(
-        largura * 0.4, comprimento * 0.82,
-        largura, comprimento * 0.4,
-        largura * 0.5, 0
-      );
+      /* Volta pela aresta EXTERNA, e a da frente traz um ENTALHE a ~62% do
+         comprimento — uma mordida velha que nunca fechou.
+
+         Está no contorno de propósito. A primeira versão cortava com
+         `destination-out`, que não recorta a orelha: recorta o CANVAS, ou
+         seja, abriria um buraco na floresta atrás dela. Entalhe é forma, e
+         forma se resolve no traçado.
+
+         É pequeno: não muda a silhueta de longe, mas de perto é a diferença
+         entre uma forma gerada e uma forma que viveu alguma coisa — e, junto
+         com a ponta da faixa, dá ao Guardião uma assimetria que sobrevive ao
+         espelhamento da direção. */
+      ctx.quadraticCurveTo(largura * 0.55, comprimento * 0.86,
+        largura * 0.74, comprimento * 0.70);
+      if (!atras) {
+        ctx.lineTo(largura * 0.12, comprimento * 0.645);
+        ctx.lineTo(largura * 0.80, comprimento * 0.56);
+      }
+      ctx.quadraticCurveTo(largura * 0.92, comprimento * 0.30, largura * 0.5, 0);
       ctx.closePath();
       ctx.fill();
       // Interior escuro na orelha da frente: sem isso ela é o maior elemento
