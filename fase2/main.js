@@ -6,10 +6,12 @@
    arquivo, ele pertence a mundo/mundo.js ou a uma entidade.
    ========================================================================= */
 
+import { clamp01 } from './core/mat.js';
 import { Tela, Laco, Camera, Transicao } from './core/laco.js';
 import { Entrada } from './core/entrada.js';
 import { Renderizador, luzRadial, feixeLuz } from './render/renderizador.js';
 import { Mundo } from './mundo/mundo.js';
+import { ArteTerreno } from './render/terreno-arte.js';
 import { validarRegistro } from './mundo/salas.js';
 import {
   desenharParallax, desenharPrimeiroPlano, anguloLuzArea, desenharHorizonte,
@@ -197,7 +199,32 @@ function quadro(alpha, dtReal) {
   render.camada(1, (ctx) => mundo.decor.desenhar(ctx, tema));
   render.emissivo(1, (ctx) => mundo.decor.desenharLuz(ctx, tema));
 
-  // 8 · entidades + jogador
+  /* 8 · SOMBRAS DE CONTATO, e só depois as entidades.
+     Sem elas, personagem e criatura ficam colados POR CIMA do plano em vez de
+     apoiados nele — é o detalhe mais barato que existe e o que mais separa
+     "colagem" de "lugar". Vão numa passada própria, antes de tudo que é
+     entidade, senão a sombra de um cairia por cima do corpo do outro. */
+  render.camada(1, (ctx) => {
+    const t = mundo.sala.terreno;
+    const sombraDe = (e, largura) => {
+      const d = t.alturaAteChao(e.centroX, e.y + (e.altura ?? 0) + 1, 6);
+      if (!Number.isFinite(d)) return;
+      ArteTerreno.contato(ctx, tema, e.centroX, e.y + (e.altura ?? 0) + d,
+        largura, clamp01(d / 90));
+    };
+    for (const e of mundo.entidades) {
+      if (e.gravidade === false || e.perigoso === false || e.morta) continue;
+      sombraDe(e, (e.largura ?? 26) * 0.9);
+    }
+    const j = mundo.jogador;
+    if (j.visivel) {
+      const d = t.alturaAteChao(j.centroX, j.pesY + 1, 6);
+      if (Number.isFinite(d)) {
+        ArteTerreno.contato(ctx, tema, j.centroX, j.pesY + d, 26, clamp01(d / 90));
+      }
+    }
+  });
+
   render.camada(1, (ctx) => {
     for (const e of mundo.entidades) e.desenhar?.(ctx, tema, camera);
     mundo.arteJogador.desenhar(ctx, mundo.jogador, tema);

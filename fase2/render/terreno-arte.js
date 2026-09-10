@@ -167,7 +167,6 @@ export class ArteTerreno {
       const x0 = f.cx0 * t.tile;
       const x1 = (f.cx1 + 1) * t.tile;
       const y = f.cy * t.tile;
-      const largura = x1 - x0;
       const s = this.semente + f.cy * 31 + f.cx0;
 
       /* DOIS TIPOS DE PLATAFORMA.
@@ -183,30 +182,59 @@ export class ArteTerreno {
          dois: a face de cima é a coisa mais clara da cena depois do próprio
          Guardião, porque é nela que o jogador pisa. */
       const ehTronco = hash2(f.cx0, f.cy, s + 5) < 0.55;
-      const espessura = t.tile * (ehTronco ? 0.46 : 0.4);
+      /* ESPESSURA E PONTAS VARIÁVEIS.
+         Os dois tipos existiam mas liam iguais, e o motivo é que tudo que
+         variava entre eles era TEXTURA INTERNA — sulco de casca, trinca — e
+         textura interna some a 40 px de tela. O que lê é a SILHUETA, e a
+         silhueta era idêntica: mesma espessura, mesmas pontas travadas na
+         grade de tiles, mesma face de cima reta de borda a borda.
 
-      const arco = Math.min(4, largura * 0.012);
-      const topoY = (px) => y + 1 + arco * Math.sin(((px - x0) / largura) * Math.PI);
+         Agora a espessura varia ±25% por peça e as pontas saem da grade —
+         nenhuma plataforma da sala começa e termina onde a grade manda. */
+      const hEsp = hash2(f.cx0, f.cy, s + 17);
+      const espessura = t.tile * (ehTronco ? 0.46 : 0.4) * lerp(0.78, 1.22, hEsp);
+      const recuoE = lerp(-6, 10, hash2(f.cx0, f.cy, s + 19));
+      const recuoD = lerp(-6, 10, hash2(f.cx1, f.cy, s + 23));
+      const bx0 = x0 - recuoE, bx1 = x1 + recuoD;
+      const larg = bx1 - bx0;
+
+      const arco = Math.min(4, larg * 0.012);
+      const topoY = (px) => y + 1 + arco * Math.sin(((px - bx0) / larg) * Math.PI);
       ctx.beginPath();
-      ctx.moveTo(x0, y + 1);
-      ctx.quadraticCurveTo((x0 + x1) / 2, y + 1 + arco, x1, y + 1);
+      ctx.moveTo(bx0, y + 1);
+      if (ehTronco) {
+        ctx.quadraticCurveTo((bx0 + bx1) / 2, y + 1 + arco, bx1, y + 1);
+      } else {
+        /* LAJE: a face de cima é quebrada em degraus de 2 a 5 px. Uma aresta
+           superior perfeitamente reta de 200 px é a coisa que mais denuncia
+           geometria gerada — pedra não tem isso. */
+        const nDeg = Math.max(3, Math.round(larg / 46));
+        for (let i = 1; i <= nDeg; i++) {
+          const px = bx0 + (larg * i) / nDeg;
+          const hd = hash2(Math.round(px), f.cy, s + 29);
+          const dy = y + 1 + arco * Math.sin(((px - bx0) / larg) * Math.PI)
+            + (hd - 0.5) * 5;
+          ctx.lineTo(px - larg / nDeg * 0.12, dy);
+          ctx.lineTo(px, dy);
+        }
+      }
       if (ehTronco) {
         // Barriga do tronco: uma curva cheia, e as pontas descem arredondadas
         // — é a curva que faz ler como cilindro em vez de tábua.
-        ctx.quadraticCurveTo(x1 + espessura * 0.5, y + espessura * 0.5,
-          x1 - espessura * 0.35, y + espessura);
-        const passos = Math.max(2, Math.round(largura / 26));
+        ctx.quadraticCurveTo(bx1 + espessura * 0.5, y + espessura * 0.5,
+          bx1 - espessura * 0.35, y + espessura);
+        const passos = Math.max(2, Math.round(larg / 26));
         for (let i = passos; i >= 0; i--) {
-          const px = x0 + (largura * i) / passos;
+          const px = bx0 + (larg * i) / passos;
           const n = hash2(Math.round(px), f.cy, s);
           ctx.lineTo(px, y + espessura * lerp(0.92, 1.06, n) + arco * 0.6);
         }
-        ctx.quadraticCurveTo(x0 - espessura * 0.5, y + espessura * 0.5, x0, y + 1);
+        ctx.quadraticCurveTo(bx0 - espessura * 0.5, y + espessura * 0.5, bx0, y + 1);
       } else {
         // Laje: quebrada embaixo, com dentes maiores e desiguais.
-        const passos = Math.max(2, Math.round(largura / 15));
+        const passos = Math.max(2, Math.round(larg / 15));
         for (let i = passos; i >= 0; i--) {
-          const px = x0 + (largura * i) / passos;
+          const px = bx0 + (larg * i) / passos;
           const n = hash2(Math.round(px), f.cy, s);
           ctx.lineTo(px, y + espessura * lerp(0.45, 1.35, n * n) + arco * 0.6);
         }
@@ -228,15 +256,15 @@ export class ArteTerreno {
         ctx.lineWidth = 1;
         for (const k of [0.42, 0.68]) {
           ctx.beginPath();
-          for (let px = x0 + 4; px <= x1 - 4; px += 9) {
+          for (let px = bx0 + 4; px <= bx1 - 4; px += 9) {
             const n = hash2(Math.round(px), f.cy + k * 10, s + 3);
             const yy = topoY(px) + espessura * k + (n - 0.5) * 1.6;
-            px === x0 + 4 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
+            px === bx0 + 4 ? ctx.moveTo(px, yy) : ctx.lineTo(px, yy);
           }
           ctx.stroke();
         }
         // Tampas de corte: o anel na ponta é o que diz "isto foi cortado".
-        for (const [px, sinal] of [[x0 + 2.5, -1], [x1 - 2.5, 1]]) {
+        for (const [px, sinal] of [[bx0 + 2.5, -1], [bx1 - 2.5, 1]]) {
           ctx.fillStyle = misturarHex(tema.terreno, tema.borda, 0.55);
           ctx.beginPath();
           ctx.ellipse(px, y + espessura * 0.52, espessura * 0.24, espessura * 0.5, 0, 0, TAU);
@@ -251,7 +279,7 @@ export class ArteTerreno {
       } else {
         // Trinca: uma só, atravessando a laje na diagonal.
         const hc = hash2(f.cx0, f.cy, s + 11);
-        const cx0 = x0 + largura * lerp(0.25, 0.7, hc);
+        const cx0 = bx0 + larg * lerp(0.25, 0.7, hc);
         ctx.strokeStyle = rgba(tema.terrenoFundo, 0.6);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -273,14 +301,14 @@ export class ArteTerreno {
       ctx.lineWidth = 1.6;
       ctx.lineCap = 'round';
       const corTopo = misturarHex(tema.crista, '#ffffff', 0.4);
-      const passosTopo = Math.max(3, Math.round(largura / 18));
+      const passosTopo = Math.max(3, Math.round(larg / 18));
       for (let i = 0; i < passosTopo; i++) {
         const u0 = i / passosTopo, u1 = (i + 1) / passosTopo;
         const n = hash2(f.cx0 + i, f.cy, s + 7);
         ctx.strokeStyle = rgba(corTopo, lerp(0.85, 0.72, pureza) * lerp(0.45, 1, n));
         ctx.beginPath();
-        ctx.moveTo(x0 + 1 + largura * u0, topoY(x0 + largura * u0) + (n - 0.5));
-        ctx.lineTo(x0 + 1 + largura * u1, topoY(x0 + largura * u1) + (n - 0.5));
+        ctx.moveTo(bx0 + 1 + larg * u0, topoY(bx0 + larg * u0) + (n - 0.5));
+        ctx.lineTo(bx0 + 1 + larg * u1, topoY(bx0 + larg * u1) + (n - 0.5));
         ctx.stroke();
       }
 
@@ -293,8 +321,8 @@ export class ArteTerreno {
       const hs = hash2(f.cx0, f.cy, s + 13);
       ctx.lineWidth = lerp(4, 8, hs);
       ctx.beginPath();
-      ctx.moveTo(x0 + 4, y + espessura + lerp(3, 7, hs));
-      ctx.lineTo(x1 - 4, y + espessura + lerp(3, 7, hs));
+      ctx.moveTo(bx0 + 4, y + espessura + lerp(3, 7, hs));
+      ctx.lineTo(bx1 - 4, y + espessura + lerp(3, 7, hs));
       ctx.stroke();
       ctx.restore();
 
@@ -303,7 +331,7 @@ export class ArteTerreno {
       if (pureza > 0.25) {
         ctx.strokeStyle = rgba(tema.crista, (pureza - 0.25) * 0.7);
         ctx.lineWidth = 1;
-        for (let px = x0 + 6; px < x1 - 4; px += 9) {
+        for (let px = bx0 + 6; px < bx1 - 4; px += 9) {
           const n = hash2(Math.round(px), f.cy + 7, s);
           if (n > pureza * 0.8) continue;
           const comp = lerp(4, 15, n) * pureza;
@@ -719,6 +747,35 @@ export class ArteTerreno {
 
     this._salientes(ctx, tema);
     this._musgo(ctx, tema, this.terreno.arestasSuperiores(0.5), pureza);
+  }
+
+  /**
+   * Sombra de contato de uma coisa apoiada no chão.
+   *
+   * Sem ela, personagem e criatura ficam COLADOS por cima do plano em vez de
+   * apoiados nele — é o detalhe mais barato que existe e o que mais separa
+   * "colagem" de "lugar". Elipse macia, mais larga que alta, e que encolhe e
+   * escurece conforme a coisa sobe: é assim que o olho lê altura.
+   *
+   * @param {number} alturaDoChao  0 = tocando, 1 = longe (some)
+   */
+  static contato(ctx, tema, x, y, largura, alturaDoChao = 0) {
+    const k = clamp01(1 - alturaDoChao);
+    if (k <= 0.02) return;
+    const rx = largura * lerp(0.75, 0.5, 1 - k);
+    const ry = rx * 0.3;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
+    g.addColorStop(0, rgba(tema.primeiroPlano, 0.5 * k));
+    g.addColorStop(0.6, rgba(tema.primeiroPlano, 0.26 * k));
+    g.addColorStop(1, rgba(tema.primeiroPlano, 0));
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, ry / rx);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, rx, 0, TAU);
+    ctx.fill();
+    ctx.restore();
   }
 
   /**
