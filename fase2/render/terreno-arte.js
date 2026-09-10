@@ -423,23 +423,38 @@ export class ArteTerreno {
         const baseY = dir < 0 ? (f.cy + 1) * t.tile : f.cy * t.tile;
         const x = cx * t.tile;
 
-        // 3 pontas por tile, alturas irregulares.
+        /* 3 pontas por tile.
+           A fileira lia como saída de laço `for`: nove triângulos de mesma
+           altura, mesma largura, mesmo espaçamento e todos verticais. Agora
+           cada um tem altura quadrática (a maioria baixa, poucos altos) e
+           INCLINAÇÃO própria — é o desalinho que quebra a fileira.
+
+           E o valor da ponta caiu. Era `acento` misturado com 35% de branco:
+           luminância ~170 num quadro cuja coisa mais clara depois do herói
+           tinha ~135. O espinho era o objeto mais claro da tela, ou seja, o
+           quadro inteiro apontava pro perigo em vez de apontar pro
+           personagem. Perigo se sinaliza por forma e posição; brilho é do
+           herói e do objetivo. */
         for (let i = 0; i < 3; i++) {
           const n = hash2(cx * 3 + i, f.cy, this.semente + 5);
-          const px = x + (i + 0.5) * (t.tile / 3) + (n - 0.5) * 4;
-          const alt = t.tile * lerp(0.5, 0.92, n) * dir;
-          const meia = t.tile * lerp(0.1, 0.16, n);
+          const n2 = hash2(cx * 3 + i, f.cy, this.semente + 61);
+          const px = x + (i + 0.5) * (t.tile / 3) + (n - 0.5) * 5;
+          const alt = t.tile * lerp(0.32, 1, n * n) * dir;
+          const meia = t.tile * lerp(0.085, 0.17, n2);
+          const torto = (n2 - 0.5) * meia * 2.4;
 
           const g = ctx.createLinearGradient(0, baseY, 0, baseY + alt);
           g.addColorStop(0, misturarHex(tema.terrenoFundo, tema.ceuTopo, 0.5));
-          g.addColorStop(1, misturarHex(tema.acento, '#ffffff', 0.35));
+          g.addColorStop(1, misturarHex(tema.crista, tema.acento, 0.5));
           ctx.fillStyle = g;
           ctx.beginPath();
           ctx.moveTo(px - meia, baseY);
           // Curva para dentro: espinho reto lê como triângulo de sinalização,
           // curvo lê como coisa crescida.
-          ctx.quadraticCurveTo(px - meia * 0.35, baseY + alt * 0.55, px, baseY + alt);
-          ctx.quadraticCurveTo(px + meia * 0.35, baseY + alt * 0.55, px + meia, baseY);
+          ctx.quadraticCurveTo(px - meia * 0.35 + torto * 0.5, baseY + alt * 0.55,
+            px + torto, baseY + alt);
+          ctx.quadraticCurveTo(px + meia * 0.35 + torto * 0.5, baseY + alt * 0.55,
+            px + meia, baseY);
           ctx.closePath();
           ctx.fill();
         }

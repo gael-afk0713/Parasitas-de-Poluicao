@@ -151,13 +151,28 @@ export const AREAS = {
       densidadeBruma: 0.44, vinheta: 0.52, saturacao: 0.38, brilhoBloom: 0.34,
     },
     restaurado: {
-      ceuTopo: '#071820', ceuBase: '#17414a',
-      bruma: '#2a6b6a',
-      distante: '#112e37', medio: '#0c2229', proximo: '#07161c',
-      terreno: '#12313a', terrenoFundo: '#041014',
-      borda: '#05141a', crista: '#7fdcc0',
+      /* RESTAURAR PRECISA CLAREAR, E A ESCADA VALE AQUI TAMBÉM.
+         Medido em luminância Rec.709 no que estava aqui: `ceuBase` 57 contra
+         135 no estado poluído. Ou seja, curar a área deixava o mundo com
+         MENOS DA METADE da luz — e o jogo se chama "traga a cor de volta".
+         O jogador fazia o trabalho todo e recebia um quarto mais escuro.
+         Pior: `bruma` (93) estava acima de `ceuBase` (57), que é exatamente a
+         inversão documentada no topo deste arquivo — corrigida no poluído e
+         nunca aplicada aqui. É por isso que a sala restaurada continuava
+         lendo como caverna, só que verde.
+
+         E o horizonte agora é QUENTE contra copa e sombra frias. Uma imagem
+         inteira num matiz só é monocromática mesmo quando o matiz é bonito;
+         o que o olho lê como "colorido" é o contraste quente/frio. É o
+         mesmo motivo de a cena poluída funcionar: lá o horizonte também é
+         quente, e é a única coisa que salva a área do cinza chapado. */
+      ceuTopo: '#0d2a38', ceuBase: '#c2b784',
+      bruma: '#6f9482',
+      distante: '#153740', medio: '#0f2830', proximo: '#0a1a20',
+      terreno: '#17414a', terrenoFundo: '#061116',
+      borda: '#061116', crista: '#5fa88d',
       primeiroPlano: '#020a0d',
-      luz: '#7fe8c4', luzAmbiente: '#0f332e',
+      luz: '#b6f0d8', luzAmbiente: '#0f332e',
       particula: '#8fe0c0', acento: '#48d9a8',
       densidadeBruma: 0.42, vinheta: 0.44, saturacao: 0.92, brilhoBloom: 0.72,
     },
@@ -191,13 +206,16 @@ export const AREAS = {
       densidadeBruma: 0.44, vinheta: 0.52, saturacao: 0.42, brilhoBloom: 0.30,
     },
     restaurado: {
-      ceuTopo: '#07182a', ceuBase: '#17475f',
-      bruma: '#2a6d80',
-      distante: '#133a48', medio: '#0e2b37', proximo: '#081c26',
-      terreno: '#123441', terrenoFundo: '#04121a',
-      borda: '#05161d', crista: '#8ce2f2',
+      // Mesma correção de escada e de valor da raiz — ver o comentário longo
+      // em `raizes.restaurado`. Aqui o horizonte puxa pro rosa-areia, que é
+      // a luz baixa refletindo na água parada.
+      ceuTopo: '#0e2740', ceuBase: '#c4ab97',
+      bruma: '#6d8f9c',
+      distante: '#143c4a', medio: '#0f2c39', proximo: '#091e28',
+      terreno: '#17475f', terrenoFundo: '#05141c',
+      borda: '#05141c', crista: '#69b6c4',
       primeiroPlano: '#020a10',
-      luz: '#a8ecff', luzAmbiente: '#0e3543',
+      luz: '#c2ecfa', luzAmbiente: '#0e3543',
       particula: '#a2dced', acento: '#4fc4e0',
       densidadeBruma: 0.50, vinheta: 0.56, saturacao: 0.95, brilhoBloom: 0.74,
     },
@@ -232,13 +250,15 @@ export const AREAS = {
       densidadeBruma: 0.42, vinheta: 0.54, saturacao: 0.60, brilhoBloom: 0.40,
     },
     restaurado: {
-      ceuTopo: '#131a10', ceuBase: '#3a4820',
-      bruma: '#556a2c',
-      distante: '#232c14', medio: '#1a2110', proximo: '#11160a',
-      terreno: '#22300f', terrenoFundo: '#080c05',
-      borda: '#080d04', crista: '#a7d472',
+      // Mesma correção de escada e de valor da raiz — ver o comentário
+      // longo em `raizes.restaurado`.
+      ceuTopo: '#1c2a16', ceuBase: '#cbbe83',
+      bruma: '#7f9257',
+      distante: '#26301a', medio: '#1b2412', proximo: '#12180b',
+      terreno: '#3a4820', terrenoFundo: '#080c05',
+      borda: '#080d04', crista: '#7fa855',
       primeiroPlano: '#050703',
-      luz: '#d8c878', luzAmbiente: '#243015',
+      luz: '#e2d69a', luzAmbiente: '#243015',
       particula: '#a8b878', acento: '#7ab84a',
       densidadeBruma: 0.44, vinheta: 0.60, saturacao: 0.88, brilhoBloom: 0.60,
     },
@@ -267,13 +287,16 @@ export const AREAS = {
       densidadeBruma: 0.50, vinheta: 0.50, saturacao: 0.18, brilhoBloom: 0.36,
     },
     restaurado: {
-      ceuTopo: '#0e1c10', ceuBase: '#33501e',
-      bruma: '#4d7030',
-      distante: '#243516', medio: '#1a2810', proximo: '#111b0a',
-      terreno: '#1e3110', terrenoFundo: '#070d04',
-      borda: '#060c04', crista: '#cae65e',
+      /* O dossel é a área mais alta e a mais aberta: restaurada, ela tem
+         que ser a mais CLARA das cinco. Estava em `ceuBase` 70 contra 159 no
+         poluído — ver o comentário longo em `raizes.restaurado`. */
+      ceuTopo: '#1a3018', ceuBase: '#e0d492',
+      bruma: '#9aad64',
+      distante: '#2a3c18', medio: '#1e2c11', proximo: '#141d0b',
+      terreno: '#33501e', terrenoFundo: '#070d04',
+      borda: '#060c04', crista: '#9cc861',
       primeiroPlano: '#040802',
-      luz: '#f0e08a', luzAmbiente: '#22350f',
+      luz: '#f6ebae', luzAmbiente: '#22350f',
       particula: '#d8dc90', acento: '#e0c040',
       densidadeBruma: 0.48, vinheta: 0.50, saturacao: 0.95, brilhoBloom: 0.80,
     },
@@ -302,11 +325,14 @@ export const AREAS = {
       densidadeBruma: 0.44, vinheta: 0.58, saturacao: 0.85, brilhoBloom: 0.56,
     },
     restaurado: {
-      ceuTopo: '#33223f', ceuBase: '#f0b096',
-      bruma: '#f7cdb2',
-      distante: '#2b4239', medio: '#1e302a', proximo: '#14211d',
-      terreno: '#23342d', terrenoFundo: '#0a110e',
-      borda: '#0a110e', crista: '#d8f0dd',
+      /* Aqui o valor já estava certo (é a área que mais clareia ao curar);
+         o que estava invertido era só a escada: `bruma` 212 acima de
+         `ceuBase` 188, e `distante` 60 acima de `terreno` 48. */
+      ceuTopo: '#33223f', ceuBase: '#f7cdb2',
+      bruma: '#dda58e',
+      distante: '#22332c', medio: '#1a2924', proximo: '#121e1a',
+      terreno: '#2b4239', terrenoFundo: '#0a110e',
+      borda: '#0a110e', crista: '#b8d8c2',
       primeiroPlano: '#050b08',
       luz: '#e8f4e0', luzAmbiente: '#2a4238',
       particula: '#d8ecdc', acento: '#8fe0b8',

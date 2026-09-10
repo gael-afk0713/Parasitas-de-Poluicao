@@ -253,6 +253,16 @@ export class Hud {
         ? 0.8 : 0.75 + 0.25 * Math.abs(Math.sin(this._t * 26));
     }
 
+    /* Véu por baixo das máscaras.
+       A cor delas é creme, e depois que o estado restaurado passou a ter céu
+       claro de verdade (`ceuBase` de 57 pra 182 na raiz) creme sobre céu
+       claro deixou de ser legível — o HUD sumia justamente nas salas que o
+       jogador acabou de curar. Uma sombra curta e macia sob cada máscara
+       garante leitura sobre qualquer fundo e não aparece sobre o escuro. */
+    ctx.shadowColor = placa(0.55);
+    ctx.shadowBlur = 5 * k;
+    ctx.shadowOffsetY = 1 * k;
+
     for (let i = 0; i < j.vidaMax; i++) {
       const cheio = i < j.vida;
       const x = x0 + i * gap;
@@ -270,6 +280,9 @@ export class Hud {
         // que a paleta inteira do jogo foi construída pra criar.
         ctx.fillStyle = tinta(tema, 0.84, 0.25);
         ctx.fill();
+        // Olhos e reflexo já estão DENTRO da máscara: repetir a sombra neles
+        // suja o desenho a 18 px.
+        ctx.shadowColor = 'transparent';
         ctx.fillStyle = placa(0.86);
         ctx.beginPath();
         ctx.ellipse(x - 2.6 * k, y0 - 0.8 * k, 1.35 * k, 2.1 * k, 0, 0, TAU);
@@ -281,6 +294,7 @@ export class Hud {
         ctx.beginPath();
         ctx.ellipse(x + 3.4 * k, y0 - 2.3 * k, 0.65 * k, 0.8 * k, 0, 0, TAU);
         ctx.fill();
+        ctx.shadowColor = placa(0.55);
       } else {
         /* SOQUETE, não ausência. O vazio era só um contorno em `tema.borda`
            a 1,17:1 — dava pra ver quantas vidas se TEM e nunca quantas se
