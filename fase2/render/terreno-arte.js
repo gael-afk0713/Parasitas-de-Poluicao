@@ -23,7 +23,7 @@ import { caminhoDe, luzRadial } from './renderizador.js';
 import { VAZIO, PLATAFORMA, PERIGO, AGUA } from '../mundo/terreno.js';
 // O mesmo campo de vento do parallax: a samambaia do chão deita na mesma
 // rajada que a folhagem do fundo, senão o primeiro plano lê como maquete.
-import { vento } from './parallax.js';
+import { vento, direcaoLuzArea } from './parallax.js';
 
 export class ArteTerreno {
   /** @param {import('../mundo/terreno.js').Terreno} terreno */
@@ -54,7 +54,13 @@ export class ArteTerreno {
 
   /* --------------------------------------------------------------------- */
 
-  desenhar(ctx, tema, camera, tempo = 0) {
+  desenhar(ctx, tema, camera, tempo = 0, area = null) {
+    /* UMA direção de luz, a mesma que já rege o céu e os feixes. Antes cada
+       forma era um preenchimento chapado com contorno arredondado: sem lado
+       claro e lado escuro, o cérebro processa a tela como camadas empilhadas
+       num editor vetorial, não como espaço com ar dentro. É a causa número um
+       de a fase ler como colagem, e vale pra tudo que é desenhado. */
+    this._luz = direcaoLuzArea(area ?? tema.area);
     // Guardado porque `_cristas`/`_samambaias` estão vários níveis abaixo e
     // passar tempo por toda a cadeia só pra folha balançar não vale a assinatura.
     this._tempo = tempo;
@@ -92,6 +98,24 @@ export class ArteTerreno {
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = 5;
     ctx.stroke(path);
+
+    /* --- 3a. oclusão DIRECIONAL ----------------------------------------
+       O mesmo contorno traçado largo, deslocado no sentido em que a luz
+       viaja. O deslocamento faz a faixa escura cair sempre do lado oposto ao
+       sol e sumir do lado voltado pra ele:
+         · face de cima  → a faixa desce e vira sombra própria sob a aresta;
+         · parede a favor→ a faixa entra na rocha e a aresta iluminada fica
+                           limpa;
+         · parede contra → metade da faixa cai bem na aresta, que é a que
+                           está na sombra;
+         · teto          → a faixa fica colada no teto, que é escuro mesmo.
+       Um traço resolve os quatro casos porque a geometria é a mesma. */
+    ctx.save();
+    ctx.translate(this._luz.x * 11, this._luz.y * 11);
+    ctx.strokeStyle = rgba(tema.borda, 0.42);
+    ctx.lineWidth = 22;
+    ctx.stroke(path);
+    ctx.restore();
 
     // --- 3b. crosta iluminada -------------------------------------------
     // DEPOIS da oclusão, de propósito. A luz vem do céu: bate na face de
@@ -209,6 +233,8 @@ export class ArteTerreno {
     const t = this.terreno;
     const faixas = this._faixas(camera, PLATAFORMA);
     if (!faixas.length) return;
+
+    this._sombraProjetada(ctx, tema, faixas);
     const pureza = tema.pureza ?? 0;
 
     for (const f of faixas) {
@@ -408,6 +434,61 @@ export class ArteTerreno {
    * SEMPRE (mesmo em área restaurada), ponta clara contra base escura, e
    * emissão própria no passe de luz. Nada de sutileza.
    */
+  /**
+   * A sombra que a plataforma joga no chão que está embaixo dela.
+   *
+   * É a peça que faltava pra plataforma parar de flutuar. Sombra de contato
+   * resolve quem está APOIADO; o que não existia era a projeção de quem está
+   * suspenso, e sem ela cada laje é um adesivo colado sobre o fundo.
+   *
+   * A direção do deslocamento é a mesma `direcaoLuzArea` do céu e dos feixes
+   * — é isso que faz as sombras da sala concordarem entre si em vez de
+   * parecerem três sóis. E ela enfraquece e alarga com a altura da queda,
+   * que é como o olho lê "isso está longe do chão".
+   *
+   * Vai ANTES do corpo da plataforma de propósito: o terreno já está
+   * pintado, a plataforma ainda não, então a sombra cai só no que está atrás.
+   */
+  _sombraProjetada(ctx, tema, faixas) {
+    const t = this.terreno;
+    const luz = this._luz ?? { x: 0, y: 1 };
+    ctx.save();
+    for (const f of faixas) {
+      const { bx0, bx1 } = ArteTerreno._extremosPlataforma(f, t.tile, this.semente);
+      const meio = (bx0 + bx1) / 2;
+      const base = (f.cy + 1) * t.tile;
+      const queda = t.alturaAteChao(meio, base + 2, 9);
+      // Sem chão à vista embaixo: a sombra não cairia em lugar nenhum.
+      if (!Number.isFinite(queda) || queda < 4) continue;
+
+      const k = clamp01(1 - queda / 260);
+      if (k <= 0.04) continue;
+      const cx = meio + luz.x * queda * 0.55;
+      const cy = base + queda;
+      const rx = (bx1 - bx0) * lerp(0.5, 0.85, 1 - k);
+      const ry = Math.max(5, rx * 0.16);
+
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(1, ry / rx);
+      /* Gradiente montado DEPOIS do translate, centrado na origem. Um
+         `createRadialGradient(cx, cy, …)` seguido de `translate(cx, cy)` põe
+         o centro do degradê no dobro da distância: as coordenadas do
+         gradiente são lidas na transformação vigente na hora do `fill`, não
+         na hora da criação. */
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+      g.addColorStop(0, rgba(tema.borda, 0.4 * k));
+      g.addColorStop(0.45, rgba(tema.borda, 0.2 * k));
+      g.addColorStop(1, rgba(tema.borda, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(0, 0, rx, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   desenharPerigos(ctx, tema, camera) {
     const t = this.terreno;
     const faixas = this._faixas(camera, PERIGO);
@@ -937,14 +1018,19 @@ export class ArteTerreno {
        elipse encontrava o brilho do herói num anel visível — lia como um
        decalque, não como sombra. A opacidade cai quase toda no primeiro
        terço e o resto é bruma. */
-    const g = ctx.createRadialGradient(x, y, 0, x, y, rx);
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(1, ry / rx);
+    /* Montado DEPOIS do translate: as coordenadas do gradiente são lidas na
+       transformação vigente na hora do `fill`. Criado antes, com centro em
+       (x, y), o degradê ia parar no DOBRO da distância e o que sobrava aqui
+       era a cor da última parada — a razão do anel duro que apareceu sob o
+       herói na primeira captura. */
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
     g.addColorStop(0, rgba(tema.primeiroPlano, 0.42 * k));
     g.addColorStop(0.35, rgba(tema.primeiroPlano, 0.2 * k));
     g.addColorStop(0.68, rgba(tema.primeiroPlano, 0.06 * k));
     g.addColorStop(1, rgba(tema.primeiroPlano, 0));
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(1, ry / rx);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(0, 0, rx, 0, TAU);
