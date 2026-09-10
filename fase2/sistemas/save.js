@@ -26,6 +26,38 @@
 
 const CHAVE_SAVE_ATIVO = 'parasitas-save-ativo';
 
+/* ------------------------------------------------------------- cópia local
+   O progresso morava SÓ no Firestore, e o Firestore só existe com sessão
+   iniciada pelo menu. Quem abre `fase2.html` direto, quem está sem internet,
+   quem tem as regras negando ou o CDN bloqueado jogava com `disponivel =
+   false`: nada era gravado, e sair e voltar apagava a fase inteira — as salas
+   restauradas voltavam sujas, os fragmentos voltavam ao lugar.
+
+   Agora toda gravação também cai no `localStorage`, e ele é lido quando a
+   nuvem não responde ou não tem nada. A nuvem continua sendo a fonte da
+   verdade quando existe (é ela que atravessa dispositivos); o local é a rede
+   de segurança de quem está só num navegador.
+   ------------------------------------------------------------------------- */
+function chaveLocal(info) {
+  return info?.uid && info?.slot
+    ? `fase2:progresso:${info.uid}:${info.slot}`
+    : 'fase2:progresso:local';
+}
+
+function lerLocal(info) {
+  try {
+    const cru = localStorage.getItem(chaveLocal(info));
+    return cru ? JSON.parse(cru) : null;
+  } catch { return null; }
+}
+
+function gravarLocal(info, progresso) {
+  try {
+    localStorage.setItem(chaveLocal(info), JSON.stringify(progresso));
+    return true;
+  } catch { return false; }   // aba anônima, cota cheia: não é motivo pra parar
+}
+
 export class Save {
   /** @param {import('../mundo/mundo.js').Mundo} mundo */
   constructor(mundo) {
@@ -34,6 +66,7 @@ export class Save {
     this.disponivel = false;      // há sessão + slot válidos?
     this.ultimoErro = null;
     this._ultimoSerializado = null;
+    this._ultimoLocal = null;
     this._gravando = false;
     this._pendente = false;
 
@@ -56,7 +89,14 @@ export class Save {
    */
   async iniciar() {
     if (!this.info?.uid || !this.info?.slot) {
-      this._estado('sem sessão — o progresso não será salvo');
+      // Sem sessão ainda dá pra continuar de onde parou NESTE navegador.
+      const local = lerLocal(this.info);
+      if (local && this.mundo.aplicarSave(local)) {
+        this._ultimoSerializado = JSON.stringify(this.mundo.paraSave());
+        this._estado('progresso restaurado deste navegador');
+        return true;
+      }
+      this._estado('sem sessão — o progresso fica só neste navegador');
       return false;
     }
     try {
@@ -92,20 +132,29 @@ export class Save {
         ? snap.data()?.saves?.[this.info.slot]?.progressoFase2
         : null;
 
-      if (dados) {
-        const ok = this.mundo.aplicarSave(dados);
+      const daNuvem = dados || lerLocal(this.info);
+      if (daNuvem) {
+        const ok = this.mundo.aplicarSave(daNuvem);
         this._ultimoSerializado = JSON.stringify(this.mundo.paraSave());
-        this._estado(ok ? 'progresso restaurado' : 'save inválido — recomeçando');
+        this._estado(ok
+          ? (dados ? 'progresso restaurado' : 'progresso restaurado deste navegador')
+          : 'save inválido — recomeçando');
         return ok;
       }
       this._estado('novo jogo');
       return false;
     } catch (e) {
       // Rede caiu, CDN bloqueado, regras negaram — nada disso pode impedir de
-      // jogar. Registra e segue.
+      // jogar, nem de continuar de onde parou.
       this.ultimoErro = e;
       console.warn('[fase2/save] indisponível:', e?.message || e);
-      this._estado('sem conexão — o progresso não será salvo');
+      const local = lerLocal(this.info);
+      if (local && this.mundo.aplicarSave(local)) {
+        this._ultimoSerializado = JSON.stringify(this.mundo.paraSave());
+        this._estado('sem conexão — progresso deste navegador');
+        return true;
+      }
+      this._estado('sem conexão — o progresso fica só neste navegador');
       return false;
     }
   }
@@ -115,11 +164,25 @@ export class Save {
    * @param {string} motivo  só para log/telemetria
    */
   async salvar(motivo = 'manual') {
-    if (!this.disponivel || !this._ref) return false;
-
     const progresso = this.mundo.paraSave();
     const serializado = JSON.stringify(progresso);
     if (serializado === this._ultimoSerializado) return false;
+
+    /* A cópia local vai SEMPRE, e antes da nuvem: é síncrona, não pode
+       falhar por rede, e é ela que salva o caso mais comum de perda — fechar
+       a aba. O `beforeunload` dispara `salvar`, mas a escrita no Firestore é
+       assíncrona e o navegador mata a aba antes de ela terminar; o
+       `localStorage` já gravou nesse ponto. */
+    const local = gravarLocal(this.info, progresso);
+    if (local) this._ultimoLocal = serializado;
+
+    if (!this.disponivel || !this._ref) {
+      if (local) {
+        this._ultimoSerializado = serializado;
+        this._estado('salvo neste navegador');
+      }
+      return local;
+    }
 
     // Uma gravação por vez. Se pedirem outra no meio, marca pendente e
     // repete ao terminar — sem isso, dois `updateDoc` simultâneos podem
@@ -147,6 +210,16 @@ export class Save {
     }
   }
 
+  /** Só a cópia deste navegador. Síncrona, sem rede, sem cota. */
+  salvarLocal() {
+    const progresso = this.mundo.paraSave();
+    const serializado = JSON.stringify(progresso);
+    if (serializado === this._ultimoLocal) return false;
+    if (!gravarLocal(this.info, progresso)) return false;
+    this._ultimoLocal = serializado;
+    return true;
+  }
+
   /**
    * Liga os momentos em que vale gravar. Chamado uma vez pelo `main.js`.
    *
@@ -161,11 +234,18 @@ export class Save {
       'habilidade',    // conquista permanente
       'semente',       // restaurou uma sala
       'fragmento',     // coletável permanente
+      'areaLimpa',     // destravou a semente da área
       'chefeMorto',    // marco grande
     ]);
     this.mundo.aoEvento = (ev) => {
       anterior?.(ev);
       if (MOMENTOS.has(ev.tipo)) this.salvar(ev.tipo);
+      /* Cada morte de parasita agora é progresso permanente (é ela que abre a
+         semente da área), então perder uma dói. Mas uma escrita no Firestore
+         por inimigo morto gastaria cota à toa: a nuvem continua nos marcos da
+         lista acima e a morte vai só pro `localStorage`, que é síncrono e de
+         graça. */
+      else if (ev.tipo === 'inimigoMorto') this.salvarLocal();
     };
 
     // Melhor esforço ao fechar a aba. O navegador pode matar a aba antes de a

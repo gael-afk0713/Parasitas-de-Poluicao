@@ -29,22 +29,57 @@ import { criarChefe } from './chefes.js';
    Coletáveis / interativos
    ========================================================================== */
 
+/** `prefixo:sala:cx,cy` — sem a sala, células iguais colidiam entre salas. */
+function chaveDeObjeto(prefixo, obj, salaId) {
+  const p = prefixo ? `${prefixo}:` : '';
+  return salaId ? `${p}${salaId}:${obj.cx},${obj.cy}` : `${p}${obj.cx},${obj.cy}`;
+}
+
 class Semente {
-  constructor(obj) {
-    this.chave = `${obj.cx},${obj.cy}`;
+  constructor(obj, salaId = null) {
+    /* A CHAVE PRECISA DA SALA.
+       Era só `cx,cy`, e a grade é a mesma em todas as salas: dois objetos em
+       células iguais em salas diferentes dividiam a mesma chave. Já
+       acontecia de verdade — `fragmento 35,23` existe em `varzea-05` e em
+       `clareira-04`, e o segundo nascia consumido, ou seja, um fragmento de
+       vida permanentemente inalcançável.
+       `chaveAntiga` fica pra saves gravados antes desta correção não
+       ressuscitarem o que o jogador já pegou. */
+    this.chave = chaveDeObjeto('', obj, salaId);
+    this.chaveAntiga = `${obj.cx},${obj.cy}`;
     this.x = obj.x - 14; this.y = obj.y - 34;
     this.largura = 28; this.altura = 28;
     this.perigoso = false;
     this.t = 0;
     this.ativada = false;
     this.abrindo = 0;
+    // Recuo: a cápsula se encolhe quando o jogador encosta e a área ainda
+    // está suja. Um "não" que se vê vale mais que um "não" silencioso.
+    this.recuo = 0;
+    this._avisou = 0;
   }
   caixa() { return { x: this.x, y: this.y, largura: this.largura, altura: this.altura }; }
   atualizar(dt, mundo) {
     this.t += dt;
+    if (this._avisou > 0) this._avisou -= dt;
+    if (this.recuo > 0) this.recuo = Math.max(0, this.recuo - dt * 2.2);
     if (this.ativada) { this.abrindo = Math.min(1, this.abrindo + dt * 1.4); return; }
     const j = mundo.jogador;
     if (sobrepoe(this.caixa(), { x: j.x, y: j.y, largura: j.largura, altura: j.altura })) {
+      /* TRANCA: a semente é o prêmio da ÁREA, não da sala em que ela por
+         acaso está. Enquanto sobrar parasita em qualquer sala da área, ela
+         recua em vez de abrir — e diz quantos faltam, senão a recusa lê como
+         defeito do jogo em vez de objetivo. O aviso tem tempo de espera
+         próprio pra não repetir a cada quadro em que o jogador encosta. */
+      const faltam = mundo.parasitasVivosNaArea?.(mundo.sala?.area) ?? 0;
+      if (faltam > 0) {
+        this.recuo = 1;
+        if ((this._avisou ?? 0) <= 0) {
+          this._avisou = 3.2;
+          mundo.aoEvento?.({ tipo: 'sementeTrancada', faltam, x: this.x + 14, y: this.y + 14 });
+        }
+        return;
+      }
       this.ativada = true;
       mundo.ativarSemente(this.chave, undefined, this.x + 14, this.y + 14);
       mundo.emitir(this.x + 14, this.y + 14, 40, {
@@ -60,6 +95,11 @@ class Semente {
 
     ctx.save();
     ctx.translate(cx, cy);
+    if (this.recuo > 0) {
+      const r = this.recuo;
+      ctx.scale(1 - r * 0.22, 1 - r * 0.22);
+      ctx.translate(Math.sin(r * 34) * r * 3, 0);
+    }
     ctx.rotate(Math.sin(this.t * 0.8) * 0.12);
     // Cápsula fechada → pétalas abertas
     const n = 6;
@@ -355,8 +395,10 @@ const deslocCelula = (cx, cy) => [
 ];
 
 class Barreira {
-  constructor(obj) {
-    this.chave = `barreira:${obj.cx},${obj.cy}`;
+  constructor(obj, salaId = null) {
+    // Ver a nota sobre chave em `Semente`.
+    this.chave = chaveDeObjeto('barreira', obj, salaId);
+    this.chaveAntiga = `barreira:${obj.cx},${obj.cy}`;
     this.cx = obj.cx; this.cy = obj.cy;
     this.viz = 0;                 // bitmask de vizinhas vivas, em VIZ_DIR
     this.x = obj.x - 16; this.y = obj.y - 32;
@@ -916,8 +958,10 @@ export class ParasitaBase {
 export const FRAGMENTOS_POR_VIDA = 4;
 
 class Fragmento {
-  constructor(obj) {
-    this.chave = `frag:${obj.cx},${obj.cy}`;
+  constructor(obj, salaId = null) {
+    // Ver a nota sobre chave em `Semente`.
+    this.chave = chaveDeObjeto('frag', obj, salaId);
+    this.chaveAntiga = `frag:${obj.cx},${obj.cy}`;
     this.x = obj.x - 11; this.y = obj.y - 26;
     this.largura = 22; this.altura = 22;
     this.perigoso = false;
@@ -961,19 +1005,24 @@ class Fragmento {
  * @param {import('../mundo/mundo.js').Mundo} mundo
  * @returns {object|null}
  */
+/** Aceita a chave nova e a antiga: save velho não ressuscita o que já foi. */
+function consumido(conjunto, ent) {
+  return conjunto.has(ent.chave) || conjunto.has(ent.chaveAntiga);
+}
+
 export function criarEntidade(obj, mundo) {
   const def = mundo.sala?.def ?? {};
 
   switch (obj.tipo) {
     // --- objetos com estado persistido: nascem já consumidos se o save disser
     case 'semente': {
-      const s = new Semente(obj);
-      if (mundo.sementesAtivadas.has(s.chave)) { s.ativada = true; s.abrindo = 1; }
+      const s = new Semente(obj, mundo.sala?.id);
+      if (consumido(mundo.sementesAtivadas, s)) { s.ativada = true; s.abrindo = 1; }
       return s;
     }
     case 'fragmento': {
-      const f = new Fragmento(obj);
-      return mundo.fragmentosColetados.has(f.chave) ? null : f;
+      const f = new Fragmento(obj, mundo.sala?.id);
+      return consumido(mundo.fragmentosColetados, f) ? null : f;
     }
     case 'altar': {
       // Qual habilidade cada altar dá vem da DEFINIÇÃO DA SALA (`def.altar`),
@@ -986,8 +1035,8 @@ export function criarEntidade(obj, mundo) {
       return a;
     }
     case 'barreira': {
-      const b = new Barreira(obj);
-      return mundo.barreirasQuebradas.has(b.chave) ? null : b;
+      const b = new Barreira(obj, mundo.sala?.id);
+      return consumido(mundo.barreirasQuebradas, b) ? null : b;
     }
 
     // --- sem estado persistido
@@ -999,6 +1048,9 @@ export function criarEntidade(obj, mundo) {
     // --- inimigos: o bestiário vive em `entidades/parasitas.js`
     case 'parasita': case 'voador': case 'cuspidor':
     case 'rastejante': case 'explosivo': case 'tecelao':
+      // Parasita morto não volta: é o que torna "limpar a área" um estado
+      // alcançável, e não um contador que zera a cada porta.
+      if (mundo.parasitaEstaMorto?.(mundo.sala?.id, obj.cx, obj.cy)) return null;
       return criarParasita(obj.tipo, obj) ?? new ParasitaBase(obj);
 
     case 'chefe': return criarChefe(def.chefe, obj, mundo);

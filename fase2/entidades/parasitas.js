@@ -311,6 +311,11 @@ export class Sombra {
       velMin: 40, velMax: 150, g: -30, vidaMin: 0.8, vidaMax: 1.8,
       cor: mundo.tema.acento, brilha: true,
     });
+    /* A morte fica GRAVADA. A semente da área só abre com a área limpa, e
+       sem persistir isso "área limpa" nunca seria verdade: as criaturas
+       renascem a cada `_popular`, então o jogador limparia a última sala e a
+       primeira já estaria cheia de novo. */
+    mundo.registrarParasitaMorto?.(this.cxInicial, this.cyInicial);
     mundo.aoEvento?.({ tipo: 'inimigoMorto', x: this.centroX, y: this.centroY });
     this.aoMorrer?.(mundo);
   }

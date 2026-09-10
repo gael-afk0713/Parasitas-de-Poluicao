@@ -15,13 +15,18 @@
    ========================================================================= */
 
 import { clamp01, lerp, damp, sobrepoe, caixaDe } from '../core/mat.js';
-import { carregarSala, PORTA_OPOSTA } from './salas.js';
+import { carregarSala, todasAsSalas, idsDeArea, PORTA_OPOSTA } from './salas.js';
 import { AREAS, resolver } from '../render/paleta.js';
 import { ArteTerreno } from '../render/terreno-arte.js';
 import { Decor } from '../render/decor.js';
 import { Jogador } from '../entidades/jogador.js';
 import { ArteJogador } from '../entidades/jogador-arte.js';
 import { FRAGMENTOS_POR_VIDA } from '../entidades/catalogo.js';
+
+/** Tipos de objeto do mapa que contam como "parasita da área". */
+const TIPOS_PARASITA = new Set([
+  'parasita', 'voador', 'cuspidor', 'rastejante', 'explosivo', 'tecelao',
+]);
 
 /** Quanto de pureza um Canto adiciona, e até onde ele sozinho consegue levar.
  *  A semente é o que leva a sala a 1 — o Canto só prepara o terreno. */
@@ -56,6 +61,14 @@ export class Mundo {
        consumido não reapareça ao voltar. As chaves incluem a posição na
        grade, então são estáveis entre sessões sem precisar de ID por objeto. */
     this.sementesAtivadas = new Set();
+    /* Parasitas mortos, por `sala:cx,cy`.
+       Existe porque a semente da área só abre com a área limpa, e sem
+       persistir a morte "área limpa" nunca seria verdade: as criaturas
+       renascem a cada `_popular`, então o jogador limparia a última sala e a
+       primeira já estaria cheia de novo. Persistir a morte também é o que
+       torna o objetivo legível — o contador só desce. */
+    this.parasitasMortos = new Set();
+    this._cacheVivos = new Map();   // area -> quantos faltam
     this.fragmentosColetados = new Set();
     this.barreirasQuebradas = new Set();
 
@@ -135,22 +148,71 @@ export class Mundo {
 
   /* ----------------------------------------------------------- restauração -- */
 
+  /* ------------------------------------------------------ praga da área -- */
+
+  /** Chave estável de um parasita: a sala mais a célula onde ele nasce. */
+  static chaveParasita(salaId, cx, cy) { return `${salaId}:${cx},${cy}`; }
+
+  parasitaEstaMorto(salaId, cx, cy) {
+    return this.parasitasMortos.has(Mundo.chaveParasita(salaId, cx, cy));
+  }
+
+  registrarParasitaMorto(cx, cy, salaId = this.sala?.id) {
+    if (!salaId) return;
+    this.parasitasMortos.add(Mundo.chaveParasita(salaId, cx, cy));
+    this._cacheVivos.clear();
+    const area = this.sala?.area;
+    if (area && this.parasitasVivosNaArea(area) === 0) {
+      this.aoEvento?.({ tipo: 'areaLimpa', area });
+    }
+  }
+
+  /**
+   * Quantos parasitas ainda respiram na área inteira.
+   *
+   * Varre a DEFINIÇÃO das salas, não as entidades vivas: só existe entidade
+   * na sala em que o jogador está, e a pergunta é sobre a área toda. As salas
+   * ficam em cache (`carregarSala`), então a varredura é barata; ainda assim
+   * o resultado é memorizado e só se invalida quando alguém morre.
+   */
+  parasitasVivosNaArea(areaId) {
+    if (this._cacheVivos.has(areaId)) return this._cacheVivos.get(areaId);
+    let vivos = 0;
+    for (const id of idsDeArea(areaId)) {
+      for (const o of carregarSala(id).objetos) {
+        if (!TIPOS_PARASITA.has(o.tipo)) continue;
+        if (!this.parasitaEstaMorto(id, o.cx, o.cy)) vivos++;
+      }
+    }
+    this._cacheVivos.set(areaId, vivos);
+    return vivos;
+  }
+
   purezaDaSala(id) { return this.pureza.get(id) ?? 0; }
 
+  /* DENOMINADOR FIXO: todas as salas da área, não só as visitadas.
+     O `Map` de pureza só ganha entrada quando o jogador PISA na sala, e as
+     médias dividiam por quantas entradas existiam. Com uma sala visitada e
+     restaurada a média dava 1; entrar na sala seguinte, ainda suja, derrubava
+     pra 0,5 sem nada ter piorado. As marcas do Guardião (que leem
+     `purezaGlobal`) e o mapa apagavam justamente quando o jogador explorava,
+     que é o oposto do que a progressão devia comunicar. Com o registro
+     inteiro no denominador a média só sobe. */
   purezaDaArea(areaId) {
-    let soma = 0, n = 0;
-    for (const [id, v] of this.pureza) {
-      if (carregarSala(id).area === areaId) { soma += v; n++; }
-    }
-    return n ? soma / n : 0;
+    const ids = idsDeArea(areaId);
+    if (!ids.length) return 0;
+    let soma = 0;
+    for (const id of ids) soma += this.pureza.get(id) ?? 0;
+    return soma / ids.length;
   }
 
   /** Média global — alimenta a floração do broto do Guardião. */
   get purezaGlobal() {
-    if (!this.pureza.size) return 0;
+    const todas = todasAsSalas();
+    if (!todas.length) return 0;
     let soma = 0;
-    for (const v of this.pureza.values()) soma += v;
-    return soma / this.pureza.size;
+    for (const d of todas) soma += this.pureza.get(d.id) ?? 0;
+    return soma / todas.length;
   }
 
   /**
@@ -344,6 +406,7 @@ export class Mundo {
       jogador: this.jogador.paraSave(),
       pureza: Object.fromEntries(this.pureza),
       sementes: [...this.sementesAtivadas],
+      parasitas: [...this.parasitasMortos],
       fragmentos: [...this.fragmentosColetados],
       barreiras: [...this.barreirasQuebradas],
       checkpoint: this.checkpoint,
@@ -355,6 +418,8 @@ export class Mundo {
     if (!dados) return false;
     this.pureza = new Map(Object.entries(dados.pureza || {}));
     this.sementesAtivadas = new Set(dados.sementes || []);
+    this.parasitasMortos = new Set(dados.parasitas || []);
+    this._cacheVivos.clear();
     this.fragmentosColetados = new Set(dados.fragmentos || []);
     this.barreirasQuebradas = new Set(dados.barreiras || []);
     this.checkpoint = dados.checkpoint || this.checkpoint;

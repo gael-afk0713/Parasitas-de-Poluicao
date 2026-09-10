@@ -298,6 +298,29 @@ function efeitoDeEvento(ev) {
         brilha: ev.variante === 'duplo',
       });
       break;
+    /* A semente recusou porque a área ainda tem parasita.
+       O aviso diz o NÚMERO: "ainda tem" manda o jogador procurar sem saber o
+       tamanho da tarefa, e um contador que só desce transforma a recusa em
+       objetivo. Peso `sussurro` porque isso vai acontecer várias vezes e não
+       merece o mesmo tratamento de tela cheia que destravar uma habilidade. */
+    case 'sementeTrancada':
+      // O peso `sussurro` desenha só o SUBTÍTULO, então ele precisa carregar
+      // a mensagem inteira — título sozinho aqui não apareceria na tela.
+      hud.anunciar(null,
+        ev.faltam === 1
+          ? 'A semente não abre — 1 parasita ainda respira na área'
+          : `A semente não abre — ${ev.faltam} parasitas ainda respiram na área`,
+        3, 'sussurro');
+      mundo.emitir(ev.x, ev.y, 14, {
+        velMin: 30, velMax: 120, g: 120, vidaMin: 0.3, vidaMax: 0.8,
+        cor: tema.particula, arrasto: 0.4,
+      });
+      camera.sacudir(0.12);
+      break;
+    case 'areaLimpa':
+      hud.anunciar('A área silenciou', 'A SEMENTE PODE SER COLHIDA', 3.4, 'marco');
+      render.piscar(tema.crista, 0.3);
+      break;
     case 'habilidade':
       hud.anunciarHabilidade(ev.habilidade);
       render.piscar(tema.crista, 0.55);
