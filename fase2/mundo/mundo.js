@@ -94,7 +94,6 @@ export class Mundo {
     this.sala = sala;
     this.arteTerreno = new ArteTerreno(sala.terreno, sala.def.semente ?? 7);
     this.decor = new Decor(sala.terreno, sala.area, sala.def.semente ?? 7);
-    this.fauna = new Fauna(sala.terreno, sala.area, sala.def.semente ?? 7);
     sala.visitada = true;
 
     if (!this.pureza.has(id)) this.pureza.set(id, 0);
@@ -107,6 +106,10 @@ export class Mundo {
     this.jogador.x = p.x - this.jogador.largura / 2;
     this.jogador.y = p.y - this.jogador.altura;
     this.jogador.vx = 0; this.jogador.vy = 0;
+    // Depois do jogador posicionado: o bicho caído da sala é colocado perto
+    // de onde ELE entrou, pra ser visto logo.
+    this.fauna = new Fauna(sala.terreno, sala.area, sala.def.semente ?? 7,
+      { x: this.jogador.centroX, y: this.jogador.pesY });
 
     this.camera.definirLimites(sala.limites);
     this.camera.encaixar(this.jogador.centroX, this.jogador.centroY);

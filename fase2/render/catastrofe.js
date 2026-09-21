@@ -43,13 +43,15 @@ import {
    fundo caem atrás das plataformas e a manada simplesmente não aparece. Lá
    ela corre recortada contra a linha de fogo, em qualquer sala. */
 export const CATASTROFE = {
-  raizes: { fogo: 0.6, fumaca: 0.85, cinza: 1, brasas: 0.45, chama: 'laranja', fuga: -1,
+  raizes: { fogo: 0.85, fumaca: 0.9, cinza: 1, brasas: 0.45, chama: 'laranja', fuga: -1,
     bichos: ['veado', 'veado', 'tamandua'] },
-  varzea: { fogo: 0, fumaca: 0.4, cinza: 0.3, brasas: 0, chama: 'laranja', fuga: 1,
+  // Várzea: o que queima é o ÓLEO sobre a água — poluição e incêndio na
+  // mesma imagem. Fogo baixo e fumaça preta, não mata em chamas.
+  varzea: { fogo: 0.5, fumaca: 0.7, cinza: 0.35, brasas: 0.2, chama: 'laranja', fuga: 1,
     bichos: ['capivara'] },
   clareira: { fogo: 1, fumaca: 1, cinza: 0.85, brasas: 1, chama: 'laranja', fuga: -1,
     bichos: ['veado', 'capivara', 'veado', 'tamandua'] },
-  dossel: { fogo: 0.35, fumaca: 0.9, cinza: 0.55, brasas: 0.25, chama: 'laranja', fuga: 1,
+  dossel: { fogo: 0.7, fumaca: 0.9, cinza: 0.55, brasas: 0.25, chama: 'laranja', fuga: 1,
     bichos: ['veado'] },
   coracao: { fogo: 0.8, fumaca: 0.7, cinza: 0.45, brasas: 0.7, chama: 'quimica', fuga: -1,
     bichos: null },
@@ -80,10 +82,14 @@ export function calmaDaFauna(pureza) {
    coisa quente perto do jogador. */
 export const CHAMAS = {
   laranja: { nucleo: '#fff1c4', meio: '#ff9c3a', borda: '#d8431a', brasa: '#ff6a24' },
-  /* Magenta sobre violeta tinha só ~30° de diferença de matiz e lia como
-     grama neon. O núcleo agora é verde-ácido: a chama QUÍMICA é a única coisa
-     da área fora da família violeta, e é por isso que ela lê como veneno. */
-  quimica: { nucleo: '#eaffb0', meio: '#b8ff4a', borda: '#e0249a', brasa: '#c8ff5a' },
+  /* Química. Duas tentativas: magenta puro lia como grama neon; núcleo
+     verde-ácido em línguas finas lia como capim ornamental. O que faz fogo
+     é MASSA — chama larga e baixa, núcleo branco-quente —, e o verde-ácido
+     virou o que ele é de verdade: VAPOR rasteiro saindo do chão queimado. */
+  quimica: {
+    nucleo: '#fff4fd', meio: '#ff4fc8', borda: '#8a2ae0', brasa: '#ff5fd0',
+    vapor: '#b8ff4a', forma: { larg: 1.8, alt: 0.7 },
+  },
 };
 
 export function chamaDe(area) { return CHAMAS[confCatastrofe(area).chama] ?? CHAMAS.laranja; }
@@ -171,7 +177,11 @@ export function frenteDeFogo(ctx, o) {
     /* Limiar ALTO de propósito: com 0,3 quase todo trecho queimava, e a frente
        lia como fileira de velas — uma borda acesa de ponta a ponta. Incêndio
        de verdade tem trecho vivo, trecho escuro e trecho que explode. */
-    const foco = clamp01((n - 0.42) / 0.34) * o.inten;
+    /* LADO. O fogo tem de onde vir: `lateral` pesa as manchas pro lado
+       oposto ao da fuga. Espalhado igual pelo horizonte inteiro, qualquer
+       direção de corrida levava a manada PRA DENTRO de alguma chama, e não
+       havia lado seguro legível. */
+    const foco = clamp01((n - 0.42) / 0.34) * o.inten * (o.lateral ? o.lateral(x) : 1);
     const yb = o.yEm(x);
     // A linha de brasa corre por baixo de TODA mancha, viva ou morrendo.
     if (n > 0.3 && o.inten > 0.02) {
@@ -180,18 +190,67 @@ export function frenteDeFogo(ctx, o) {
     if (foco < 0.05) continue;
     // Labareda: de vez em quando um trecho sobe três vezes mais alto.
     const lab = clamp01((ruido1(xm * 0.012 + o.t * 0.09, o.semente + 3) - 0.6) / 0.4);
-    const alt = o.escala * lerp(0.35, 1.3, h) * (0.2 + 0.8 * foco) * (1 + 2.2 * lab * lab);
-    const larg = passo * lerp(1.2, 2.1, hash2(xm | 0, o.semente, 17));
+    const fa = o.ch.forma?.alt ?? 1, fl = o.ch.forma?.larg ?? 1;
+    const alt = o.escala * lerp(0.35, 1.3, h) * (0.2 + 0.8 * foco) * (1 + 2.2 * lab * lab) * fa;
+    const larg = passo * lerp(1.2, 2.1, hash2(xm | 0, o.semente, 17)) * fl;
     tufo(pb, pm, pn, x + (h - 0.5) * passo * 0.5, yb + 1, alt, larg, o.t, h, o.inclina);
   }
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  if (o.ch.vapor) {
+    // Vapor rasteiro, largo e mole, por baixo das chamas.
+    ctx.strokeStyle = rgba(o.ch.vapor, 0.1 * o.inten * o.alfa);
+    ctx.lineWidth = o.escala * 1.6;
+    ctx.stroke(brasa);
+    ctx.strokeStyle = rgba(o.ch.vapor, 0.2 * o.inten * o.alfa);
+    ctx.lineWidth = o.escala * 0.6;
+    ctx.stroke(brasa);
+  }
   ctx.strokeStyle = rgba(o.ch.brasa, 0.55 * o.inten * o.alfa);
   ctx.lineWidth = Math.max(1.2, o.escala * 0.16);
   ctx.stroke(brasa);
   preencherFogo(ctx, pb, pm, pn, o.ch, o.alfa);
   ctx.restore();
+}
+
+/**
+ * Fogueira: um monte de toras carbonizadas com fogo alto em cima. Usada na
+ * moldura da frente — é o "fogo perto" que faltava nas áreas que queimam.
+ */
+export function fogueira(ctx, x, yBase, largura, altura, t, semente, ch, alfa, corToras) {
+  const n = 5;
+  ctx.fillStyle = corToras;
+  ctx.beginPath();
+  ctx.moveTo(x - largura * 0.62, yBase + 10);
+  for (let i = 0; i <= n; i++) {
+    const u = i / n;
+    const hh = hash2(i, semente, 7);
+    ctx.lineTo(x + (u - 0.5) * largura * 1.1, yBase - largura * (0.12 + 0.2 * Math.sin(u * Math.PI)) * (0.8 + 0.4 * hh));
+  }
+  ctx.lineTo(x + largura * 0.62, yBase + 10);
+  ctx.closePath();
+  ctx.fill();
+  const pb = new Path2D(), pm = new Path2D(), pn = new Path2D();
+  for (let i = 0; i < 6; i++) {
+    const hi = hash2(i, semente, 11);
+    const u = (i + 0.5) / 6;
+    const px = x + (u - 0.5) * largura * 0.9;
+    const topoMonte = yBase - largura * (0.12 + 0.2 * Math.sin(u * Math.PI));
+    const a = altura * lerp(0.45, 1, hi) * (0.55 + 0.45 * Math.sin(u * Math.PI));
+    tufo(pb, pm, pn, px, topoMonte + 4, a, largura * lerp(0.22, 0.34, hi), t, hi + semente * 0.01, 0.15);
+  }
+  preencherFogo(ctx, pb, pm, pn, ch, alfa);
+}
+
+/** Poça de luz do fogo no chão e no ar em volta (passe emissivo ou cena). */
+export function focoDeLuz(ctx, x, y, r, cor, alfa) {
+  if (alfa < 0.01) return;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, rgba(cor, alfa));
+  g.addColorStop(1, rgba(cor, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x - r, y - r, r * 2, r * 2);
 }
 
 /** Clarão do incêndio no céu: é o fogo que você não vê iluminando o que vê. */
@@ -273,10 +332,14 @@ function coresFumaca(a, extraFogo = 1) {
  * (várzea, dossel). Com uma cor só, ela sumia num caso ou no outro.
  */
 export function coresDeFumaca(tema, corPlano, chama, fogo) {
-  const l = luminancia(tema.ceuTopo);
-  const base = l < 0.16
+  /* A decisão é pelo céu PERTO DO HORIZONTE (`ceuBase`), que é onde a coluna
+     passa a maior parte da altura. Decidindo pelo zênite, Raízes e Dossel
+     (zênite escuro, horizonte cinza-claro) ganhavam fumaça CLARA — cinza
+     sobre cinza, invisível sem aumentar o contraste da captura. */
+  const l = luminancia(tema.ceuBase);
+  const base = l < 0.42
     ? misturarHex(misturarHex(corPlano, tema.bruma, 0.55), '#8a8078', 0.25)
-    : misturarHex(misturarHex(corPlano, tema.ceuTopo, 0.35), tema.bruma, 0.18);
+    : misturarHex(misturarHex(corPlano, '#1e1916', 0.6), tema.ceuTopo, 0.2);
   const baixa = misturarHex(base, chama.borda, 0.48 * fogo);
   return { baixa, alta: base };
 }
@@ -312,7 +375,7 @@ function incendio(ctx, a, s) {
   frenteDeFogo(ctx, {
     x0: a.x0, x1: a.x1, passo: s.passo ?? 14, yEm, escala: s.escala ?? 26,
     t: a.tempoAnim, semente: s.semente, ch: a.chama, inten: a.fogo,
-    inclina: a.inclinaFogo, alfa: s.alfa ?? 1,
+    inclina: a.inclinaFogo, alfa: s.alfa ?? 1, lateral: a.lateral,
   });
 }
 
@@ -334,6 +397,8 @@ function colunaFumaca(ctx, a, s) {
     const h = hash2(x | 0, s.semente, 41);
     if (h > (s.dens ?? 0.6)) continue;
     const h2 = hash2(x | 0, s.semente + 1, 43);
+    // A fumaça sobe de onde o fogo está: do lado da fuga ela rareia.
+    if (hash2(x | 0, s.semente + 2, 47) > a.lateral(x)) continue;
     pluma(ctx, {
       x: x + (h2 - 0.5) * passo * 0.6, y: yb,
       alt: a.vh * lerp(s.altMin ?? 0.55, s.altMax ?? 1.1, h2),
@@ -341,7 +406,9 @@ function colunaFumaca(ctx, a, s) {
       t: a.tempoAnim, vel: 0.022, semente: (x | 0) + s.semente,
       // A fumaça vai pro MESMO lado que os bichos correm: o vento que a
       // leva é o que empurra o fogo, e todo mundo foge dele.
-      deriva: a.inclinaFogo * 1.6,
+      // Tombada pelo vento, 10–15°: coluna perfeitamente vertical lia como
+      // lagarta em pé.
+      deriva: a.inclinaFogo * 2.8,
       corBaixa: baixa, corAlta: alta, alfa: 0.5 * a.fumaca * (s.alfa ?? 1),
     });
   }
@@ -429,7 +496,7 @@ function arvoreEmChamas(ctx, a, s) {
        enfeite brilhante como perigo. Mesma ideia da máscara do primeiro
        plano: a força cai conforme a árvore se aproxima dele na tela. */
     const longe = clamp01((Math.abs(tx - a.jogX) - 90) / 320);
-    const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe);
+    const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe) * a.lateral(tx);
     if (inten > 0.04) {
       algumFogo = true;
       for (let i = 0; i < pontas.length; i++) {
@@ -752,7 +819,9 @@ function lixo(ctx, a, s) {
   if (sujo > 0.03) {
     ctx.globalAlpha = sujo;
     ctx.fillStyle = a.cor; ctx.fill(corpo);
-    ctx.fillStyle = misturarHex(a.cor, '#d8b43a', 0.38); ctx.fill(faixas);
+    // Aro ESCURO, não faixa dourada: caixote com faixa dourada é o ícone
+    // universal de baú, e num metroidvania isso diz "colete isto".
+    ctx.fillStyle = ajustarBrilho(a.cor, -0.2); ctx.fill(faixas);
     ctx.fillStyle = misturarHex(a.cor, '#ece8dc', 0.42); ctx.fill(sacolas);
   }
   if (a.calma > 0.03) {
@@ -836,6 +905,7 @@ const ESPECIES = {
     // Galope ESTICADO (amp alta, cabeça baixa à frente): com 0,95 e cabeça
     // erguida o veado lia como bicho trotando, não fugindo.
     freq: 2.1, amp: 1.2, salto: 0.13, cabecaFuga: 0.45, cabecaPasto: 2.0, pastoInclina: 0.16,
+    cabecaDeitado: 1.35,
   },
   capivara: {
     corpo: [[-0.52, -0.3], [-0.5, -0.43], [-0.38, -0.53], [-0.1, -0.57], [0.18, -0.56],
@@ -848,6 +918,7 @@ const ESPECIES = {
     quadris: [[0.26, -0.26], [-0.34, -0.26]],
     perna: [0.13, 0.13], grossura: [0.09, 0.06],
     freq: 2.6, amp: 0.85, salto: 0.06, cabecaFuga: 0.25, cabecaPasto: 0.9, pastoInclina: 0.06,
+    cabecaDeitado: 0.7,
   },
   /* Tamanduá-bandeira: lia como raposa. O que identifica o bicho são duas
      coisas e as duas faltavam — o FOCINHO tubular longo apontado pra baixo
@@ -874,6 +945,7 @@ const ESPECIES = {
     quadris: [[0.22, -0.3], [-0.28, -0.3]],
     perna: [0.14, 0.15], grossura: [0.09, 0.06],
     freq: 1.3, amp: 0.6, salto: 0.02, cabecaFuga: 0.22, cabecaPasto: 0.8, pastoInclina: 0.04,
+    cabecaDeitado: 0.2,
   },
 };
 
@@ -898,9 +970,14 @@ function contornoSuave(p, pts, ox, oy, rot = 0) {
  * origem no chão, L = 1, olhando pra +x.
  * @param {number} fuga  1 = galope, 0 = pastando parado
  */
-function animal(ctx, esp, fase, fuga, tempo, h, borda = null) {
+function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
   const E = ESPECIES[esp];
   const galope = fuga;
+  /* `pose.deitado` (0..1): o bicho EXAUSTO, caído — corpo no chão, patas
+     dobradas, cabeça apoiada à frente, respiração pesada. `pose.ergue`
+     (0..1): levanta a cabeça pra olhar alguém que chega perto. */
+  const deitado = pose?.deitado ?? 0;
+  const ergue = pose?.ergue ?? 0;
   // Suspensão: no galope o corpo inteiro sai do chão numa fase do ciclo.
   const salto = E.salto * Math.pow(Math.max(0, Math.sin(fase + 1.2)), 2) * galope;
   /* Pastando, o corpo INCLINA pra frente em volta do quadril de trás: só
@@ -911,6 +988,14 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null) {
 
   ctx.save();
   ctx.translate(0, yCorpo);
+  if (deitado > 0) {
+    // Afunda até a barriga encostar no chão, e respira: o corpo inteiro sobe
+    // e desce devagar, sempre a partir do chão.
+    const perna = E.perna[0] + E.perna[1];
+    const resp = 1 + Math.sin(tempo * 1.7 + h * 9) * 0.035 * deitado;
+    ctx.translate(0, perna * 0.82 * deitado);
+    ctx.scale(1, resp);
+  }
   if (galope < 1) {
     const [qx, qy] = E.quadris[1];
     // Girar em volta do quadril de trás afunda as patas da frente no chão;
@@ -936,6 +1021,14 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null) {
     // Pastando: pequena base aberta, pata da frente um pouco adiante.
     th += (1 - galope) * (frente ? 0.06 : -0.08);
     baixo += (1 - galope) * (frente ? 0.04 : -0.12);
+    /* Deitado: coxa pra FRENTE quase na horizontal e canela voltando pra
+       trás por baixo do corpo — a perna vira um Z deitado no chão. Com a
+       coxa pra trás, a canela de trás apontava pro alto e o bicho caído
+       ganhava dois palitos espetados. */
+    if (deitado > 0) {
+      th = lerp(th, frente ? 1.45 : 1.35, deitado);
+      baixo = lerp(baixo, -1.5, deitado);
+    }
     const kx = hx + Math.sin(th) * q1, ky = hy + Math.cos(th) * q1;
     const fx = kx + Math.sin(baixo) * q2, fy = ky + Math.cos(baixo) * q2;
     ctx.lineWidth = E.grossura[0];
@@ -953,8 +1046,12 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null) {
     // A bandeira do tamanduá balança com o trote.
     contornoSuave(p, E.cauda, 0, 0, Math.sin(fase * 0.5) * 0.05 * galope);
   }
-  const rotCabeca = lerp(E.cabecaPasto + Math.sin(tempo * 0.9 + h * 7) * 0.12, E.cabecaFuga, galope)
+  let rotCabeca = lerp(E.cabecaPasto + Math.sin(tempo * 0.9 + h * 7) * 0.12, E.cabecaFuga, galope)
     + Math.sin(fase) * 0.08 * galope;
+  // Deitado, a cabeça descansa à frente, rente ao chão; erguer a devolve ao
+  // alto (olhando), com um tremor fraco.
+  rotCabeca = lerp(rotCabeca, E.cabecaDeitado ?? 1.2, deitado);
+  rotCabeca = lerp(rotCabeca, -0.15 + Math.sin(tempo * 7) * 0.03, ergue);
   contornoSuave(p, E.cabeca, E.pivo[0], E.pivo[1], rotCabeca);
   /* CONTORNO DE LUZ: o mesmo corpo pintado antes, deslocado um fio pra cima,
      na cor do fogo. Sobra uma lasca acesa nas costas — é o que separa bicho
@@ -1014,8 +1111,10 @@ export function desenharManada(ctx, o) {
      a altura em que o jogador está. Um veado de 50 px pastando do lado dele,
      na mesma linha da plataforma, lia como bicho EM CIMA da plataforma, do
      tamanho de um inimigo. Perto dele na tela, o bicho some. */
+  // Só no PASTO: bicho parado ao lado do herói confunde escala; bicho
+  // passando correndo não — e apagado ele virava fantasma.
   const perto = (px) => o.evitarX == null ? 1
-    : lerp(0.08, 1, clamp01((Math.abs(px - o.evitarX) - 50) / 150));
+    : lerp(0.35, 1, clamp01((Math.abs(px - o.evitarX) - 50) / 150));
 
   if (fuga > 0.02) {
     const passo = o.passo ?? 1700;
@@ -1030,7 +1129,9 @@ export function desenharManada(ctx, o) {
       const corre = 0.55;
       if (u > corre) continue;
       const k = u / corre;
-      const fade = Math.min(clamp01(k / 0.12), clamp01((1 - k) / 0.12));
+      // Entrada e saída CURTAS: bicho meio transparente por muito tempo lia
+      // como alma, não como fuga.
+      const fade = Math.min(clamp01(k / 0.06), clamp01((1 - k) / 0.06));
       const centro = i * passo + passo * 0.5;
       const lider = centro + dir * (k - 0.5) * percurso;
       /* 3 a 6 bichos. Grupo lê como FUGA e bicho solto lê como passeio —
@@ -1048,7 +1149,7 @@ export function desenharManada(ctx, o) {
         const py = o.yEm(px) + (m % 2) * 0.1 * L;
         const freq = ESPECIES[e].freq * lerp(0.9, 1.1, hm);
         ctx.save();
-        ctx.globalAlpha = fade * fuga * perto(px);
+        ctx.globalAlpha = fade * fuga;
         ctx.translate(px, py);
         ctx.scale(dir * L, L);
         animal(ctx, e, t * TAU * freq + hm * TAU, 1, t, hm, o.borda);

@@ -58,7 +58,7 @@ import { feixeLuz } from './renderizador.js';
 import {
   FORMAS_CATASTROFE, FORMAS_LUZ, confCatastrofe, forcaFogo, forcaFumaca,
   calmaDaFauna, chamaDe, frenteDeFogo, claraoDeFogo, pluma,
-  desenharManada, desenharBando, coresDeFumaca,
+  desenharManada, desenharBando, coresDeFumaca, fogueira, focoDeLuz,
 } from './catastrofe.js';
 
 /* =========================================================================
@@ -172,6 +172,16 @@ const _amb = {
    assim aquele arquivo não precisa importar este, e não nasce um ciclo. */
 _amb.y = (rel) => yDe(_amb, rel);
 _amb.perfil = (x, s) => perfilAltura(x, s);
+/* LADO DO FOGO. O incêndio vem de um lado da tela — o oposto ao da fuga —, e
+   é isso que dá à manada um lado seguro pra onde correr. 0,2 no lado da fuga,
+   1 no lado do fogo, medido na posição de TELA (o fogo é "pra lá", não um
+   ponto do mapa). */
+_amb.lateral = (x) => ladoDoFogo((x - _amb.x0 - 220) / _amb.vw, _amb.fuga);
+
+function ladoDoFogo(u, fuga) {
+  const s = clamp01(u);
+  return clamp01(0.2 + 0.95 * (fuga < 0 ? s : 1 - s));
+}
 
 /* Movimento reduzido: o `main.js` liga isto. Fogo, bando e manada continuam
    existindo — eles SÃO a informação da cena —, mas andam a um terço. */
@@ -1316,10 +1326,17 @@ const CAMADAS = {
         largMin: 8, largMax: 20, semente: 23, altura: [0.42, 0.62] },
       { f: 'galhos', rel: 0.20, passo: 260, dens: 0.55, escalaLarg: 0.45, semente: 29 },
       { f: 'massa', lado: 'baixo', rel: 0.70, amp: 56, escala: 0.0017, semente: 31, passo: 15 },
+      /* O fogo que PASSOU ainda queima nos morros do meio: línguas de 60–90
+         px, do lado de onde o incêndio veio. Sem este plano o fogo de Raízes
+         era só um pavio no horizonte. */
+      { f: 'incendio', rel: 0.70, solo: { amp: 56, escala: 0.0017, semente: 31 },
+        escala: 34, passo: 13, clarao: 0.26, semente: 33 },
     ] },
     { p: 0.17, d: 0.73, cor: 'medio', brilho: -0.2, formas: [
       { f: 'troncosColossais', rel: 0.70, passo: 250, dens: 0.7,
         largMin: 13, largMax: 32, semente: 37, altura: [0.58, 0.85] },
+      { f: 'arvoreEmChamas', rel: 0.74, passo: 520, dens: 0.55, altMin: 150, altMax: 280,
+        largMin: 6, largMax: 13, semente: 38 },
       { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
     ] },
@@ -1396,6 +1413,9 @@ const CAMADAS = {
       { f: 'agua', rel: 0.70, altura: 420, semente: 131 },
       // O furta-cor do petróleo e o que boia: é aqui que a várzea adoece.
       { f: 'oleo', rel: 0.70, escala: 1.4, semente: 133 },
+      // E o óleo PEGA FOGO: manchas baixas queimando sobre a lâmina, de onde
+      // sobe fumaça preta.
+      { f: 'incendio', rel: 0.70, escala: 20, passo: 11, clarao: 0.18, semente: 134 },
       { f: 'troncos', rel: 0.70, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
       { f: 'lixo', rel: 0.70, passo: 130, dens: 0.7, escala: 1.6, semente: 135 },
     ] },
@@ -1505,8 +1525,14 @@ const CAMADAS = {
       { f: 'massa', lado: 'baixo', rel: 0.86, amp: 60, escala: 0.0014, semente: 304, passo: 16 },
       { f: 'tocos', rel: 0.86, solo: { amp: 60, escala: 0.0014, semente: 304 },
         passo: 46, dens: 0.8, escala: 0.45, semente: 305 },
+      // A máquina: uma por tela, praticamente sempre (era 0,6 e muita tela
+      // ficava sem ela).
       { f: 'maquina', rel: 0.86, solo: { amp: 60, escala: 0.0014, semente: 304 },
-        passo: 1400, dens: 0.6, escala: 0.42, semente: 306 },
+        passo: 1400, dens: 0.95, escala: 0.5, semente: 306 },
+      /* Queimada depois do corte: a encosta desmatada ARDE atrás da máquina.
+         É o desmatamento e o incêndio na mesma imagem. */
+      { f: 'incendio', rel: 0.86, solo: { amp: 60, escala: 0.0014, semente: 304 },
+        escala: 26, passo: 11, clarao: 0.28, semente: 307 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 1.4, passo: 340, dens: 0.7, largMin: 30, largMax: 90, semente: 307 },
@@ -1810,7 +1836,10 @@ export function desenharParallax(render, sala, mundo) {
        virava um emaranhado. É uma trapaça de profundidade (o horizonte é mais
        longe que esses troncos), e ninguém percebe — um bicho partido ao meio
        todo mundo percebe. */
-    if (i === 1) desenharFaunaHorizonte(render, sala, mundo);
+    /* Depois do VÉU da camada 2, não da 1: cada véu de bruma pintado por
+       cima lavava a manada escura até ela virar fantasma bege, com o fogo
+       aparecendo através do corpo. */
+    if (i === 2) desenharFaunaHorizonte(render, sala, mundo);
   }
 }
 
@@ -1908,7 +1937,50 @@ export function desenharPrimeiroPlano(render, mundo) {
     desenharMolduraBase(ctx, molde.base, esq, vw, vh, yBase, refX, tempo, t);
     desenharMolduraTopo(ctx, molde.topo, esq, vw, vh, yTopo, refX, tempo, t);
     ctx.globalAlpha = 1;
+    fogueirasDaFrente(ctx, t, sala.area, esq, vw, vh, yBase, refX,
+      render.movimentoReduzido ? tempo * 0.33 : tempo, false);
+    ctx.globalAlpha = 1;
   });
+  render.emissivo(P, (ctx, t, camera) => {
+    const vw = camera.largura / camera.zoom;
+    const vh = camera.altura / camera.zoom;
+    const j = mundo.jogador;
+    const refX = (j ? j.centroX : camera.viewX + vw * 0.5) * P;
+    fogueirasDaFrente(ctx, t, sala.area, camera.viewX * P, vw, vh, camera.viewY * P + vh,
+      refX, tempo, true);
+    ctx.globalAlpha = 1;
+  });
+}
+
+/**
+ * Fogueiras na moldura de baixo — o FOGO PERTO. Com o fogo só no horizonte e
+ * no meio do fundo, o incêndio era sempre uma coisa lá longe; aqui ele queima
+ * na borda da tela, entre o jogador e a câmera. Obedecem à mesma máscara da
+ * moldura: somem conforme se aproximam do Guardião, então nunca ficam na
+ * linha dele nem competem com ele.
+ */
+function fogueirasDaFrente(ctx, tema, area, esq, vw, vh, yBase, refX, tempo, luz) {
+  const fogo = forcaFogo(area, tema.pureza ?? 0);
+  if (fogo < 0.05) return;
+  const ch = chamaDe(area);
+  const passo = 1150;
+  const x0 = Math.floor((esq - passo) / passo) * passo;
+  for (let x = x0; x <= esq + vw + passo; x += passo) {
+    const h = hash2(x, 877, 3);
+    if (h > 0.6) continue;
+    const px = x + (hash2(x, 881, 3) - 0.5) * passo * 0.5;
+    const alfa = opacidadeDeBorda(px - refX, vw);
+    if (alfa < 0.04) continue;
+    const larg = lerp(110, 170, hash2(x, 883, 3));
+    const alt = vh * lerp(0.2, 0.3, h) * fogo;
+    if (luz) {
+      const g = lerp(1, 0.5, clamp01(tema.brilhoBloom ?? 0.4));
+      focoDeLuz(ctx, px, yBase - alt * 0.5, alt * 1.3, ch.meio, 0.5 * alfa * g * fogo);
+      continue;
+    }
+    ctx.globalAlpha = alfa;
+    fogueira(ctx, px, yBase, larg, alt, tempo, x, ch, alfa * clamp01(0.4 + fogo), tema.primeiroPlano);
+  }
 }
 
 function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, refX, tempo, tema) {
@@ -2356,7 +2428,20 @@ export function desenharHorizonte(render, sala, mundo) {
         /* Clarão largo e QUENTE: o fogo tem que ser a luz principal do céu.
            Com 0,2·h e o alfa de antes, em Raízes a faixa acima do fogo ficava
            neutra (matiz 211°, saturação 0,05) — o fogo não iluminava nada. */
-        claraoDeFogo(ctx, 0, w, y00 - amp0 - h * 0.34, y00, ch, Math.min(1, fogo * 1.6));
+        claraoDeFogo(ctx, 0, w, y00 - amp0 - h * 0.34, y00, ch, Math.min(1, fogo * 1.1));
+        /* Focos quentes do lado do fogo e o CHÃO aceso abaixo da linha: o
+           incêndio tem que ser a luz principal da cena, não um fio laranja
+           sobre um céu neutro. */
+        for (let k = 0; k < 3; k++) {
+          const u = fuga < 0 ? lerp(0.55, 0.98, k / 2) : lerp(0.02, 0.45, k / 2);
+          const inten = fogo * ladoDoFogo(u, fuga);
+          focoDeLuz(ctx, u * w, y00 - amp0 * 0.6, h * lerp(0.28, 0.4, k / 2), ch.meio, 0.32 * inten);
+        }
+        const gc = ctx.createLinearGradient(0, y00 - 4, 0, y00 + h * 0.17);
+        gc.addColorStop(0, rgba(ch.meio, 0.26 * fogo));
+        gc.addColorStop(1, rgba(ch.borda, 0));
+        ctx.fillStyle = gc;
+        ctx.fillRect(0, y00 - 4, w, h * 0.17 + 4);
         if (fumaca > 0.03) {
           const { baixa: baseBaixa, alta: base } = coresDeFumaca(
             tema, cor(tema, 'distante', 0.9, -0.2), ch, fogo);
@@ -2368,13 +2453,14 @@ export function desenharHorizonte(render, sala, mundo) {
             if (hc > 0.75) continue;
             const xm = i * passoC + hc * passoC * 0.8;
             const x = xm - desl0;
+            if (hash2(i, s0, 23) > ladoDoFogo(x / w, fuga)) continue;
             pluma(ctx, {
               x, y: y00 - perfilHorizonte(xm, s0, amp0, conf.tipo) + 4,
               // Colunas que SAEM pelo topo do quadro, largas lá em cima: a
               // fumaça tem que ocupar o céu, não enfeitar o horizonte.
               alt: h * lerp(0.75, 1.1, hash2(i, s0, 19)), larg: h * lerp(0.03, 0.05, hc),
               t: tAnim, vel: 0.014, semente: i * 7 + s0,
-              deriva: fuga * 0.45,
+              deriva: fuga * 0.7,
               corBaixa: baseBaixa, corAlta: base,
               alfa: 0.5 * fumaca,
             });
@@ -2389,8 +2475,9 @@ export function desenharHorizonte(render, sala, mundo) {
           x0: -12, x1: w + 12, dx: desl0, passo: 7,
           yEm: (x) => y00 - perfilHorizonte(x + desl0, conf.semente, amp0, conf.tipo),
           // ~3x a altura de antes: a 6 px efetivos o incêndio era um pavio.
-          escala: h * 0.036, t: tAnim, semente: conf.semente + 5, ch, inten: Math.min(1, fogo * 1.3),
+          escala: h * 0.042, t: tAnim, semente: conf.semente + 5, ch, inten: Math.min(1, fogo * 1.3),
           inclina: fuga * 0.22, alfa: 0.92,
+          lateral: (x) => ladoDoFogo(x / w, fuga),
         });
       }
 

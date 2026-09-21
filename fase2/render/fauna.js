@@ -18,19 +18,28 @@
    reage ao jogador, e é essa reação que faz o lugar parecer habitado.
    ========================================================================= */
 
-import { TAU, lerp, clamp01, hash2, misturarHex } from '../core/mat.js';
-import { calmaDaFauna, confCatastrofe } from './catastrofe.js';
+import { TAU, lerp, clamp01, hash2, misturarHex, rgba, damp } from '../core/mat.js';
+import {
+  calmaDaFauna, confCatastrofe, desenharAnimal, forcaFogo, chamaDe,
+} from './catastrofe.js';
 import { VAZIO } from '../mundo/terreno.js';
 
 const MAX_AVES = 14;
+
+/* O bicho caído de cada área. O Coração não tem: lá não sobrou nenhum. */
+const FERIDO = { raizes: 'veado', varzea: 'capivara', clareira: 'tamandua', dossel: 'veado' };
 
 export class Fauna {
   /**
    * @param {import('../mundo/terreno.js').Terreno} terreno
    */
-  constructor(terreno, area, semente = 7) {
+  /**
+   * @param {{x:number,y:number}|null} entrada  onde o jogador acabou de entrar
+   */
+  constructor(terreno, area, semente = 7, entrada = null) {
     this.area = area;
     this.aves = [];
+    this.ferido = entrada ? this._acharFerido(terreno, area, semente, entrada) : null;
     // Poleiros: pontos das arestas PISÁVEIS (as mesmas em que o musgo
     // cresce), espaçados, sorteados por posição — a mesma sala tem sempre as
     // mesmas aves nos mesmos lugares.
@@ -82,6 +91,60 @@ export class Fauna {
     }
     this._primeiro = true;
     this._idade = 0;
+  }
+
+  /**
+   * O ANIMAL EXAUSTO. Todo o sofrimento do fundo fica a centenas de pixels de
+   * profundidade; este fica NO PLANO DO JOGO, a 220–420 px de onde o Guardião
+   * entra, pra ser visto nos primeiros segundos. Na sala suja ele está caído,
+   * respirando pesado, e ergue a cabeça quando o Guardião chega perto — não
+   * foge, não tem mais força pra isso. Restaurada a sala, o MESMO bicho, no
+   * MESMO lugar, se levanta devagar e volta a pastar. É esse par, antes e
+   * depois, que transforma troca de cor em emoção.
+   *
+   * Não bloqueia, não colide, não dá item. Por enquanto é só presença.
+   */
+  _acharFerido(terreno, area, semente, entrada) {
+    const especie = FERIDO[area];
+    if (!especie) return null;
+    // Duas buscas: a ideal (perto da entrada, mesma altura) e, se a sala não
+    // tiver chão assim, uma mais larga — senão metade das salas ficava sem.
+    return this._buscarChao(terreno, entrada, especie, semente, 220, 420, 180)
+      ?? this._buscarChao(terreno, entrada, especie, semente, 130, 760, 420);
+  }
+
+  _buscarChao(terreno, entrada, especie, semente, dMin, dMax, dyMax) {
+    let melhor = null, nota = Infinity;
+    for (const faixa of terreno.arestasSuperiores(0.9)) {
+      let percorrido = 0, proximo = 20;
+      for (let i = 0; i < faixa.length - 1; i++) {
+        const a = faixa[i], b = faixa[i + 1];
+        const comp = Math.hypot(b.x - a.x, b.y - a.y);
+        while (proximo <= percorrido + comp) {
+          const u = (proximo - percorrido) / (comp || 1);
+          const x = lerp(a.x, b.x, u), y = lerp(a.y, b.y, u);
+          proximo += 24;
+          const dx = Math.abs(x - entrada.x), dy = Math.abs(y - entrada.y);
+          if (dx < dMin || dx > dMax || dy > dyMax) continue;
+          const cx = Math.floor(x / terreno.tile);
+          const cy = Math.floor((y - terreno.tile * 0.5) / terreno.tile);
+          // Chão com ar em cima e com APOIO dos dois lados do corpo.
+          if (terreno.em(cx, cy) !== VAZIO) continue;
+          if (!terreno.solido(Math.floor((x - 26) / terreno.tile), Math.floor((y + 4) / terreno.tile))) continue;
+          if (!terreno.solido(Math.floor((x + 26) / terreno.tile), Math.floor((y + 4) / terreno.tile))) continue;
+          const n = Math.abs(dx - (dMin + dMax) * 0.5) + dy * 1.5;
+          if (n < nota) { nota = n; melhor = { x, y }; }
+        }
+        percorrido += comp;
+      }
+    }
+    if (!melhor) return null;
+    return {
+      ...melhor, especie, h: hash2(Math.round(melhor.x), 5, semente),
+      // Olha pra onde o jogador entrou.
+      dir: entrada.x > melhor.x ? 1 : -1,
+      deitado: 1, ergue: 0, iniciado: false,
+    };
   }
 
   /**
@@ -149,6 +212,18 @@ export class Fauna {
         if (k >= 1) { a.estado = 'pousado'; a.t = 0; }
       }
     }
+    const f = this.ferido;
+    if (f) {
+      // Primeira vez: já no estado certo. Depois, se levanta devagar
+      // (restauração) — o jogador tem que VER o bicho se erguer.
+      const alvo = 1 - calma;
+      if (!f.iniciado) { f.deitado = alvo; f.iniciado = true; }
+      f.deitado = damp(f.deitado, alvo, 0.9, dt);
+      const dx = jogador.centroX - f.x, dy = jogador.centroY - f.y;
+      const perto = dx * dx + dy * dy < 170 * 170;
+      f.ergue = damp(f.ergue, perto && f.deitado > 0.5 ? 1 : 0, perto ? 0.5 : 1.2, dt);
+      if (perto && f.deitado > 0.5) f.dir = dx > 0 ? 1 : -1;
+    }
     this._primeiro = false;
   }
 
@@ -184,6 +259,40 @@ export class Fauna {
       if (a.estado === 'pousado') this._pousada(ctx, a, tempo, corpo, peito);
       else this._voando(ctx, a, tempo, corpo);
     }
+    ctx.restore();
+    if (this.ferido) this._ferido(ctx, tema, tempo);
+  }
+
+  _ferido(ctx, tema, tempo) {
+    const f = this.ferido;
+    const L = 58;
+    const fogo = forcaFogo(this.area, tema.pureza ?? 0);
+    /* Silhueta OPACA, bem mais escura que o fundo, e só um fio de luz quente
+       nas costas. Na várzea o fio é furta-cor: é o óleo cobrindo o bicho. */
+    const corpo = misturarHex(tema.primeiroPlano, tema.terreno, 0.3);
+    let borda;
+    if (this.area === 'varzea' && f.deitado > 0.3) borda = rgba('#8fe8d8', 0.55 * f.deitado);
+    else if (fogo > 0.05) borda = rgba(chamaDe(this.area).meio, 0.5);
+    else borda = rgba(tema.luz, 0.45);
+    ctx.save();
+    // Sombra de contato: o corpo caído ENCOSTA no chão.
+    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, L * 0.75);
+    g.addColorStop(0, rgba(tema.primeiroPlano, 0.45));
+    g.addColorStop(1, rgba(tema.primeiroPlano, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(f.x, f.y + 1, L * 0.75, L * 0.16, 0, 0, TAU);
+    ctx.fill();
+    ctx.translate(f.x, f.y + 1);
+    ctx.scale(f.dir * L, L);
+    ctx.fillStyle = corpo;
+    ctx.strokeStyle = corpo;
+    /* Cabeça MEIO ERGUIDA por padrão, caindo e voltando devagar: com a cabeça
+       apoiada no chão o bicho deitado virava uma placa escura — o que diz
+       "veado caído" é o pescoço de pé. O balanço lento é o cansaço. */
+    const cansaco = (0.5 + 0.3 * Math.sin(tempo * 0.45 + f.h * 5)) * f.deitado;
+    desenharAnimal(ctx, f.especie, 0, 0, tempo, f.h, borda,
+      { deitado: f.deitado, ergue: Math.max(f.ergue, cansaco) });
     ctx.restore();
   }
 

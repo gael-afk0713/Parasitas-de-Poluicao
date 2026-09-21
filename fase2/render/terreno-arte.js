@@ -596,8 +596,8 @@ export class ArteTerreno {
     const E = 1.9;
     const passo = 64;
     const lixo = new Path2D(), rotulos = new Path2D(), sacolas = new Path2D();
-    const tambores = new Path2D(), faixasRisco = new Path2D();
-    const peixes = new Path2D(), barrigas = new Path2D();
+    const tambores = new Path2D(), faixasRisco = new Path2D(), escorridos = new Path2D();
+    const peixes = new Path2D(), barrigas = new Path2D(), olhos = new Path2D();
     const folhas = new Path2D(), flores = new Path2D();
 
     const i0 = Math.ceil(x0 / passo), i1 = Math.floor(x1 / passo);
@@ -619,16 +619,28 @@ export class ArteTerreno {
              várzea. Decidido pelo índice de MUNDO, não "o primeiro deste
              trecho": o trecho é recortado pela tela, e o tambor da direita
              virava peixe quando o peixe da esquerda saía do quadro. */
-          const q = [P(-8, -1), P(-4, -4.5), P(4, -4.5), P(7, -2), P(11, -5), P(11, 1), P(7, -0.5), P(4, 1), P(-4, 1)];
+          // Fuso comprido, cauda em V bem aberta e olho em X: sem as duas
+          // últimas coisas o peixe lia como pedra ou meia-lua.
+          const q = [P(-10, -1), P(-7, -4.2), P(0, -5.2), P(6, -3.8), P(9, -2.4),
+            P(14, -6.5), P(12.5, -2), P(14, 2.2), P(9, -0.8), P(4, 0.6), P(-6, 0.6)];
           peixes.moveTo(...q[0]); for (let k = 1; k < q.length; k++) peixes.lineTo(...q[k]); peixes.closePath();
-          const b = [P(-6, -2.6), P(-3, -4.2), P(4, -4.2), P(5.5, -2.6)];
+          const b = [P(-8, -2.4), P(-5, -4.3), P(2, -4.8), P(6, -3.4)];
           barrigas.moveTo(...b[0]); for (let k = 1; k < 4; k++) barrigas.lineTo(...b[k]); barrigas.closePath();
+          const ox = P(-6.5, -1.6);
+          olhos.moveTo(ox[0] - 1.6, ox[1] - 1.6); olhos.lineTo(ox[0] + 1.6, ox[1] + 1.6);
+          olhos.moveTo(ox[0] + 1.6, ox[1] - 1.6); olhos.lineTo(ox[0] - 1.6, ox[1] + 1.6);
         } else if (h3 < 0.3) {
-          // Tambor meio afundado, de pé, com a faixa amarela de risco.
-          const q = [P(-6, 2), P(-6, -9), P(6, -9), P(6, 2)];
+          /* Tambor meio afundado, de pé: corpo enferrujado, dois AROS escuros
+             e um escorrido preto descendo da borda. A faixa amarela de antes
+             fazia o tambor ler como baú de tesouro. */
+          const q = [P(-6, 2), P(-6.4, -9), P(6.4, -9), P(6, 2)];
           tambores.moveTo(...q[0]); for (let k = 1; k < 4; k++) tambores.lineTo(...q[k]); tambores.closePath();
-          const f = [P(-6, -5.5), P(-6, -3), P(6, -3), P(6, -5.5)];
-          faixasRisco.moveTo(...f[0]); for (let k = 1; k < 4; k++) faixasRisco.lineTo(...f[k]); faixasRisco.closePath();
+          for (const yy of [-7.2, -3]) {
+            const f = [P(-6.5, yy - 0.9), P(6.5, yy - 0.9), P(6.5, yy + 0.9), P(-6.5, yy + 0.9)];
+            faixasRisco.moveTo(...f[0]); for (let k = 1; k < 4; k++) faixasRisco.lineTo(...f[k]); faixasRisco.closePath();
+          }
+          const e = [P(-2, -9), P(1.5, -9), P(1, -2), P(-0.5, 0.5), P(-1.5, -3)];
+          escorridos.moveTo(...e[0]); for (let k = 1; k < e.length; k++) escorridos.lineTo(...e[k]); escorridos.closePath();
         } else if (h2 < 0.38) {
           // Garrafa deitada, gargalo pra fora.
           const q = [P(-7, 0), P(-7, -5), P(3, -5), P(5, -3.5), P(9, -3.5), P(9, -1.5), P(5, -1.5), P(3, 0)];
@@ -671,10 +683,14 @@ export class ArteTerreno {
       ctx.fillStyle = misturarHex(tema.terreno, tema.borda, 0.35); ctx.fill(lixo);
       ctx.fillStyle = misturarHex(tema.terreno, '#d8dccf', 0.45); ctx.fill(rotulos);
       ctx.fillStyle = rgba(misturarHex(tema.bruma, '#f2efe6', 0.55), 0.85); ctx.fill(sacolas);
-      ctx.fillStyle = misturarHex(tema.terreno, '#4a2a18', 0.4); ctx.fill(tambores);
-      ctx.fillStyle = misturarHex(tema.terreno, '#e6c23a', 0.6); ctx.fill(faixasRisco);
+      ctx.fillStyle = misturarHex(tema.terreno, '#7a3a1a', 0.5); ctx.fill(tambores);
+      ctx.fillStyle = misturarHex(tema.primeiroPlano, '#1a1410', 0.5); ctx.fill(faixasRisco);
+      ctx.fillStyle = rgba('#0a0806', 0.85); ctx.fill(escorridos);
       ctx.fillStyle = misturarHex(tema.terreno, '#5a6a70', 0.5); ctx.fill(peixes);
       ctx.fillStyle = misturarHex(tema.bruma, '#f4f0e4', 0.7); ctx.fill(barrigas);
+      ctx.strokeStyle = misturarHex(tema.primeiroPlano, '#101010', 0.5);
+      ctx.lineWidth = 1.1;
+      ctx.stroke(olhos);
     }
     if (calma > 0.03) {
       ctx.globalAlpha = calma;

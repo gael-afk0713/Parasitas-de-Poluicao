@@ -103,6 +103,16 @@ const CHAVES_NUM = ['densidadeBruma', 'vinheta', 'saturacao', 'brilhoBloom'];
    tem uma cor dominante distinta, pra que o mapa seja legível por cor.
    ========================================================================= */
 
+/* O ESTADO RESTAURADO TEM TRÊS FAMÍLIAS DE MATIZ, SEMPRE.
+   Medido nas capturas: cada sala limpa era MONOCROMÁTICA (dossel ~95°,
+   clareira ~105°, raízes ~165°) e lia como um filtro de cor aplicado por cima
+   da sala suja — não como luz voltando. Toda paleta `restaurado` agora tem:
+     · céu FRIO no zênite (`ceuTopo`, 200–225°);
+     · luz-chave DOURADA (`ceuBase` e `luz`, 35–50°) — o sol voltou;
+     · folhagem VERDE nos planos e no terreno (110–150°).
+   E uma cor de cura só em todas as áreas: o teal do Guardião no `acento`
+   (#48d9a8). Verde-lima brilhante é de VENENO (a chama química do Coração
+   sujo) e não aparece em nenhuma sala limpa. */
 export const AREAS = {
   /* --------------------------------------------------------------------
      1. SUB-BOSQUE CINZENTO — chão da floresta, entre raízes mortas.
@@ -172,7 +182,7 @@ export const AREAS = {
       terreno: '#17414a', terrenoFundo: '#061116',
       borda: '#061116', crista: '#5fa88d',
       primeiroPlano: '#020a0d',
-      luz: '#b6f0d8', luzAmbiente: '#0f332e',
+      luz: '#f0d89a', luzAmbiente: '#0f332e',
       particula: '#8fe0c0', acento: '#48d9a8',
       densidadeBruma: 0.42, vinheta: 0.44, saturacao: 0.92, brilhoBloom: 0.72,
     },
@@ -211,12 +221,15 @@ export const AREAS = {
       // a luz baixa refletindo na água parada.
       ceuTopo: '#0e2740', ceuBase: '#c4ab97',
       bruma: '#6d8f9c',
-      distante: '#143c4a', medio: '#0f2c39', proximo: '#091e28',
-      terreno: '#17475f', terrenoFundo: '#05141c',
-      borda: '#05141c', crista: '#69b6c4',
-      primeiroPlano: '#020a10',
-      luz: '#c2ecfa', luzAmbiente: '#0e3543',
-      particula: '#a2dced', acento: '#4fc4e0',
+      // Luar frio lia MAIS TRISTE que a várzea suja. A água continua azul
+      // (bruma, crista); o que volta é o sol baixo dourado e o verde da
+      // vegetação da margem.
+      distante: '#153f3c', medio: '#0f2f2e', proximo: '#0a2120',
+      terreno: '#18493f', terrenoFundo: '#05141a',
+      borda: '#05141a', crista: '#69b6c4',
+      primeiroPlano: '#020a0e',
+      luz: '#f2d8a0', luzAmbiente: '#0e3543',
+      particula: '#b8e8d8', acento: '#48d9a8',
       densidadeBruma: 0.50, vinheta: 0.56, saturacao: 0.95, brilhoBloom: 0.74,
     },
   },
@@ -257,14 +270,14 @@ export const AREAS = {
          usa pra "tóxico". O alívio lia como névoa venenosa. Agora a bruma e
          os planos vão pra 115–125° (verde de folha, não de lodo), a névoa
          cede um pouco e o céu clareia: restaurar tem que ABRIR o ar. */
-      ceuTopo: '#14301f', ceuBase: '#d6d8a0',
-      bruma: '#6fa06e',
+      ceuTopo: '#12283a', ceuBase: '#e2c890',
+      bruma: '#79a09a',
       distante: '#1f3a24', medio: '#16301b', proximo: '#0e2012',
       terreno: '#2e5428', terrenoFundo: '#06100a',
-      borda: '#050e07', crista: '#86c46a',
+      borda: '#050e07', crista: '#6cc496',
       primeiroPlano: '#030804',
-      luz: '#e6e4a8', luzAmbiente: '#18351f',
-      particula: '#a8d894', acento: '#6fd07a',
+      luz: '#f2d49a', luzAmbiente: '#18351f',
+      particula: '#b8e8c8', acento: '#48d9a8',
       densidadeBruma: 0.36, vinheta: 0.58, saturacao: 0.9, brilhoBloom: 0.64,
     },
   },
@@ -298,14 +311,14 @@ export const AREAS = {
       /* Também saiu do oliva (79°) — mesmo motivo da clareira. O dourado
          continua no `acento` e na luz, que são a identidade do Dossel Aceso;
          o que mudou foi o ar entre as folhas, que era cor de lodo. */
-      ceuTopo: '#163319', ceuBase: '#e8e0a0',
-      bruma: '#86b870',
+      ceuTopo: '#10283c', ceuBase: '#f0d494',
+      bruma: '#88b4a4',
       distante: '#24441f', medio: '#1a3417', proximo: '#11240f',
       terreno: '#2e5a22', terrenoFundo: '#060e05',
-      borda: '#050c04', crista: '#a6d86a',
+      borda: '#050c04', crista: '#8ad0a0',
       primeiroPlano: '#030802',
-      luz: '#f6ebae', luzAmbiente: '#1c3812',
-      particula: '#d8e6a0', acento: '#e8c848',
+      luz: '#f6dc9a', luzAmbiente: '#1c3812',
+      particula: '#e8e0a8', acento: '#48d9a8',
       densidadeBruma: 0.38, vinheta: 0.50, saturacao: 0.95, brilhoBloom: 0.80,
     },
   },
@@ -336,20 +349,23 @@ export const AREAS = {
       /* Aqui o valor já estava certo (é a área que mais clareia ao curar);
          o que estava invertido era só a escada: `bruma` 212 acima de
          `ceuBase` 188, e `distante` 60 acima de `terreno` 48. */
-      ceuTopo: '#33223f', ceuBase: '#f7cdb2',
+      /* O clímax era a sala limpa MAIS CINZA do jogo (saturação média 0,09):
+         o fim da jornada parecia cansado. Céu azul-amanhecer em cima,
+         horizonte pêssego-dourado, mata verde de verdade — e o teal da cura. */
+      ceuTopo: '#2a3a6a', ceuBase: '#f7cdb2',
       bruma: '#dda58e',
-      distante: '#22332c', medio: '#1a2924', proximo: '#121e1a',
-      terreno: '#2b4239', terrenoFundo: '#0a110e',
-      borda: '#0a110e', crista: '#b8d8c2',
+      distante: '#1f4a35', medio: '#173a2a', proximo: '#0f281d',
+      terreno: '#2a5a42', terrenoFundo: '#0a110e',
+      borda: '#0a110e', crista: '#7fe0b0',
       primeiroPlano: '#050b08',
-      luz: '#e8f4e0', luzAmbiente: '#2a4238',
-      particula: '#d8ecdc', acento: '#8fe0b8',
+      luz: '#ffe0b0', luzAmbiente: '#2a4238',
+      particula: '#e0f4e4', acento: '#48d9a8',
       /* brilhoBloom era 0.85. Com `luz` e `bruma` quase brancas nesta paleta,
          o buffer emissivo já entra claríssimo, e o bloom transformava o feixe
          de luz num borrão branco sem forma no meio do quadro — a única tela
          do jogo em que dava pra ver estouro. 0.50 mantém o amanhecer sem
          apagar o desenho. */
-      densidadeBruma: 0.40, vinheta: 0.46, saturacao: 0.90, brilhoBloom: 0.50,
+      densidadeBruma: 0.34, vinheta: 0.46, saturacao: 1.0, brilhoBloom: 0.50,
     },
   },
 };
