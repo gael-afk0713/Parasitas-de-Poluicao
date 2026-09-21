@@ -219,18 +219,20 @@ export const AREAS = {
       // Mesma correção de escada e de valor da raiz — ver o comentário longo
       // em `raizes.restaurado`. Aqui o horizonte puxa pro rosa-areia, que é
       // a luz baixa refletindo na água parada.
-      ceuTopo: '#0e2740', ceuBase: '#c4ab97',
-      bruma: '#6d8f9c',
+      ceuTopo: '#0e2740', ceuBase: '#dcb888',
+      bruma: '#7f9a8c',
       // Luar frio lia MAIS TRISTE que a várzea suja. A água continua azul
-      // (bruma, crista); o que volta é o sol baixo dourado e o verde da
-      // vegetação da margem.
+      // (crista); o que volta é o sol baixo dourado e o verde da vegetação
+      // da margem. A bruma azul-aço (#6d8f9c, com densidade 0,5) ainda lavava
+      // a tela inteira de cinza-frio: a várzea limpa era a única tela
+      // restaurada sem calor nenhum. Horizonte dourado e bruma verde-quente.
       distante: '#153f3c', medio: '#0f2f2e', proximo: '#0a2120',
       terreno: '#18493f', terrenoFundo: '#05141a',
       borda: '#05141a', crista: '#69b6c4',
       primeiroPlano: '#020a0e',
-      luz: '#f2d8a0', luzAmbiente: '#0e3543',
-      particula: '#b8e8d8', acento: '#48d9a8',
-      densidadeBruma: 0.50, vinheta: 0.56, saturacao: 0.95, brilhoBloom: 0.74,
+      luz: '#f4d69a', luzAmbiente: '#163a3a',
+      particula: '#e8e0b8', acento: '#48d9a8',
+      densidadeBruma: 0.42, vinheta: 0.52, saturacao: 0.98, brilhoBloom: 0.74,
     },
   },
 

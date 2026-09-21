@@ -836,6 +836,30 @@ export class ArteTerreno {
         ctx.lineTo(px + comp, y + onda(px + comp) + 3);
         ctx.stroke();
       }
+      /* 3b · água LIMPA devolve o sol: faixas douradas logo abaixo da lâmina,
+         em duas fileiras, cintilando. Suja, a água não reflete nada — é isso
+         que faz a diferença entre poça parada e rio vivo. */
+      const calmaAgua = calmaDaFauna(tema.pureza ?? 0);
+      if (calmaAgua > 0.03) {
+        ctx.strokeStyle = rgba(tema.luz, 0.6 * calmaAgua);
+        ctx.lineWidth = 1.4;
+        const passoSol = 22;
+        const sx0 = Math.floor(x0 / passoSol) * passoSol;
+        for (let bx = sx0; bx <= x1; bx += passoSol) {
+          const h = hash2(bx, f.cy, this.semente + 57);
+          if (h > 0.7) continue;
+          const fila = h > 0.35 ? 1 : 0;
+          const px = bx + h * passoSol;
+          const comp = lerp(6, 20, h) * (fila ? 0.7 : 1);
+          if (px < x0 || px + comp > x1) continue;
+          ctx.globalAlpha = Math.max(0, Math.sin(tempo * lerp(0.8, 1.7, h) + h * 11));
+          const yy = y + onda(px) + 6 + fila * 6;
+          ctx.beginPath();
+          ctx.moveTo(px, yy);
+          ctx.lineTo(px + comp, yy);
+          ctx.stroke();
+        }
+      }
       ctx.restore();
 
       // 4 · o que a água carrega — ver `_boiando`.
