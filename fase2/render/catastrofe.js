@@ -897,8 +897,8 @@ const ESPECIES = {
     pivo: [0.36, -0.75],
     // Pescoço GROSSO na base afinando pra cabeça. Com a base fina e a cabeça
     // larga, o conjunto lia como uma trombeta.
-    cabeca: [[-0.08, 0.06], [-0.01, -0.12], [0.07, -0.27], [0.06, -0.38], [0.02, -0.47],
-      [0.11, -0.39], [0.19, -0.36], [0.31, -0.3], [0.36, -0.26], [0.31, -0.22],
+    cabeca: [[-0.08, 0.06], [-0.01, -0.12], [0.07, -0.27], [0.03, -0.4], [-0.02, -0.55],
+      [0.08, -0.46], [0.12, -0.39], [0.19, -0.36], [0.31, -0.3], [0.36, -0.26], [0.31, -0.22],
       [0.2, -0.22], [0.16, -0.1], [0.14, 0.1]],
     quadris: [[0.3, -0.56], [-0.36, -0.58]],
     perna: [0.3, 0.32], grossura: [0.075, 0.045],
@@ -1053,6 +1053,19 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
   rotCabeca = lerp(rotCabeca, E.cabecaDeitado ?? 1.2, deitado);
   rotCabeca = lerp(rotCabeca, -0.15 + Math.sin(tempo * 7) * 0.03, ergue);
   contornoSuave(p, E.cabeca, E.pivo[0], E.pivo[1], rotCabeca);
+  /* Contorno escuro: separa o bicho de um fundo de valor parecido (a pelagem
+     marrom sobre o laranja da clareira sumia). Traçado ANTES do corpo e com o
+     dobro da largura: o preenchimento cobre a metade de dentro — inclusive a
+     emenda onde o pescoço entra no corpo, que num traço por cima aparecia
+     como um laço no meio do pescoço. */
+  if (pose?.contorno) {
+    const st = ctx.strokeStyle, lw = ctx.lineWidth;
+    ctx.strokeStyle = pose.contorno;
+    ctx.lineWidth = 0.07;
+    ctx.lineJoin = 'round';
+    ctx.stroke(p);
+    ctx.strokeStyle = st; ctx.lineWidth = lw;
+  }
   /* CONTORNO DE LUZ: o mesmo corpo pintado antes, deslocado um fio pra cima,
      na cor do fogo. Sobra uma lasca acesa nas costas — é o que separa bicho
      escuro de chão escuro e diz de onde vem a luz. */

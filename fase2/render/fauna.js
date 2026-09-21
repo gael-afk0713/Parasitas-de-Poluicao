@@ -265,11 +265,18 @@ export class Fauna {
 
   _ferido(ctx, tema, tempo) {
     const f = this.ferido;
-    const L = 58;
+    const L = 64;
     const fogo = forcaFogo(this.area, tema.pureza ?? 0);
-    /* Silhueta OPACA, bem mais escura que o fundo, e só um fio de luz quente
-       nas costas. Na várzea o fio é furta-cor: é o óleo cobrindo o bicho. */
-    const corpo = misturarHex(tema.primeiroPlano, tema.terreno, 0.3);
+    /* PELAGEM, não silhueta. Preto chapado funciona contra céu; no plano do
+       jogo o bicho fica na frente de TERRA escura e sumia — só o contorno
+       aparecia, e ele lia como tronco caído. Marrom-acinzentado tocado pela
+       luz da área: mais claro que o chão, bem mais escuro que o Guardião, e
+       longe do preto dos parasitas (ninguém confunde bicho com inimigo).
+       Na várzea, o óleo escurece a pelagem e o fio de luz é furta-cor. */
+    const oleado = this.area === 'varzea' ? f.deitado : 0;
+    const corpo = misturarHex(
+      misturarHex(misturarHex(tema.terreno, '#7a5a44', 0.55), tema.luz, 0.12),
+      '#15181a', 0.55 * oleado);
     let borda;
     if (this.area === 'varzea' && f.deitado > 0.3) borda = rgba('#8fe8d8', 0.55 * f.deitado);
     else if (fogo > 0.05) borda = rgba(chamaDe(this.area).meio, 0.5);
@@ -290,9 +297,12 @@ export class Fauna {
     /* Cabeça MEIO ERGUIDA por padrão, caindo e voltando devagar: com a cabeça
        apoiada no chão o bicho deitado virava uma placa escura — o que diz
        "veado caído" é o pescoço de pé. O balanço lento é o cansaço. */
-    const cansaco = (0.5 + 0.3 * Math.sin(tempo * 0.45 + f.h * 5)) * f.deitado;
+    // O veado deitado se reconhece pelo PESCOÇO DE PÉ; os outros, pelo corpo.
+    const base = f.especie === 'veado' ? 0.86 : 0.72;
+    const cansaco = (base + 0.12 * Math.sin(tempo * 0.45 + f.h * 5)) * f.deitado;
     desenharAnimal(ctx, f.especie, 0, 0, tempo, f.h, borda,
-      { deitado: f.deitado, ergue: Math.max(f.ergue, cansaco) });
+      { deitado: f.deitado, ergue: Math.max(f.ergue, cansaco),
+        contorno: rgba(tema.primeiroPlano, 0.75) });
     ctx.restore();
   }
 
