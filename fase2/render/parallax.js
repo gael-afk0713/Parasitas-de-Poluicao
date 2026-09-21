@@ -1329,7 +1329,7 @@ const CAMADAS = {
       /* O fogo que PASSOU ainda queima nos morros do meio: línguas de 60–90
          px, do lado de onde o incêndio veio. Sem este plano o fogo de Raízes
          era só um pavio no horizonte. */
-      { f: 'incendio', rel: 0.70, solo: { amp: 56, escala: 0.0017, semente: 31 },
+      { f: 'incendio', rel: 0.70, fundo: 1, solo: { amp: 56, escala: 0.0017, semente: 31 },
         escala: 34, passo: 13, clarao: 0.26, semente: 33 },
     ] },
     { p: 0.17, d: 0.73, cor: 'medio', brilho: -0.2, formas: [
@@ -1415,7 +1415,7 @@ const CAMADAS = {
       { f: 'oleo', rel: 0.70, escala: 1.4, semente: 133 },
       // E o óleo PEGA FOGO: manchas baixas queimando sobre a lâmina, de onde
       // sobe fumaça preta.
-      { f: 'incendio', rel: 0.70, escala: 20, passo: 11, clarao: 0.18, semente: 134 },
+      { f: 'incendio', rel: 0.70, fundo: 1, escala: 20, passo: 11, clarao: 0.18, semente: 134 },
       { f: 'troncos', rel: 0.70, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
       { f: 'lixo', rel: 0.70, passo: 130, dens: 0.7, escala: 1.6, semente: 135 },
     ] },
@@ -1531,7 +1531,7 @@ const CAMADAS = {
         passo: 1400, dens: 0.95, escala: 0.5, semente: 306 },
       /* Queimada depois do corte: a encosta desmatada ARDE atrás da máquina.
          É o desmatamento e o incêndio na mesma imagem. */
-      { f: 'incendio', rel: 0.86, solo: { amp: 60, escala: 0.0014, semente: 304 },
+      { f: 'incendio', rel: 0.86, fundo: 1, solo: { amp: 60, escala: 0.0014, semente: 304 },
         escala: 26, passo: 11, clarao: 0.28, semente: 307 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
@@ -2231,8 +2231,58 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
       case 'cano': {
         const comp = vh * lerp(0.12, 0.32, h3);
         const d = lerp(16, 40, h2);
-        ctx.fillRect(px - d * 0.5, yTopo - 30, d, comp);
-        ctx.fillRect(px - d * 0.85, yTopo + comp - d * 0.5, d * 1.7, d * 0.5);
+        /* CANO, não pistão. A tampa larga na ponta e o cotovelo solto
+           pendurado liam como marreta de armadilha — o jogador esperava que
+           aquilo descesse nele. Agora: colarinhos finos ao longo do corpo, uma
+           boca só um pouco mais larga, e o que um cano de fábrica faz de
+           verdade: PINGA. Restaurado, a trepadeira toma conta. */
+        ctx.fillRect(px - d * 0.5, yTopo - 30, d, comp + 30);
+        for (let k = 1; k <= 2; k++) {
+          ctx.fillRect(px - d * 0.62, yTopo + comp * (k / 3), d * 1.24, Math.max(3, d * 0.2));
+        }
+        ctx.fillRect(px - d * 0.6, yTopo + comp - d * 0.28, d * 1.2, d * 0.28);
+        const calmaC = calmaDaFauna(tema.pureza ?? 0);
+        if (calmaC < 0.97) {
+          // A gota se forma na boca, cai e some.
+          const u = ((_reduzido ? tempo * 0.33 : tempo) * lerp(0.35, 0.55, h) + h * 3) % 1;
+          const forma = clamp01(u / 0.35);
+          const r = d * 0.16;
+          ctx.save();
+          ctx.globalAlpha = alfa * (1 - calmaC);
+          ctx.beginPath();
+          if (u < 0.35) {
+            ctx.ellipse(px, yTopo + comp + r * forma, r * 0.8, r * (0.6 + 0.6 * forma), 0, 0, TAU);
+          } else {
+            const q = (u - 0.35) / 0.65;
+            ctx.globalAlpha *= 1 - q;
+            ctx.ellipse(px, yTopo + comp + r + q * q * vh * 0.35, r * 0.7, r * 1.2, 0, 0, TAU);
+          }
+          ctx.fill();
+          ctx.restore();
+        }
+        if (calmaC > 0.03) {
+          // Trepadeira enrolada no cano e folhas penduradas na boca.
+          const verde = misturarHex(tema.primeiroPlano, tema.acento, 0.3);
+          ctx.save();
+          ctx.strokeStyle = rgba(verde, calmaC);
+          ctx.fillStyle = rgba(verde, calmaC);
+          ctx.lineWidth = Math.max(1.5, d * 0.12);
+          ctx.beginPath();
+          for (let yy = yTopo - 30; yy <= yTopo + comp; yy += 6) {
+            const xx = px + Math.sin((yy - yTopo) * 0.09 + h * 7) * d * 0.55;
+            yy === yTopo - 30 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+          }
+          ctx.stroke();
+          for (let i = 0; i < 4; i++) {
+            const hi = hash2(x + i, 941, 9);
+            const fx = px + (hi - 0.5) * d * 1.4;
+            const fy = yTopo + comp + d * lerp(0.1, 0.9, hi) * calmaC;
+            ctx.beginPath();
+            ctx.ellipse(fx, fy, d * 0.2, d * 0.34, (hi - 0.5) * 0.8, 0, TAU);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
         /* Com o céu aceso pelo incêndio, cano preto chapado era o contraste
            mais duro da tela e lia como arte faltando. O lado de baixo pega o
            reflexo do fogo: um fio quente nas arestas. */
@@ -2242,16 +2292,8 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
           ctx.save();
           ctx.strokeStyle = rgba(chC.meio, 0.4 * fogoAqui);
           ctx.lineWidth = 1.5;
-          ctx.strokeRect(px - d * 0.5, yTopo - 30, d, comp - d * 0.5 + 30);
-          ctx.strokeRect(px - d * 0.85, yTopo + comp - d * 0.5, d * 1.7, d * 0.5);
-          ctx.restore();
-        }
-        // cotovelo quebrado
-        if (h3 > 0.55) {
-          ctx.save();
-          ctx.translate(px, yTopo + comp);
-          ctx.rotate(lerp(-0.9, 0.9, h2));
-          ctx.fillRect(-d * 0.45, 0, d * 0.9, comp * 0.5);
+          ctx.strokeRect(px - d * 0.5, yTopo - 30, d, comp - d * 0.28 + 30);
+          ctx.strokeRect(px - d * 0.6, yTopo + comp - d * 0.28, d * 1.2, d * 0.28);
           ctx.restore();
         }
         break;
@@ -2367,10 +2409,12 @@ function desenharFaunaHorizonte(render, sala, mundo) {
     /* Contraluz: o bicho está entre o olho e o fogo, então é quase preto — e
        ganha uma lasca de luz nas costas na cor do que o ilumina (fogo onde há
        fogo, céu onde não há). */
-    const silhueta = misturarHex(cor(tema, 'distante', 0.8, -0.24), tema.primeiroPlano, 0.7);
-    const borda = fogo > 0.05
-      ? rgba(misturarHex(ch.meio, ch.borda, 0.25), 0.3 + 0.45 * fogo)
-      : rgba(tema.luz, 0.4);
+    /* Sem contorno aceso e fora do preto: silhueta preta com fio de luz é a
+       linguagem dos parasitas, e a manada lia como bando de aranhas. A cor
+       é a do morro onde ela corre, puxada pra bruma — bicho LONGE. */
+    const silhueta = misturarHex(misturarHex(cor(tema, 'distante', 0.8, -0.24), tema.primeiroPlano, 0.45),
+      tema.bruma, 0.22);
+    const borda = null;
     if (cc.bichos) {
       desenharManada(ctx, {
         x0: -60, x1: w + 60, dx: desl1,
@@ -2418,6 +2462,35 @@ export function desenharHorizonte(render, sala, mundo) {
     const t = mundo.laco?.tempo ?? 0;
     const tAnim = render.movimentoReduzido ? t * 0.33 : t;
     const fuga = confCatastrofe(sala.area).fuga;
+
+    /* O SOL ATRÁS DA FUMAÇA: um disco chapado, vermelho, sem halo — a
+       imagem de todo incêndio florestal grande, quando a fumaça filtra o sol
+       até ele virar uma moeda em brasa que dá pra olhar de frente. No
+       Coração, um sol verde doente. Pintado antes das colunas, que passam
+       por cima dele; some conforme a fumaça afina (o sol de verdade, o da
+       área limpa, é a luz dourada que já existe). */
+    if (fumaca > 0.05) {
+      const meioS = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
+      const xs = (fuga < 0 ? 0.3 : 0.7) * w - (camera.viewX - meioS) * 0.008;
+      const ys = yH - h * 0.27;
+      const rs = h * 0.043;
+      const corSol = sala.area === 'coracao' ? '#b9d24a' : '#d8402a';
+      const al = (sala.area === 'coracao' ? 0.55 : 0.82) * clamp01((fumaca - 0.05) / 0.4);
+      ctx.save();
+      ctx.fillStyle = rgba(corSol, al);
+      ctx.beginPath();
+      ctx.arc(xs, ys, rs, 0, TAU);
+      ctx.fill();
+      // Duas faixas de fumaça atravessando o disco.
+      ctx.clip();
+      const { alta: corFaixa } = coresDeFumaca(tema, cor(tema, 'distante', 0.9, -0.2), ch, 0);
+      for (let k = 0; k < 2; k++) {
+        const yy = ys + rs * (k ? 0.35 : -0.2) + Math.sin(tAnim * 0.12 + k * 2) * rs * 0.1;
+        ctx.fillStyle = rgba(corFaixa, 0.38 * al);
+        ctx.fillRect(xs - rs, yy - rs * 0.09, rs * 2, rs * (k ? 0.26 : 0.16));
+      }
+      ctx.restore();
+    }
 
     for (let banda = 0; banda < 2; banda++) {
       /* O INCÊNDIO NO HORIZONTE vive entre as duas bandas: o clarão e as
@@ -2487,20 +2560,6 @@ export function desenharHorizonte(render, sala, mundo) {
           });
         }
       }
-      /* A FONTE do Coração: entre as duas bandas, do lado do fogo. A banda da
-         frente, pintada logo depois, cobre o pé do jorro. */
-      if (banda === 1 && sala.area === 'coracao') {
-        const meio = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
-        const xF = (fuga < 0 ? 0.74 : 0.26) * w - (camera.viewX - meio) * 0.03;
-        const yF = yH + h * 0.008 - perfilHorizonte(xF + camera.viewX * 0.018, conf.semente, h * conf.alt, conf.tipo);
-        escoadouroNoHorizonte(ctx, {
-          x: xF, yChao: yF + h * 0.03, esc: h / 720 * 0.62, lado: fuga < 0 ? -1 : 1,
-          t: tAnim, ch, vivo: clamp01(1 - (tema.pureza ?? 0) * 1.6),
-          calma: calmaDaFauna(tema.pureza ?? 0),
-          cor: cor(tema, 'distante', 0.93, -0.1), verde: misturarHex(cor(tema, 'distante', 0.93, -0.1), tema.acento, 0.45),
-          deriva: fuga * 0.5, semente: conf.semente + 41,
-        });
-      }
       if (banda === 1 && fogo > 0.02) {
         const amp0 = h * conf.alt;
         const y00 = yH + h * 0.008;
@@ -2534,6 +2593,23 @@ export function desenharHorizonte(render, sala, mundo) {
       ctx.lineTo(w + 4, h + 4);
       ctx.closePath();
       ctx.fill();
+
+      /* A FONTE do Coração: em cima da crista da frente, do lado do fogo. A
+         poça fica na crista e o cano brota dela — atrás das árvores do meio
+         do fundo, mas inteiro na faixa de céu que toda sala do Coração tem. */
+      if (banda === 1 && sala.area === 'coracao') {
+        const meioF = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
+        const xF = (fuga < 0 ? 0.76 : 0.24) * w - (camera.viewX - meioF) * 0.03;
+        const corBanda = cor(tema, 'distante', d, -0.14);
+        escoadouroNoHorizonte(ctx, {
+          x: xF, yEm: (x) => y0 - perfilHorizonte(x + desl, s, amp, conf.tipo),
+          esc: h / 720 * 0.62, lado: fuga < 0 ? -1 : 1,
+          t: tAnim, ch, vivo: clamp01(1 - (tema.pureza ?? 0) * 1.6),
+          calma: calmaDaFauna(tema.pureza ?? 0),
+          cor: ajustarBrilho(corBanda, -0.06), verde: misturarHex(corBanda, tema.acento, 0.45),
+          deriva: fuga * 0.5, semente: conf.semente + 41,
+        });
+      }
 
       // 2 · os vultos que quebram a linha — é o que faz "mata" e não "duna".
       if (conf.tipo === 'rocha') continue;

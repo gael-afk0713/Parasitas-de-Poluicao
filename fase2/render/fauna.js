@@ -224,7 +224,10 @@ export class Fauna {
       if (!f.iniciado) { f.estado = calma > 0.5 ? 'dePe' : 'caido'; f.iniciado = true; }
       f.tl += dt;
       if (f.estado === 'caido' && calma > 0.5) { f.estado = 'levantando'; f.tl = 0; }
-      if (f.estado === 'levantando' && f.tl > 2.6) { f.estado = 'dePe'; f.tl = 0; }
+      // Fica de pé olhando pra onde acabou de se virar (pro Guardião). Sem
+      // gravar a direção, a pose de pé voltava pra `dir` da entrada e o
+      // bicho se espelhava num quadro, de costas pra quem estava do lado.
+      if (f.estado === 'levantando' && f.tl > 2.6) { f.estado = 'dePe'; f.tl = 0; f.dir = f.olhaPara; }
       const dx = jogador.centroX - f.x, dy = jogador.centroY - f.y;
       const perto = dx * dx + dy * dy < 170 * 170;
       // Caído, ele só consegue erguer um pouco a cabeça quando alguém chega.
@@ -280,30 +283,47 @@ export class Fauna {
     /* PELAGEM, não silhueta: preto chapado sumia contra a terra escura do
        plano de jogo e o bicho lia como tronco caído. Marrom-acinzentado
        tocado pela luz da área — mais claro que o chão, bem mais escuro que o
-       Guardião, longe do preto dos parasitas. A capivara da várzea, caída, é
-       PRETA DE ÓLEO e brilha; o brilho vai sumindo conforme ela se levanta. */
+       Guardião, longe do preto dos parasitas.
+       REGRA: preto + olho claro + contorno claro é a linguagem dos
+       INIMIGOS. Nenhum bicho junta os três. A capivara oleada era preta
+       inteira, de olho branco e fio de brilho — lia como mais um parasita.
+       Agora ela é marrom com o ÓLEO POR CIMA (dorso encharcado, barriga
+       ainda marrom), o brilho do óleo é um fio verde-azulado, e o olho do
+       bicho caído fica FECHADO. */
     const pelo = misturarHex(misturarHex(tema.terreno, '#7a5a44', 0.55), tema.luz, 0.12);
     const oleo = oleado ? pose.sujo : 0;
-    const corpo = misturarHex(pelo, '#0e1012', 0.9 * oleo);
+    const corpo = pelo;
     let borda;
     if (f.estado === 'dePe') borda = rgba(tema.luz, 0.6);            // luz dourada no dorso
-    else if (oleo > 0.3) borda = rgba('#f4f4f0', 0.4 * oleo);         // brilho molhado do óleo
+    else if (oleo > 0.3) borda = rgba('#7fd6c8', 0.45 * oleo);        // fio molhado do óleo
     else if (fogo > 0.05) borda = rgba(chamaDe(this.area).meio, 0.55); // lado do fogo
     else borda = rgba(tema.luz, 0.45);
 
     ctx.save();
-    // Poça furta-cor embaixo da capivara oleada.
+    // Poça de óleo embaixo da capivara: escura, com um fio furta-cor na borda.
     if (oleo > 0.05) {
-      const g = ctx.createLinearGradient(f.x - L * 0.8, 0, f.x + L * 0.8, 0);
-      g.addColorStop(0, rgba('#ff4fd8', 0));
-      g.addColorStop(0.3, rgba('#ff4fd8', 0.32 * oleo));
-      g.addColorStop(0.55, rgba('#46e0d0', 0.32 * oleo));
-      g.addColorStop(0.8, rgba('#ffe45a', 0.28 * oleo));
-      g.addColorStop(1, rgba('#ffe45a', 0));
-      ctx.fillStyle = g;
+      ctx.fillStyle = rgba('#0d0b0a', 0.7 * oleo);
       ctx.beginPath();
       ctx.ellipse(f.x, f.y + 2, L * 0.8, L * 0.1, 0, 0, TAU);
       ctx.fill();
+      const g = ctx.createLinearGradient(f.x - L * 0.8, 0, f.x + L * 0.8, 0);
+      g.addColorStop(0, rgba('#ff4fd8', 0.35 * oleo));
+      g.addColorStop(0.5, rgba('#46e0d0', 0.35 * oleo));
+      g.addColorStop(1, rgba('#ffe45a', 0.3 * oleo));
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    // De pé ainda sujo, o óleo PINGA da barriga.
+    if (oleo > 0.05 && pose.deitado < 0.5) {
+      ctx.fillStyle = rgba('#120e0c', 0.85 * oleo);
+      for (let i = 0; i < 4; i++) {
+        const u = (tempo * 0.8 + i / 4 + f.h) % 1;
+        const dx = (i - 1.5) * L * 0.16 * pose.dir;
+        ctx.beginPath();
+        ctx.ellipse(f.x + dx, lerp(f.y - L * 0.2, f.y, u), 1.5, 3, 0, 0, TAU);
+        ctx.fill();
+      }
     }
     // Sombra de contato: o corpo caído ENCOSTA no chão.
     const gs = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, L * 0.75);
@@ -343,9 +363,13 @@ export class Fauna {
     ctx.fillStyle = corpo;
     ctx.strokeStyle = corpo;
     desenharAnimal(ctx, f.especie, 0, 0, tempo, f.h, borda, {
-      deitado: pose.deitado, deLado: pose.deLado, ergue: pose.ergue, sacode: pose.sacode,
-      peito: pose.peito, fuligem: pose.sujo * (oleado ? 0 : 1),
-      olho: rgba('#f6f2ea', 0.9), contorno: rgba(tema.primeiroPlano, 0.75),
+      deitado: pose.deitado, deitadoTras: pose.deitadoTras, deLado: pose.deLado,
+      ergue: pose.ergue, sacode: pose.sacode,
+      peito: pose.peito, fuligem: pose.sujo * (oleado ? 0 : 1), oleo,
+      // Caído, de olho fechado; abre quando ergue a cabeça pra quem chega.
+      olhoFechado: f.estado === 'caido' && f.ergue < 0.3,
+      olho: f.estado === 'caido' && f.ergue < 0.3 ? rgba('#2a1d15', 0.9) : rgba('#f6f2ea', 0.9),
+      contorno: rgba(tema.primeiroPlano, 0.75),
     });
     ctx.restore();
   }
@@ -370,11 +394,16 @@ export class Fauna {
     }
     if (f.estado === 'levantando') {
       const t = f.tl;
+      // Rola pro peito; a TRASEIRA sobe primeiro (joelhos da frente ainda no
+      // chão); depois a frente; sacode; vira pro Guardião.
       const deLado = 1 - suave(0, 0.6, t);
-      const deitado = 1 - suave(0.6, 1.5, t);
+      const deitadoTras = 1 - suave(0.6, 1.05, t);
+      // A frente AJOELHA enquanto a traseira sobe (peito fora do chão), e só
+      // depois estica.
+      const deitado = 1 - 0.45 * suave(0.6, 1.05, t) - 0.55 * suave(1.05, 1.5, t);
       const agita = t > 1.5 && t < 1.95 ? (1 - (t - 1.5) / 0.45) : 0;
       return {
-        deitado, deLado, ergue: suave(0.1, 0.7, t),
+        deitado, deitadoTras, deLado, ergue: suave(0.1, 0.7, t),
         peito: 1, sacode: Math.sin(t * 46) * 0.035 * agita,
         sujo: 1 - suave(1.5, 1.95, t), cinza: agita, dir: t > 1.95 ? f.olhaPara : f.dir,
       };

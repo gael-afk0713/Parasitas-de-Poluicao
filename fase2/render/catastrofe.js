@@ -31,7 +31,7 @@
    ========================================================================= */
 
 import {
-  TAU, lerp, clamp01, rgba, ruido1, hash2, misturarHex, ajustarBrilho,
+  TAU, lerp, clamp, clamp01, rgba, ruido1, hash2, misturarHex, ajustarBrilho,
 } from '../core/mat.js';
 
 /* =========================================================================
@@ -183,7 +183,9 @@ export function frenteDeFogo(ctx, o) {
        direção de corrida levava a manada PRA DENTRO de alguma chama, e não
        havia lado seguro legível. */
     const lado = o.lateral ? o.lateral(x) : 1;
-    let foco = clamp01((n - 0.42) / 0.34) * o.inten * lado;
+    // `piso`: fogo pequeno (um toco) cabe inteiro dentro de uma mancha do
+    // ruído — sem piso ele ficava todo aceso ou todo apagado.
+    let foco = Math.max(clamp01((n - 0.42) / 0.34), o.piso ?? 0) * o.inten * lado;
     /* MASSA. Línguas soltas, todas do mesmo tamanho, liam como fileira de
        velas — enfeite de borda, não incêndio. Em alguns trechos a frente vira
        PAREDE: as línguas engrossam, sobem três vezes mais e se fundem num
@@ -211,16 +213,24 @@ export function frenteDeFogo(ctx, o) {
     const lab = clamp01((ruido1(xm * 0.012 + o.t * 0.09, o.semente + 3) - 0.6) / 0.4);
     // Dentro da parede, a altura ONDULA: cristas mais altas rolando ao longo
     // dela. Sem isso a parede era um pente — todas as pontas no mesmo nível.
-    const onda = zona > 0.05 ? lerp(0.55, 1.45, ruido1(xm * 0.018 + o.t * 0.22, o.semente + 9)) : 1;
+    /* E um ENVELOPE longo (300–500 px) por cima da ondulação curta: a parede
+       tem morros e vales de fogo, não uma altura só de ponta a ponta. */
+    const env = 0.5 + 0.5 * (0.6 * Math.sin(xm * TAU / 420 + o.t * 0.15 + o.semente)
+      + 0.4 * Math.sin(xm * TAU / 290 - o.t * 0.1 + o.semente * 2));
+    const onda = zona > 0.05
+      ? lerp(0.55, 1.45, ruido1(xm * 0.018 + o.t * 0.22, o.semente + 9)) * lerp(0.45, 1.6, env)
+      : 1;
     const sobe = Math.max(lab * lab, zona * 0.85 * onda);
     const fa = o.ch.forma?.alt ?? 1, fl = o.ch.forma?.larg ?? 1;
     const alt = o.escala * lerp(0.35, 1.3, h) * (0.2 + 0.8 * foco) * (1 + 2.2 * sobe) * fa;
-    const larg = passo * lerp(1.2, 2.1, hash2(xm | 0, o.semente, 17)) * fl * (1 + 0.6 * zona);
+    // Largura bem variada (fina a gorda): línguas todas iguais liam como pente.
+    const hl = hash2(xm | 0, o.semente, 17);
+    const larg = passo * lerp(1, 3.2, hl * hl) * fl * (1 + 0.6 * zona);
     const xf = x + (h - 0.5) * passo * 0.5;
     tufo(pb, pm, pn, xf, yb + 1, alt, larg, o.t, h, o.inclina);
     if (zona > 0.08) {
       // O corpo da parede: elipses baixas que se fundem num preenchimento só.
-      elipse(corpo, xf, yb - alt * 0.18, larg * 1.1, alt * 0.38 * zona + 2);
+      elipse(corpo, xf, yb - alt * 0.3, larg * 1.3, alt * 0.55 * zona + 2);
       temCorpo = true;
       if (yb < yMin) yMin = yb;
       if (yb > yMax) yMax = yb;
@@ -245,7 +255,7 @@ export function frenteDeFogo(ctx, o) {
   ctx.lineWidth = Math.max(0.8, o.escala * 0.06);
   ctx.stroke(cinzaViva);
   if (temCorpo) {
-    const g = ctx.createLinearGradient(0, yMax + 2, 0, yMin - o.escala * 2.4);
+    const g = ctx.createLinearGradient(0, yMax + 2, 0, yMin - o.escala * 4);
     g.addColorStop(0, rgba(o.ch.meio, 0.75 * o.alfa));
     g.addColorStop(0.45, rgba(o.ch.borda, 0.45 * o.alfa));
     g.addColorStop(1, rgba(o.ch.borda, 0));
@@ -357,22 +367,30 @@ export function tocoEmBrasa(ctx, x, yBase, larg, alt, t, semente, ch, vida, corS
   ctx.stroke(rachas);
   ctx.restore();
 
-  // 4 · línguas BAIXAS lambendo o topo lascado e o dorso da tora.
-  const pb = new Path2D(), pm = new Path2D(), pn = new Path2D();
-  const bocas = [[x - r * 0.42, topo + alt * 0.24], [x + r * 0.22, topo + alt * 0.18],
-    [x - r * 0.9, topo + alt * 0.16]];
-  for (let i = 0; i < bocas.length; i++) {
-    const hi = hash2(semente, i, 23);
-    tufo(pb, pm, pn, bocas[i][0], bocas[i][1] + 3, alt * lerp(0.16, 0.3, hi) * vida,
-      r * lerp(0.7, 1.05, hi), t, hi + i * 0.31, -dir * 0.12);
-  }
-  for (let i = 0; i < 2; i++) {
-    const u = 0.35 + i * 0.3;
-    const hi = hash2(semente, i, 29);
-    tufo(pb, pm, pn, ax + cx * u - nx * 0.85, ay + cy * u - ny * 0.85 + 2,
-      alt * lerp(0.1, 0.18, hi) * vida, r * lerp(0.6, 0.9, hi), t, hi + 0.7 + i, -dir * 0.12);
-  }
-  preencherFogo(ctx, pb, pm, pn, ch, clamp01(0.4 + vida));
+  /* 4 · uma FRANJA de fogo correndo pela borda lascada do toco e pelo dorso
+     da tora — a mesma frente de fogo do resto do jogo, em miniatura. Três
+     tufos soltos no topo liam como ícone (e, baixos e largos, como folha). */
+  const bordaToco = [[x - r * 0.9, topo + alt * lerp(0.08, 0.2, h1)], [x - r * 0.42, topo + alt * 0.24],
+    [x - r * 0.12, topo], [x + r * 0.22, topo + alt * 0.18], [x + r * 0.6, topo + alt * lerp(0.06, 0.14, h2)]];
+  const naBorda = (xx) => {
+    for (let i = 1; i < bordaToco.length; i++) {
+      const [x0, y0] = bordaToco[i - 1], [x1, y1] = bordaToco[i];
+      if (xx <= x1) return lerp(y0, y1, clamp01((xx - x0) / (x1 - x0)));
+    }
+    return bordaToco[bordaToco.length - 1][1];
+  };
+  frenteDeFogo(ctx, {
+    x0: x - r * 0.85, x1: x + r * 0.55, passo: 5, yEm: naBorda, escala: alt * 0.16,
+    t, semente: semente + 3, ch, inten: vida, inclina: -dir * 0.15, alfa: clamp01(0.4 + vida),
+    piso: 0.75,
+  });
+  const u0 = 0.2, u1 = 0.85;
+  frenteDeFogo(ctx, {
+    x0: Math.min(ax + cx * u0, ax + cx * u1), x1: Math.max(ax + cx * u0, ax + cx * u1), passo: 5,
+    yEm: (xx) => { const u = (xx - ax) / cx; return ay + cy * u - Math.abs(ny) - tr * 0.1; },
+    escala: alt * 0.1, t, semente: semente + 5, ch, inten: vida, inclina: -dir * 0.15,
+    alfa: clamp01(0.4 + vida), piso: 0.55,
+  });
 
   // 5 · fagulhas subindo.
   ctx.fillStyle = rgba(ch.brasa, 0.9 * vida);
@@ -498,9 +516,27 @@ function luminancia(hex) {
    Assinatura igual às de parallax.js: (ctx, a, s). Registradas lá em FORMAS.
    ========================================================================= */
 
+/**
+ * Rampa de chama ABAFADA pela distância: sem núcleo branco, puxada pra
+ * bruma. Fogo de fundo que corre na altura do chão jogável, com núcleo
+ * branco-amarelo, fazia o jogador perguntar se aquilo queimava — o branco
+ * quente fica reservado pro fogo que está perto.
+ */
+function chamaAbafada(ch, bruma, f) {
+  return {
+    nucleo: misturarHex(ch.meio, bruma, 0.2 * f),
+    meio: misturarHex(ch.meio, bruma, 0.38 * f),
+    borda: misturarHex(ch.borda, bruma, 0.38 * f),
+    brasa: misturarHex(ch.brasa, bruma, 0.38 * f),
+    vapor: ch.vapor, forma: ch.forma,
+  };
+}
+
 /** Incêndio correndo sobre o perfil de chão de uma camada. */
 function incendio(ctx, a, s) {
   if (a.fogo < 0.02) return;
+  const ch = s.fundo ? chamaAbafada(a.chama, a.tema.bruma, s.fundo) : a.chama;
+  const alfa = (s.alfa ?? 1) * (1 - 0.4 * (s.fundo ?? 0));
   const y0 = a.y(s.rel);
   const solo = s.solo;
   const yEm = (x) => y0 - (solo ? a.perfil(x, solo) : 0);
@@ -514,19 +550,19 @@ function incendio(ctx, a, s) {
   ctx.lineTo(a.x1 + 16, y0 - a.vh * 2);
   ctx.closePath();
   ctx.clip();
-  claraoDeFogo(ctx, a.x0, a.x1, y0 - a.vh * (s.clarao ?? 0.32), y0 + 30, a.chama, a.fogo * (s.alfa ?? 1));
+  claraoDeFogo(ctx, a.x0, a.x1, y0 - a.vh * (s.clarao ?? 0.32), y0 + 30, ch, a.fogo * alfa);
   ctx.restore();
   frenteDeFogo(ctx, {
     x0: a.x0, x1: a.x1, passo: s.passo ?? 14, yEm, escala: s.escala ?? 26,
-    t: a.tempoAnim, semente: s.semente, ch: a.chama, inten: a.fogo,
-    inclina: a.inclinaFogo, alfa: s.alfa ?? 1, lateral: a.lateral, massa: s.massa ?? 1,
+    t: a.tempoAnim, semente: s.semente, ch, inten: a.fogo,
+    inclina: a.inclinaFogo, alfa, lateral: a.lateral, massa: s.massa ?? 1,
   });
 }
 
 function incendioLuz(ctx, a, s) {
   if (a.fogo < 0.02) return;
   const y0 = a.y(s.rel);
-  const g = lerp(1, 0.5, clamp01(a.tema.brilhoBloom ?? 0.4));
+  const g = lerp(1, 0.5, clamp01(a.tema.brilhoBloom ?? 0.4)) * (1 - 0.6 * (s.fundo ?? 0));
   claraoDeFogo(ctx, a.x0, a.x1, y0 - a.vh * 0.12, y0 + 10, a.chama, a.fogo * 0.9 * g);
 }
 
@@ -556,6 +592,17 @@ function colunaFumaca(ctx, a, s) {
       corBaixa: baixa, corAlta: alta, alfa: 0.5 * a.fumaca * (s.alfa ?? 1),
     });
   }
+}
+
+/**
+ * Quanto uma árvore em chamas queima: a mesma conta na cena e no passe de
+ * luz — se uma mudar sem a outra, o halo destoa da árvore.
+ */
+function forcaDaArvore(a, h2, tx) {
+  // Nenhuma queima forte PERTO do Guardião (ver o comentário na cena).
+  const longe = clamp01((Math.abs(tx - a.jogX) - 90) / 320);
+  const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe) * a.lateral(tx);
+  return { longe, inten, tocha: clamp01((inten - 0.4) / 0.35) };
 }
 
 /**
@@ -639,15 +686,13 @@ function arvoreEmChamas(ctx, a, s) {
        a coisa mais clara perto do jogador era um enfeite, e o jogador lê
        enfeite brilhante como perigo. Mesma ideia da máscara do primeiro
        plano: a força cai conforme a árvore se aproxima dele na tela. */
-    const longe = clamp01((Math.abs(tx - a.jogX) - 90) / 320);
-    const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe) * a.lateral(tx);
+    const { inten, tocha } = forcaDaArvore(a, h2, tx);
     if (inten > 0.04) {
       algumFogo = true;
       /* TOCHA. Com o fogo forte (lado do fogo, longe do Guardião) a árvore
          queima INTEIRA: línguas subindo pelo tronco e a copa engolida. Um
          tufinho na ponta de cada galho lia como vela de aniversário — era o
          fogo decorando a árvore, não consumindo. */
-      const tocha = clamp01((inten - 0.4) / 0.35);
       for (let i = 0; i < pontas.length; i++) {
         const [ex, ey] = pontas[i];
         const hi = hash2((x | 0) + i * 13, s.semente, 19);
@@ -660,12 +705,34 @@ function arvoreEmChamas(ctx, a, s) {
         }
       }
       if (tocha > 0.05) {
-        for (let k = 0; k < 4; k++) {
-          const hk = hash2((x | 0) + k * 5, s.semente, 37);
-          const kk = lerp(0.18, 0.8, (k + hk * 0.7) / 4);
-          const lado = k % 2 ? 1 : -1;
-          tufo(pb, pm, pn, lerp(px, tx, kk) + lado * r * 0.55, yb - alt * kk,
-            r * lerp(3.2, 5.5, hk) * tocha, r * lerp(1.5, 2.3, hk), t, hk + k * 0.37, a.inclinaFogo);
+        /* BAINHA: uma chama só abraçando o tronco da base à copa, com a
+           borda ondulando e subindo além da ponta. Tufos empilhados no tronco
+           liam como uma pilha de gotas iguais. */
+        const nucleoEsc = [1, 0.7, 0.45];
+        const caminhos = [pb, pm, pn];
+        for (let q = 0; q < 3; q++) {
+          const cam = caminhos[q];
+          const esc = nucleoEsc[q];
+          const k0 = lerp(0.12, 0.3, q / 2);
+          const N = 9;
+          const pts = [];
+          for (let i = 0; i <= N; i++) {
+            const k = lerp(k0, 1, i / N);
+            const cx = lerp(px, tx, k);
+            const cy = yb - alt * k;
+            const ond = 0.5 + 0.5 * Math.sin(k * 13 - t * 5.5 + h * 9 + q);
+            const w = (r * (0.9 + 0.4 * (1 - k)) + (8 + 14 * ond) * tocha) * esc;
+            pts.push([cx, cy, w]);
+          }
+          const topoY = ty - alt * 0.32 * tocha * esc * (0.85 + 0.3 * ruido1(t * 2.2 + h * 7, 91));
+          const topoX = tx + a.inclinaFogo * alt * 0.3;
+          // Sobe pela esquerda, passa pela ponta, desce pela direita: horário.
+          cam.moveTo(pts[0][0] - pts[0][2], pts[0][1]);
+          for (const [cx, cy, w] of pts) cam.lineTo(cx - w, cy);
+          cam.quadraticCurveTo(tx - r * esc, ty - alt * 0.1, topoX, topoY);
+          cam.quadraticCurveTo(tx + r * esc, ty - alt * 0.1, pts[N][0] + pts[N][2], pts[N][1]);
+          for (let i = N; i >= 0; i--) cam.lineTo(pts[i][0] + pts[i][2], pts[i][1]);
+          cam.closePath();
         }
       }
     }
@@ -714,12 +781,10 @@ function arvoreEmChamasLuz(ctx, a, s) {
     const alt = lerp(s.altMin ?? 150, s.altMax ?? 330, h3);
     const tx = px + (h - 0.5) * 0.22 * alt;
     // A mesma máscara da cena: o halo não pode ficar forte do lado do herói.
-    const longe = clamp01((Math.abs(tx - a.jogX) - 90) / 320);
+    const { longe, tocha } = forcaDaArvore(a, h2, tx);
     if (longe < 0.05) continue;
     ctx.globalAlpha = lerp(0.22, 1, longe);
     // A árvore-tocha acende um halo maior e mais baixo, que pega o tronco.
-    const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe) * a.lateral(tx);
-    const tocha = clamp01((inten - 0.4) / 0.35);
     const r = lerp(s.largMin ?? 6, s.largMax ?? 16, h2) * (4 + 3 * tocha);
     ctx.beginPath();
     ctx.arc(tx, yb - alt * (1 - 0.2 * tocha), r, 0, TAU);
@@ -1152,6 +1217,11 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
      chama decide o ritmo — e as pausas). `pose.sacode`: deslocamento lateral
      de quem se sacode pra tirar a cinza. */
   const deLado = pose?.deLado ?? 0;
+  /* `pose.deitadoTras` (0..1, opcional): a traseira levanta ANTES da frente —
+     é assim que um veado se põe de pé (quadris no alto, joelhos da frente
+     ainda no chão, e só então a frente). Levantando tudo junto, o meio da
+     animação lia como galope. Sem ele, frente e trás usam `deitado`. */
+  const deitadoT = pose?.deitadoTras ?? deitado;
   // Suspensão: no galope o corpo inteiro sai do chão numa fase do ciclo.
   const salto = E.salto * Math.pow(Math.max(0, Math.sin(fase + 1.2)), 2) * galope;
   /* Pastando, o corpo INCLINA pra frente em volta do quadril de trás: só
@@ -1159,15 +1229,15 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
      e o veado "pastando" lia como mesa com cabeça. */
   // Deitado não pasta: sem isso o bicho caído mergulhava o focinho no chão.
   const arfagem = Math.sin(fase) * 0.06 * galope
-    + (1 - galope) * (1 - deitado) * (E.pastoInclina ?? 0);
+    + (1 - galope) * (1 - Math.max(deitado, deitadoT)) * (E.pastoInclina ?? 0);
   const yCorpo = -salto;
 
   ctx.save();
   ctx.translate(pose?.sacode ?? 0, yCorpo);
   // Onde fica o chão no espaço local do corpo (pra nenhuma pata atravessá-lo
   // enquanto o bicho se deita ou levanta).
-  let chao = -yCorpo;
-  if (deitado > 0) {
+  let chao = -yCorpo, chaoF = chao, chaoT = chao;
+  if (deitado > 0 || deitadoT > 0) {
     /* Afunda até a BARRIGA encostar no chão, e respira: o corpo sobe e desce
        sempre a partir da barriga. De lado ele ainda achata um pouco. A
        escala é em volta da barriga, não da origem — em volta da origem o
@@ -1175,9 +1245,22 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     const barriga = E.barriga ?? Math.max(...E.corpo.map((c) => c[1]));
     const resp = pose?.peito ?? (1 + Math.sin(tempo * 1.7 + h * 9) * 0.035 * deitado);
     const k = resp * (1 - 0.14 * deLado);
-    const esc = lerp(1, k, deitado), desce = (0.02 - barriga * k) * deitado;
+    const dMax = Math.max(deitado, deitadoT);
+    const esc = lerp(1, k, dMax);
+    const desceF = (0.02 - barriga * k) * deitado, desceT = (0.02 - barriga * k) * deitadoT;
+    const desce = (desceF + desceT) * 0.5;
     ctx.translate(0, desce);
+    // Frente e trás em alturas diferentes: o corpo inclina em volta do meio.
+    const xF = E.quadris[0][0], xT = E.quadris[1][0];
+    // Limitada: inclinação de 35° enfiava o focinho do tamanduá no chão.
+    const incl = clamp(Math.atan2(desceF - desceT, xF - xT), -0.3, 0.3);
+    if (Math.abs(incl) > 1e-4) {
+      const xm = (xF + xT) * 0.5;
+      ctx.translate(xm, 0); ctx.rotate(incl); ctx.translate(-xm, 0);
+    }
     ctx.scale(1, esc);
+    chaoF = (chao - desceF) / esc;
+    chaoT = (chao - desceT) / esc;
     chao = (chao - desce) / esc;
   }
   if (galope < 1) {
@@ -1192,7 +1275,9 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
   // Patas primeiro: a do lado de lá fica atrás do corpo.
   ctx.lineCap = 'round';
   const [q1, q2] = E.perna;
-  const pata = (hx, hy, fs, frente) => {
+  const pata = (hx, hy, fs, frente, perto) => {
+    const deit = frente ? deitado : deitadoT;
+    const chaoP = frente ? chaoF : chaoT;
     let th, baixo;
     if (galope > 0.02) {
       th = E.amp * Math.sin(fs) * galope;
@@ -1209,13 +1294,13 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
        trás por baixo do corpo — a perna vira um Z deitado no chão. Com a
        coxa pra trás, a canela de trás apontava pro alto e o bicho caído
        ganhava dois palitos espetados. */
-    if (deitado > 0) {
-      th = lerp(th, frente ? 1.45 : 1.35, deitado);
-      baixo = lerp(baixo, -1.5, deitado);
+    if (deit > 0) {
+      th = lerp(th, frente ? 1.45 : 1.35, deit);
+      baixo = lerp(baixo, -1.5, deit);
     }
     // Em pé e parado, um joelho: perna reta de ponta a ponta lia como pé de
     // mesa.
-    if (galope < 0.02 && deitado < 0.02) baixo += frente ? -0.14 : 0.18;
+    if (galope < 0.02 && deit < 0.02) baixo += frente ? -0.14 : 0.18;
     let kx = hx + Math.sin(th) * q1, ky = hy + Math.cos(th) * q1;
     let fx = kx + Math.sin(baixo) * q2, fy = ky + Math.cos(baixo) * q2;
     /* De lado: as patas ESTICADAS rentes ao chão — as da frente pra frente,
@@ -1225,7 +1310,10 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
        de trás passava por "reta pra baixo" no meio do rolamento e atravessava
        o chão. */
     if (deLado > 0) {
-      const t2 = frente ? 1.36 : -1.3, b2 = frente ? 1.56 : -1.6;
+      // Joelho levemente dobrado, e a perna de lá um pouco mais baixa que a
+      // de cá: um PAR de patas, não uma só.
+      const t2 = (frente ? 1.34 : -1.28) + (perto ? 0 : (frente ? 0.14 : -0.14));
+      const b2 = frente ? 1.72 : -1.74;
       const kx2 = hx + Math.sin(t2) * q1, ky2 = hy + Math.cos(t2) * q1;
       kx = lerp(kx, kx2, deLado); ky = lerp(ky, ky2, deLado);
       fx = lerp(fx, kx2 + Math.sin(b2) * q2, deLado);
@@ -1234,8 +1322,8 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     // No meio do deitar/levantar, os ângulos intermediários pediam uma perna
     // mais comprida que a distância até o chão: o casco afundava. A perna
     // encolhe na vertical e abre pro lado, como quem apoia o peso.
-    if (deitado > 0.02 && Math.max(fy, ky) > chao && chao > hy) {
-      const f = (chao - hy) / (Math.max(fy, ky) - hy);
+    if (deit > 0.02 && Math.max(fy, ky) > chaoP && chaoP > hy) {
+      const f = (chaoP - hy) / (Math.max(fy, ky) - hy);
       ky = hy + (ky - hy) * f; fy = hy + (fy - hy) * f;
     }
     ctx.lineWidth = E.grossura[0];
@@ -1244,8 +1332,8 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
   };
   const [fr, tr] = E.quadris;
-  pata(fr[0] - 0.04, fr[1], fase + 2.4 + 0.35, true);
-  pata(tr[0] - 0.04, tr[1], fase + 0.35, false);
+  pata(fr[0] - 0.04, fr[1], fase + 2.4 + 0.35, true, false);
+  pata(tr[0] - 0.04, tr[1], fase + 0.35, false, false);
 
   const p = new Path2D();
   contornoSuave(p, E.corpo, 0, 0);
@@ -1299,11 +1387,42 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     ctx.fill(p);
     ctx.fillStyle = fill;
   }
+  /* De lado, a BARRIGA fica pra câmera: uma faixa clara ao longo da parte
+     de baixo do corpo. É o que separa "bicho caído" de "tábua" — sem ela o
+     veado deitado lia como canoa com orelha. */
+  if (deLado > 0.02) {
+    let base = -1;
+    for (const c of E.corpo) if (c[1] > base) base = c[1];
+    const xF = E.quadris[0][0], xT = E.quadris[1][0];
+    ctx.save();
+    ctx.clip(p);
+    ctx.fillStyle = typeof fill === 'string' ? misturarHex(fill, '#d8c4a4', 0.42) : fill;
+    ctx.globalAlpha *= deLado;
+    ctx.beginPath();
+    elipse(ctx, (xF + xT) * 0.5, base - 0.03, (xF - xT) * 0.62, 0.075);
+    ctx.fill();
+    ctx.restore();
+  }
+  // Óleo: o dorso encharcado, a barriga ainda na cor do bicho.
+  if (pose?.oleo > 0.02) {
+    let topo = 0, base = -1;
+    for (const c of E.corpo) { if (c[1] < topo) topo = c[1]; if (c[1] > base) base = c[1]; }
+    const g = ctx.createLinearGradient(0, topo - 0.05, 0, base);
+    g.addColorStop(0, rgba('#120e0c', 0.88 * pose.oleo));
+    g.addColorStop(0.62, rgba('#120e0c', 0.8 * pose.oleo));
+    g.addColorStop(1, rgba('#120e0c', 0));
+    ctx.fillStyle = g;
+    ctx.fill(p);
+    ctx.fillStyle = fill;
+  }
   if (E.faixa) {
     const fb = new Path2D(), fp = new Path2D();
     contornoSuave(fb, E.faixa, 0, 0);
     contornoSuave(fp, E.faixaPreta, 0, 0);
-    ctx.fillStyle = misturarHex(typeof fill === 'string' ? fill : '#302820', '#ece6d8', 0.6);
+    // Na silhueta de manada (sem `pose`), a borda da faixa fica só um tom
+    // acima do corpo: branca, a 40 px de bicho ela era a coisa mais clara do
+    // horizonte e o tamanduá virava lagarto listrado.
+    ctx.fillStyle = misturarHex(typeof fill === 'string' ? fill : '#302820', '#ece6d8', pose ? 0.6 : 0.22);
     ctx.fill(fb);
     ctx.fillStyle = '#12100e';
     ctx.fill(fp);
@@ -1315,15 +1434,26 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     const c = Math.cos(rotCabeca), sn = Math.sin(rotCabeca);
     const ox = E.pivo[0] + E.olho[0] * c - E.olho[1] * sn;
     const oy = E.pivo[1] + E.olho[0] * sn + E.olho[1] * c;
-    ctx.fillStyle = pose.olho;
-    ctx.beginPath();
-    ctx.arc(ox, oy, 0.028, 0, TAU);
-    ctx.fill();
+    if (pose.olhoFechado) {
+      // Pálpebra: um arco curto voltado pra baixo.
+      const st = ctx.strokeStyle, lw = ctx.lineWidth;
+      ctx.strokeStyle = pose.olho;
+      ctx.lineWidth = 0.022;
+      ctx.beginPath();
+      ctx.arc(ox, oy - 0.012, 0.03, 0.15 * Math.PI, 0.85 * Math.PI);
+      ctx.stroke();
+      ctx.strokeStyle = st; ctx.lineWidth = lw;
+    } else {
+      ctx.fillStyle = pose.olho;
+      ctx.beginPath();
+      ctx.arc(ox, oy, 0.028, 0, TAU);
+      ctx.fill();
+    }
     ctx.fillStyle = fill;
   }
 
-  pata(fr[0] + 0.04, fr[1], fase + 2.4, true);
-  pata(tr[0] + 0.04, tr[1], fase, false);
+  pata(fr[0] + 0.04, fr[1], fase + 2.4, true, true);
+  pata(tr[0] + 0.04, tr[1], fase, false, true);
   ctx.restore();
 }
 
@@ -1586,45 +1716,70 @@ function bando(ctx, a, s) {
  *   (0..1, o musgo), verde, deriva, semente
  */
 export function escoadouroNoHorizonte(ctx, o) {
-  const { x: px, yChao: yb, esc, lado, t, ch, vivo } = o;
+  const { x: px, esc, lado, t, ch, vivo } = o;
   const R = 40 * esc, H = 230 * esc, J = H * 0.3;
-  const yc = yb - H;
   const xPoca = px + lado * (R * 0.2 + J);
+  // O chão é o perfil da crista: a poça fica EM CIMA dela, e o cano brota
+  // dela (tudo abaixo da crista é recortado).
+  const yb = o.yEm(xPoca);
+  const yc = o.yEm(px) - H;
 
-  // Vapor ácido subindo do pé do jorro — por TRÁS do cano.
+  // Vapor ácido: nuvens soltas subindo da poça, crescendo e sumindo. É o
+  // único verde da cena, o complementar do magenta.
   if (vivo > 0.03) {
-    pluma(ctx, {
-      x: xPoca, y: yb, alt: H * 2.2, larg: R * 0.9,
-      t, vel: 0.03, semente: o.semente,
-      deriva: o.deriva,
-      // Vapor ácido: o verde que não pertence a este lugar.
-      corBaixa: misturarHex(ch.vapor ?? ch.meio, o.cor, 0.3),
-      corAlta: misturarHex(o.cor, ch.vapor ?? ch.meio, 0.3),
-      alfa: 0.6 * vivo,
-    });
+    /* Cada nuvem em duas passadas (uma maior e mais rala por fora): com
+       uma só, de borda dura, elas liam como bolas de gude verdes. */
+    const cv = misturarHex(ch.vapor ?? ch.meio, o.cor, 0.25);
+    for (let i = 0; i < 7; i++) {
+      const hi = hash2(i, o.semente, 83);
+      const u = (t * lerp(0.07, 0.11, hi) + i / 7) % 1;
+      const r = R * lerp(0.6, 2.6, u) * lerp(0.8, 1.2, hi);
+      const cx = xPoca + (hi - 0.5) * R * 1.4 + o.deriva * u * H * 0.8;
+      const cy = yb - R * 0.4 - u * H * 1.5;
+      const al = 0.16 * vivo * Math.sin(Math.PI * u);
+      ctx.fillStyle = rgba(cv, al * 0.6);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r * 1.45, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = rgba(cv, al);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, TAU);
+      ctx.fill();
+    }
   }
 
+  ctx.save();
+  // Recorte: só o que fica ACIMA da crista.
+  ctx.beginPath();
+  const xa = px - (500 * esc + 40), xb = px + (500 * esc + 40);
+  ctx.moveTo(xa, yc - H * 3);
+  for (let x = xa; x <= xb; x += 8) ctx.lineTo(x, o.yEm(x) + 1);
+  ctx.lineTo(xb, yc - H * 3);
+  ctx.closePath();
+  ctx.clip();
+
   /* Cano, no referencial dele: boca na origem, corpo indo pra trás e pra
-     baixo até entrar no chão. Diagonal, brotando da encosta. */
+     baixo até entrar na crista. Escuro (mais que o céu, que é onde ele se
+     recorta), com anéis de ferrugem. */
   const run = 380 * esc;
   const ang = Math.atan2(H, run);
   const comp = Math.hypot(H, run) + 80 * esc;
-  const corCano = ajustarBrilho(o.cor, -0.08);
+  const corCano = o.cor;
   ctx.save();
   ctx.translate(px, yc);
   ctx.scale(lado, 1);
   ctx.rotate(-ang);
-  const cano = new Path2D();
-  cano.rect(-comp, -R, comp, R * 2);
-  for (let k = 1; k <= 3; k++) cano.rect(-k * 110 * esc - 6 * esc, -R * 1.14, 12 * esc, R * 2.28);
-  cano.rect(-16 * esc, -R * 1.2, 16 * esc, R * 2.4);
   ctx.fillStyle = corCano;
-  ctx.fill(cano);
+  ctx.fillRect(-comp, -R, comp, R * 2);
   // VOLUME: faixa clara em cima, escura embaixo — sem isso, chapa.
-  ctx.fillStyle = rgba(ajustarBrilho(corCano, 0.12), 0.9);
+  ctx.fillStyle = rgba(ajustarBrilho(corCano, 0.1), 0.9);
   ctx.fillRect(-comp, -R * 0.78, comp, R * 0.3);
   ctx.fillStyle = rgba(ajustarBrilho(corCano, -0.2), 0.9);
   ctx.fillRect(-comp, R * 0.45, comp, R * 0.55);
+  // Anéis de ferrugem e a flange da boca.
+  ctx.fillStyle = misturarHex(corCano, '#8a3a2a', 0.4);
+  for (let k = 1; k <= 3; k++) ctx.fillRect(-k * 110 * esc - 6 * esc, -R * 1.14, 12 * esc, R * 2.28);
+  ctx.fillRect(-16 * esc, -R * 1.2, 16 * esc, R * 2.4);
   // Luz de baixo: o lodo aceso ilumina a barriga do cano perto da boca.
   if (vivo > 0.03) {
     const gl = ctx.createLinearGradient(0, R, 0, -R * 0.2);
@@ -1633,11 +1788,16 @@ export function escoadouroNoHorizonte(ctx, o) {
     ctx.fillStyle = gl;
     ctx.fillRect(-260 * esc, -R * 0.2, 260 * esc, R * 1.25);
   }
-  // Boca: o escuro de dentro.
-  ctx.fillStyle = ajustarBrilho(o.cor, -0.5);
+  // Boca: o escuro de dentro, com a borda de dentro acesa pelo lodo.
+  ctx.fillStyle = ajustarBrilho(corCano, -0.5);
   ctx.beginPath();
   elipse(ctx, 0, 0, R * 0.3, R * 0.86);
   ctx.fill();
+  if (vivo > 0.03) {
+    ctx.strokeStyle = rgba(ch.meio, 0.85 * vivo);
+    ctx.lineWidth = Math.max(1.2, 2.4 * esc);
+    ctx.stroke();
+  }
   // Restaurado: musgo no dorso e trepadeira pendurada.
   if (o.calma > 0.02) {
     const musgo = new Path2D(), cipo = new Path2D();
@@ -1660,48 +1820,75 @@ export function escoadouroNoHorizonte(ctx, o) {
   }
   ctx.restore();
 
-  if (vivo < 0.03) return;
-  // Jorro: parábola da boca até o chão, mais largo em cima.
+  if (vivo < 0.03) { ctx.restore(); return; }
+  // Jorro: parábola da boca até a poça, afinando, com um fio claro por dentro.
   const N = 14;
   const borda = [];
   for (let i = 0; i <= N; i++) {
     const u = i / N;
-    const w = R * lerp(1.1, 0.75, u) * (1 + 0.06 * Math.sin(u * 9 - t * 7)) * 0.5;
-    borda.push([px + lado * (R * 0.2 + J * Math.sqrt(u)), lerp(yc + R * 0.15, yb + 6, u), w]);
+    const w = R * lerp(0.75, 0.42, u) * (1 + 0.06 * Math.sin(u * 9 - t * 7)) * 0.5;
+    borda.push([px + lado * (R * 0.2 + J * Math.sqrt(u)), lerp(yc + R * 0.15, yb + 2, u), w]);
   }
   // Desce pela borda da direita e sobe pela da esquerda: sentido horário.
-  const pj = new Path2D();
+  const pj = new Path2D(), meio = new Path2D();
   pj.moveTo(borda[0][0] + borda[0][2], borda[0][1]);
   for (const [cx, cy, w] of borda) pj.lineTo(cx + w, cy);
   for (let i = N; i >= 0; i--) pj.lineTo(borda[i][0] - borda[i][2], borda[i][1]);
   pj.closePath();
+  meio.moveTo(borda[0][0], borda[0][1]);
+  for (const [cx, cy] of borda) meio.lineTo(cx, cy);
   // Halo do jorro (no lugar do bloom, que o horizonte não tem).
-  ctx.save();
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = rgba(ch.meio, 0.22 * vivo);
-  ctx.lineWidth = R * 0.9;
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = rgba(ch.meio, 0.2 * vivo);
+  ctx.lineWidth = R * 1.1;
   ctx.stroke(pj);
-  ctx.restore();
   const gj = ctx.createLinearGradient(0, yc, 0, yb);
-  gj.addColorStop(0, rgba(ch.nucleo, 0.95 * vivo));
-  gj.addColorStop(0.35, rgba(ch.meio, 0.92 * vivo));
-  gj.addColorStop(1, rgba(ch.borda, 0.85 * vivo));
+  gj.addColorStop(0, rgba(ch.meio, 0.95 * vivo));
+  gj.addColorStop(1, rgba(ch.borda, 0.9 * vivo));
   ctx.fillStyle = gj;
   ctx.fill(pj);
-  // O lodo ESCORRE: filetes claros descendo pelo jorro. Gotas redondas em
-  // fila liam como botões de casaco.
-  ctx.fillStyle = rgba(ch.nucleo, 0.42 * vivo);
+  ctx.strokeStyle = rgba(ch.nucleo, 0.8 * vivo);
+  ctx.lineWidth = Math.max(1, R * 0.16);
+  ctx.stroke(meio);
+  // O lodo ESCORRE: filetes claros descendo pelo jorro.
+  ctx.fillStyle = rgba(ch.nucleo, 0.5 * vivo);
   for (let i = 0; i < 9; i++) {
     const hi = hash2(i, o.semente, 77);
     const u = ((i / 9) + t * lerp(0.45, 0.7, hi)) % 1;
     const cx = px + lado * (R * 0.2 + J * Math.sqrt(u));
     const cy = lerp(yc + R * 0.15, yb, u);
     ctx.beginPath();
-    elipse(ctx, cx + (hi - 0.5) * R * 0.6, cy, R * lerp(0.05, 0.09, hi), R * lerp(0.3, 0.55, hi));
+    elipse(ctx, cx + (hi - 0.5) * R * 0.3, cy, R * lerp(0.04, 0.07, hi), R * lerp(0.25, 0.45, hi));
     ctx.fill();
   }
-  // Clarão no pé: o lodo acende o morro por trás.
-  focoDeLuz(ctx, xPoca, yb, R * 3.2, ch.meio, 0.5 * vivo);
+  ctx.restore();
+
+  // Poça: elipse acesa em cima da crista, borda magenta, e respingos.
+  const rx = R * 2.5, ry = R * 0.38;
+  const gp = ctx.createRadialGradient(xPoca, yb, 0, xPoca, yb, rx);
+  gp.addColorStop(0, rgba(ch.nucleo, 0.8 * vivo));
+  gp.addColorStop(0.5, rgba(ch.meio, 0.75 * vivo));
+  gp.addColorStop(1, rgba(ch.borda, 0.55 * vivo));
+  ctx.fillStyle = gp;
+  ctx.beginPath();
+  elipse(ctx, xPoca, yb, rx, ry);
+  ctx.fill();
+  ctx.strokeStyle = rgba(ch.meio, 0.9 * vivo);
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  ctx.fillStyle = rgba(ch.nucleo, 0.85 * vivo);
+  for (let i = 0; i < 7; i++) {
+    const hi = hash2(i, o.semente, 79);
+    const u = (t * lerp(0.9, 1.4, hi) + hi) % 1;
+    const dx = (hi - 0.5) * rx * 1.4 * u;
+    const dy = -Math.sin(u * Math.PI) * R * lerp(0.6, 1.3, hi);
+    ctx.beginPath();
+    ctx.arc(xPoca + dx, yb + dy, Math.max(1, 2.4 * esc * (1 - u * 0.5)), 0, TAU);
+    ctx.fill();
+  }
+  // Clarão no pé: o lodo acende o morro.
+  focoDeLuz(ctx, xPoca, yb, R * 3.4, ch.meio, 0.45 * vivo);
 }
 
 /* =========================================================================
