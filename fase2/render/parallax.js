@@ -59,6 +59,7 @@ import {
   FORMAS_CATASTROFE, FORMAS_LUZ, confCatastrofe, forcaFogo, forcaFumaca,
   calmaDaFauna, chamaDe, frenteDeFogo, claraoDeFogo, pluma,
   desenharManada, desenharBando, coresDeFumaca, tocoEmBrasa, focoDeLuz, escoadouroNoHorizonte,
+  desenharMaquina,
 } from './catastrofe.js';
 
 /* =========================================================================
@@ -2189,6 +2190,29 @@ function desenharMolduraBase(ctx, tipo, esq, vw, vh, yBase, refX, tempo, tema) {
 function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
   const passo = 300;
   const x0 = Math.floor((esq - passo) / passo) * passo;
+  /* Canos: um COLETOR horizontal no alto, de onde eles descem. Soltos, sem
+     nada que os segurasse, liam como pistões caindo do céu. */
+  if (tipo === 'cano') {
+    ctx.globalAlpha = 1;
+    ctx.fillRect(esq - 20, yTopo - 30, vw + 40, 46);
+    const passoF = 150;
+    for (let fx = Math.floor(esq / passoF) * passoF; fx <= esq + vw + passoF; fx += passoF) {
+      ctx.fillRect(fx - 5, yTopo - 30, 10, 52);
+    }
+    // A barriga do coletor pega a luz do fogo: é o fio que o faz ler como
+    // CANO, e não como uma tarja preta no alto da tela.
+    const fogoC = forcaFogo(areaAtual, tema.pureza ?? 0);
+    if (fogoC > 0.05) {
+      ctx.save();
+      ctx.strokeStyle = rgba(chamaDe(areaAtual).meio, 0.45 * fogoC);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(esq - 20, yTopo + 15.5);
+      ctx.lineTo(esq + vw + 20, yTopo + 15.5);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
   for (let x = x0; x <= esq + vw + passo; x += passo) {
     const h = hash2(x, 907, 9);
     if (h > 0.78) continue;
@@ -2240,7 +2264,17 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
         for (let k = 1; k <= 2; k++) {
           ctx.fillRect(px - d * 0.62, yTopo + comp * (k / 3), d * 1.24, Math.max(3, d * 0.2));
         }
-        ctx.fillRect(px - d * 0.6, yTopo + comp - d * 0.28, d * 1.2, d * 0.28);
+        // Ponta CORTADA em diagonal, com a flange rasgada: cano rompido.
+        ctx.beginPath();
+        ctx.moveTo(px - d * 0.62, yTopo + comp - d * 0.3);
+        ctx.lineTo(px + d * 0.62, yTopo + comp - d * 0.3);
+        ctx.lineTo(px + d * 0.5, yTopo + comp - d * 0.1);
+        ctx.lineTo(px + d * 0.5, yTopo + comp + d * 0.15);
+        ctx.lineTo(px - d * 0.1, yTopo + comp + d * 0.3);
+        ctx.lineTo(px - d * 0.5, yTopo + comp + d * 0.45);
+        ctx.lineTo(px - d * 0.5, yTopo + comp - d * 0.1);
+        ctx.closePath();
+        ctx.fill();
         const calmaC = calmaDaFauna(tema.pureza ?? 0);
         if (calmaC < 0.97) {
           // A gota se forma na boca, cai e some.
@@ -2266,19 +2300,37 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
           ctx.save();
           ctx.strokeStyle = rgba(verde, calmaC);
           ctx.fillStyle = rgba(verde, calmaC);
-          ctx.lineWidth = Math.max(1.5, d * 0.12);
-          ctx.beginPath();
-          for (let yy = yTopo - 30; yy <= yTopo + comp; yy += 6) {
-            const xx = px + Math.sin((yy - yTopo) * 0.09 + h * 7) * d * 0.55;
-            yy === yTopo - 30 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
-          }
-          ctx.stroke();
-          for (let i = 0; i < 4; i++) {
-            const hi = hash2(x + i, 941, 9);
-            const fx = px + (hi - 0.5) * d * 1.4;
-            const fy = yTopo + comp + d * lerp(0.1, 0.9, hi) * calmaC;
+          /* Dois fios de passo irregular (senoide perfeita lia como DNA ou
+             poste de barbeiro), cachos de folha e uma ponta pendurada. */
+          ctx.lineWidth = Math.max(1.5, d * 0.1);
+          for (let fio = 0; fio < 2; fio++) {
             ctx.beginPath();
-            ctx.ellipse(fx, fy, d * 0.2, d * 0.34, (hi - 0.5) * 0.8, 0, TAU);
+            let fase = h * 7 + fio * 2.1;
+            for (let yy = yTopo - 30; yy <= yTopo + comp; yy += 6) {
+              fase += lerp(0.35, 0.8, hash2(Math.round(yy), x + fio, 943)) * 0.5;
+              const xx = px + Math.sin(fase) * d * 0.55;
+              yy === yTopo - 30 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+            }
+            ctx.stroke();
+          }
+          const pend = lerp(40, 80, h) * calmaC;
+          ctx.beginPath();
+          ctx.moveTo(px + d * 0.4, yTopo + comp);
+          ctx.quadraticCurveTo(px + d * 0.8, yTopo + comp + pend * 0.5, px + d * 0.5, yTopo + comp + pend);
+          ctx.stroke();
+          for (let i = 0; i < 7; i++) {
+            const hi = hash2(x + i, 941, 9);
+            const cyF = yTopo + lerp(0.15, 1, hash2(i, x, 947)) * comp;
+            const fx = px + (hi - 0.5) * d * 1.3 + (i > 4 ? d * 0.5 : 0);
+            const fy = i > 4 ? yTopo + comp + pend * lerp(0.3, 1, hi) : cyF;
+            // Cada elipse começa NO contorno dela (sem isso o caminho emenda
+            // uma reta entre as duas folhas).
+            const r1 = (hi - 0.5) * 1.4, r2 = hi - 0.2;
+            ctx.beginPath();
+            ctx.moveTo(fx + Math.cos(r1) * d * 0.18, fy + Math.sin(r1) * d * 0.18);
+            ctx.ellipse(fx, fy, d * 0.18, d * 0.3, r1, 0, TAU);
+            ctx.moveTo(fx + d * 0.2 + Math.cos(r2) * d * 0.14, fy + d * 0.12 + Math.sin(r2) * d * 0.14);
+            ctx.ellipse(fx + d * 0.2, fy + d * 0.12, d * 0.14, d * 0.24, r2, 0, TAU);
             ctx.fill();
           }
           ctx.restore();
@@ -2413,7 +2465,7 @@ function desenharFaunaHorizonte(render, sala, mundo) {
        linguagem dos parasitas, e a manada lia como bando de aranhas. A cor
        é a do morro onde ela corre, puxada pra bruma — bicho LONGE. */
     const silhueta = misturarHex(misturarHex(cor(tema, 'distante', 0.8, -0.24), tema.primeiroPlano, 0.45),
-      tema.bruma, 0.22);
+      tema.ceuBase, 0.32);
     const borda = null;
     if (cc.bichos) {
       desenharManada(ctx, {
@@ -2469,25 +2521,40 @@ export function desenharHorizonte(render, sala, mundo) {
        Coração, um sol verde doente. Pintado antes das colunas, que passam
        por cima dele; some conforme a fumaça afina (o sol de verdade, o da
        área limpa, é a luz dourada que já existe). */
-    if (fumaca > 0.05) {
+    /* (No Coração não: o disco verde lia como lua. Lá a fonte e o fogo
+       químico bastam.) */
+    if (fumaca > 0.05 && sala.area !== 'coracao') {
       const meioS = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
       const xs = (fuga < 0 ? 0.3 : 0.7) * w - (camera.viewX - meioS) * 0.008;
       const ys = yH - h * 0.27;
-      const rs = h * 0.043;
-      const corSol = sala.area === 'coracao' ? '#b9d24a' : '#d8402a';
-      const al = (sala.area === 'coracao' ? 0.55 : 0.82) * clamp01((fumaca - 0.05) / 0.4);
+      const rs = h * 0.062;
+      const al = 0.82 * clamp01((fumaca - 0.05) / 0.4);
       ctx.save();
-      ctx.fillStyle = rgba(corSol, al);
+      // O terço de baixo do disco se perde na névoa do horizonte.
+      const gsol = ctx.createLinearGradient(0, ys - rs, 0, ys + rs);
+      gsol.addColorStop(0, rgba('#d8402a', al));
+      gsol.addColorStop(0.62, rgba('#d8402a', al));
+      gsol.addColorStop(1, rgba('#d8402a', al * 0.15));
+      ctx.fillStyle = gsol;
       ctx.beginPath();
       ctx.arc(xs, ys, rs, 0, TAU);
       ctx.fill();
-      // Duas faixas de fumaça atravessando o disco.
-      ctx.clip();
+      /* Faixas de fumaça atravessando o CÉU (não o disco): longas, finas,
+         inclinadas, de bordas moles (duas passadas). Presas dentro do disco,
+         iguais e paralelas, liam como logo impresso nele. */
       const { alta: corFaixa } = coresDeFumaca(tema, cor(tema, 'distante', 0.9, -0.2), ch, 0);
-      for (let k = 0; k < 2; k++) {
-        const yy = ys + rs * (k ? 0.35 : -0.2) + Math.sin(tAnim * 0.12 + k * 2) * rs * 0.1;
-        ctx.fillStyle = rgba(corFaixa, 0.38 * al);
-        ctx.fillRect(xs - rs, yy - rs * 0.09, rs * 2, rs * (k ? 0.26 : 0.16));
+      const faixas = [[-0.35, 0.1, -0.087], [0.3, 0.22, 0.14]];
+      for (const [dy, esp, ang] of faixas) {
+        ctx.save();
+        ctx.translate(xs + Math.sin(tAnim * 0.05 + dy * 9) * rs * 0.4, ys + rs * dy);
+        ctx.rotate(ang);
+        for (const [k, a2] of [[1.8, 0.25], [1, 0.5]]) {
+          ctx.fillStyle = rgba(corFaixa, a2 * al);
+          ctx.beginPath();
+          ctx.ellipse(0, 0, rs * 4.5, rs * esp * k, 0, 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
       }
       ctx.restore();
     }
@@ -2568,7 +2635,10 @@ export function desenharHorizonte(render, sala, mundo) {
           x0: -12, x1: w + 12, dx: desl0, passo: 7,
           yEm: (x) => y00 - perfilHorizonte(x + desl0, conf.semente, amp0, conf.tipo),
           // ~3x a altura de antes: a 6 px efetivos o incêndio era um pavio.
-          escala: h * 0.042, t: tAnim, semente: conf.semente + 5, ch, inten: Math.min(1, fogo * 1.3),
+          // O fogo químico é baixo e largo (forma própria): sem compensar, no
+          // Coração ele virava um fio de neon de 4 px.
+          escala: h * (sala.area === 'coracao' ? 0.075 : 0.042), t: tAnim, semente: conf.semente + 5,
+          ch, inten: Math.min(1, fogo * 1.3),
           inclina: fuga * 0.22, alfa: 0.92, massa: 1,
           lateral: (x) => ladoDoFogo(x / w, fuga),
         });
@@ -2611,6 +2681,62 @@ export function desenharHorizonte(render, sala, mundo) {
         });
       }
 
+      /* CORTE RASO no Dossel: na crista da frente a mata ACABA, e começa uma
+         faixa de tocos de corte claro com a máquina parada na borda, farol
+         aceso, virada pra mata que sobrou. É a única faixa que aparece em toda
+         sala — no fundo de parallax a máquina ficava escondida atrás dos
+         troncos colossais em quase toda tela. Restaurado, a mata volta. */
+      let corte0 = 0, corte1 = 0;
+      const corte = banda === 1 && sala.area === 'dossel'
+        ? 1 - clamp01((calmaDaFauna(tema.pureza ?? 0) - 0.2) / 0.5) : 0;
+      if (corte > 0.02) {
+        const meioC = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
+        const dC = -(camera.viewX - meioC) * 0.045;
+        // Do lado do fogo (a queimada vem depois do corte) e fora do centro,
+        // que no Dossel é quase sempre tomado pelo tronco da árvore-mãe.
+        corte0 = (fuga > 0 ? 0.1 : 0.56) * w + dC;
+        corte1 = (fuga > 0 ? 0.44 : 0.9) * w + dC;
+        const perfilC = (x) => y0 - perfilHorizonte(x + desl, s, amp, conf.tipo);
+        const tocosC = new Path2D(), cortes = new Path2D();
+        for (let x = corte0; x <= corte1; x += 13) {
+          const hx = hash2(Math.round(x - dC), 853, 5);
+          if (hx > 0.8) continue;
+          const tx = x + hx * 8;
+          const tb = perfilC(tx) + 2;
+          const ta = h * lerp(0.013, 0.026, hx);
+          const tl = h * lerp(0.005, 0.009, hx);
+          tocosC.moveTo(tx - tl * 1.3, tb);
+          tocosC.lineTo(tx - tl, tb - ta);
+          tocosC.lineTo(tx + tl, tb - ta);
+          tocosC.lineTo(tx + tl * 1.3, tb);
+          tocosC.closePath();
+          cortes.moveTo(tx + tl, tb - ta);
+          cortes.ellipse(tx, tb - ta, tl, tl * 0.4, 0, 0, TAU);
+        }
+        ctx.save();
+        ctx.globalAlpha = corte;
+        ctx.fill(tocosC);
+        // A face do corte é CLARA: madeira viva recém-exposta.
+        ctx.fillStyle = misturarHex(cor(tema, 'distante', d, -0.14), '#c9a77a', 0.55);
+        ctx.fill(cortes);
+        // A máquina na borda do corte, virada pra mata.
+        const xm = fuga > 0 ? corte1 - h * 0.02 : corte0 + h * 0.02;
+        const escM = h / 720 * 0.5;
+        desenharMaquina(ctx, xm, perfilC(xm) + 3, escM, fuga > 0 ? 1 : -1,
+          cor(tema, 'distante', d, -0.2), 1);
+        const fx = xm + 34 * (fuga > 0 ? 1 : -1) * escM, fy = perfilC(xm) + 3 - 34 * escM;
+        focoDeLuz(ctx, fx, fy, h * 0.03, '#fff0c8', 0.55);
+        ctx.fillStyle = rgba('#fff0c8', 0.16);
+        ctx.beginPath();
+        ctx.moveTo(fx, fy);
+        ctx.lineTo(fx + (fuga > 0 ? 1 : -1) * h * 0.16, fy + h * 0.02);
+        ctx.lineTo(fx + (fuga > 0 ? 1 : -1) * h * 0.16, fy - h * 0.025);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+        ctx.fillStyle = cor(tema, 'distante', d, banda === 0 ? -0.06 : -0.14);
+      }
+
       // 2 · os vultos que quebram a linha — é o que faz "mata" e não "duna".
       if (conf.tipo === 'rocha') continue;
       const passo = conf.passo * (banda === 0 ? 1 : 1.6);
@@ -2626,6 +2752,8 @@ export function desenharHorizonte(render, sala, mundo) {
         // como cerca de estacas — o olho acha o ritmo antes de achar a mata.
         if (ruido1(xm * 0.0026, s + 21) < 0.38) continue;
         const x = xm - desl;
+        // No corte raso não sobra árvore.
+        if (corte > 0.5 && x > corte0 - 6 && x < corte1 + 6) continue;
         const base = y0 - perfilHorizonte(xm, s, amp, conf.tipo) + 2;
         // Faixa de altura larga: vultos todos do mesmo tamanho denunciam
         // repetição mais rápido que qualquer outra coisa.

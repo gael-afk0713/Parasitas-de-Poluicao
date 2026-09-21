@@ -622,8 +622,11 @@ function arvoreEmChamas(ctx, a, s) {
   const pb = new Path2D(), pm = new Path2D(), pn = new Path2D();
   const rachas = new Path2D();
   const brotos = new Path2D();
+  // A bainha da árvore-tocha tem caminhos próprios: a camada de trás é
+  // pintada ANTES do tronco (a árvore aparece recortada contra o fogo).
+  const bb = new Path2D(), bm = new Path2D(), bn = new Path2D();
   const t = a.tempoAnim;
-  let algumFogo = false;
+  let algumFogo = false, algumaTocha = false;
 
   for (let x = x0 - passo; x <= a.x1 + passo; x += passo) {
     const h = hash2(x | 0, s.semente, 3);
@@ -705,15 +708,19 @@ function arvoreEmChamas(ctx, a, s) {
         }
       }
       if (tocha > 0.05) {
-        /* BAINHA: uma chama só abraçando o tronco da base à copa, com a
-           borda ondulando e subindo além da ponta. Tufos empilhados no tronco
-           liam como uma pilha de gotas iguais. */
-        const nucleoEsc = [1, 0.7, 0.45];
-        const caminhos = [pb, pm, pn];
+        /* BAINHA: uma chama abraçando o tronco da base à copa, com a borda
+           ondulando e subindo além da ponta. Tufos empilhados liam como pilha
+           de gotas; a bainha inteira em branco-quente virou um pilar de luz no
+           meio do espaço de pulo. Agora a camada de trás (vermelha) abraça o
+           tronco, que é pintado POR CIMA dela; o laranja só da metade pra
+           cima; o núcleo claro só no quarto de cima. */
+        algumaTocha = true;
+        const nucleoEsc = [1, 0.62, 0.34];
+        const caminhos = [bb, bm, bn];
         for (let q = 0; q < 3; q++) {
           const cam = caminhos[q];
           const esc = nucleoEsc[q];
-          const k0 = lerp(0.12, 0.3, q / 2);
+          const k0 = [0.12, 0.5, 0.75][q];
           const N = 9;
           const pts = [];
           for (let i = 0; i <= N; i++) {
@@ -721,7 +728,7 @@ function arvoreEmChamas(ctx, a, s) {
             const cx = lerp(px, tx, k);
             const cy = yb - alt * k;
             const ond = 0.5 + 0.5 * Math.sin(k * 13 - t * 5.5 + h * 9 + q);
-            const w = (r * (0.9 + 0.4 * (1 - k)) + (8 + 14 * ond) * tocha) * esc;
+            const w = (r * (0.9 + 0.4 * (1 - k)) + (6 + 12 * ond) * tocha) * esc;
             pts.push([cx, cy, w]);
           }
           const topoY = ty - alt * 0.32 * tocha * esc * (0.85 + 0.3 * ruido1(t * 2.2 + h * 7, 91));
@@ -747,9 +754,19 @@ function arvoreEmChamas(ctx, a, s) {
     }
   }
 
+  if (algumaTocha) {
+    ctx.fillStyle = rgba(a.chama.borda, 0.85);
+    ctx.fill(bb);
+  }
   ctx.fillStyle = ajustarBrilho(a.cor, -0.05);
   ctx.fill(tronco);
   ctx.fill(galhos);
+  if (algumaTocha) {
+    ctx.fillStyle = rgba(a.chama.meio, 0.85);
+    ctx.fill(bm);
+    ctx.fillStyle = rgba(a.chama.nucleo, 0.8);
+    ctx.fill(bn);
+  }
   if (a.calma > 0.02) {
     ctx.fillStyle = rgba(misturarHex(a.cor, a.tema.acento, 0.4), 0.9 * a.calma);
     ctx.fill(brotos);
@@ -897,11 +914,30 @@ function maquina(ctx, a, s) {
     const px = x + (hash2(x | 0, s.semente + 1, 63) - 0.5) * passo * 0.4;
     const yb = y0 - (solo ? a.perfil(px, solo) : 0);
     const lado = h > 0.35 ? 1 : -1;
+    desenharMaquina(ctx, px, yb, esc, lado, a.cor, vis);
+    // Escapamento: fumaça escura saindo em sopros.
+    const { alta } = coresFumaca(a, 0);
+    pluma(ctx, {
+      x: px + (-33.5 * lado) * esc, y: yb - 46 * esc, alt: 150 * esc, larg: 6 * esc,
+      t: a.tempoAnim, vel: 0.08, semente: (x | 0) + 7,
+      deriva: 0.5 * a.fuga, corBaixa: ajustarBrilho(alta, -0.12), corAlta: alta,
+      alfa: 0.55 * vis,
+    });
+  }
+  ctx.globalAlpha = 1;
+}
+
+/**
+ * A máquina de desmatamento (esteira, cabine acesa, braço com garra, farol),
+ * com o chão em (px, yb). Usada no fundo e na linha do horizonte do Dossel.
+ */
+export function desenharMaquina(ctx, px, yb, esc, lado, cor, vis) {
+  {
     ctx.save();
     ctx.translate(px, yb);
     ctx.scale(lado * esc, esc);
-    ctx.globalAlpha = vis;
-    ctx.fillStyle = a.cor;
+    ctx.globalAlpha *= vis;
+    ctx.fillStyle = cor;
     ctx.beginPath();
     // esteira
     // Todos os subcaminhos no MESMO sentido (horário na tela): com sentidos
@@ -919,7 +955,7 @@ function maquina(ctx, a, s) {
     ctx.moveTo(82, -80); ctx.lineTo(104, -64); ctx.lineTo(98, -46); ctx.lineTo(80, -58);
     ctx.fill();
     // janela da cabine, levemente acesa por dentro
-    ctx.fillStyle = rgba(misturarHex(a.cor, '#ffd89a', 0.35), 0.8);
+    ctx.fillStyle = rgba(misturarHex(cor, '#ffd89a', 0.35), 0.8);
     ctx.fillRect(2, -52, 20, 14);
     // farol
     // Farol: com a máquina a 0,42 um raio de 2,6 virava 1 px. Tem um mínimo
@@ -927,16 +963,7 @@ function maquina(ctx, a, s) {
     ctx.fillStyle = rgba('#fff4d2', 0.95);
     ctx.beginPath(); ctx.arc(34, -34, Math.max(2.6, 4 / esc), 0, TAU); ctx.fill();
     ctx.restore();
-    // Escapamento: fumaça escura saindo em sopros.
-    const { alta } = coresFumaca(a, 0);
-    pluma(ctx, {
-      x: px + (-33.5 * lado) * esc, y: yb - 46 * esc, alt: 150 * esc, larg: 6 * esc,
-      t: a.tempoAnim, vel: 0.08, semente: (x | 0) + 7,
-      deriva: 0.5 * a.fuga, corBaixa: ajustarBrilho(alta, -0.12), corAlta: alta,
-      alfa: 0.55 * vis,
-    });
   }
-  ctx.globalAlpha = 1;
 }
 
 function maquinaLuz(ctx, a, s) {
@@ -1131,7 +1158,7 @@ const ESPECIES = {
     // Galope ESTICADO (amp alta, cabeça baixa à frente): com 0,95 e cabeça
     // erguida o veado lia como bicho trotando, não fugindo.
     freq: 2.1, amp: 1.2, salto: 0.13, cabecaFuga: 0.45, cabecaPasto: 2.0, pastoInclina: 0.16,
-    cabecaDeitado: 1.35, cabecaLado: 1.3, olho: [0.22, -0.31],
+    cabecaDeitado: 1.35, cabecaLado: 1.55, olho: [0.22, -0.31],
     comp: 1.3,
   },
   capivara: {
@@ -1244,7 +1271,9 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
        achatamento afundava o bicho caído 10 px dentro do chão. */
     const barriga = E.barriga ?? Math.max(...E.corpo.map((c) => c[1]));
     const resp = pose?.peito ?? (1 + Math.sin(tempo * 1.7 + h * 9) * 0.035 * deitado);
-    const k = resp * (1 - 0.14 * deLado);
+    // De lado o corpo NÃO achata: ao vivo, 22 px de espessura por 120 de
+    // comprimento liam como tábua.
+    const k = resp;
     const dMax = Math.max(deitado, deitadoT);
     const esc = lerp(1, k, dMax);
     const desceF = (0.02 - barriga * k) * deitado, desceT = (0.02 - barriga * k) * deitadoT;
@@ -1330,6 +1359,17 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
     ctx.lineWidth = E.grossura[1];
     ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx, fy); ctx.stroke();
+    // Casco escuro: sem ele a pata do bicho de perto era uma prancha.
+    if (pose?.contorno) {
+      const st = ctx.strokeStyle;
+      ctx.strokeStyle = pose.contorno;
+      const cl = Math.hypot(fx - kx, fy - ky) || 1;
+      ctx.beginPath();
+      ctx.moveTo(fx - (fx - kx) / cl * 0.05, fy - (fy - ky) / cl * 0.05);
+      ctx.lineTo(fx, fy);
+      ctx.stroke();
+      ctx.strokeStyle = st;
+    }
   };
   const [fr, tr] = E.quadris;
   pata(fr[0] - 0.04, fr[1], fase + 2.4 + 0.35, true, false);
@@ -1390,18 +1430,18 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
   /* De lado, a BARRIGA fica pra câmera: uma faixa clara ao longo da parte
      de baixo do corpo. É o que separa "bicho caído" de "tábua" — sem ela o
      veado deitado lia como canoa com orelha. */
-  if (deLado > 0.02) {
-    let base = -1;
-    for (const c of E.corpo) if (c[1] > base) base = c[1];
-    const xF = E.quadris[0][0], xT = E.quadris[1][0];
-    ctx.save();
-    ctx.clip(p);
-    ctx.fillStyle = typeof fill === 'string' ? misturarHex(fill, '#d8c4a4', 0.42) : fill;
-    ctx.globalAlpha *= deLado;
-    ctx.beginPath();
-    elipse(ctx, (xF + xT) * 0.5, base - 0.03, (xF - xT) * 0.62, 0.075);
-    ctx.fill();
-    ctx.restore();
+  // Um DEGRADÊ no terço de baixo, não uma elipse: a elipse separada lia
+  // como prato embaixo de uma canoa.
+  if (deLado > 0.02 && typeof fill === 'string') {
+    let topo = 0, base = -1;
+    for (const c of E.corpo) { if (c[1] < topo) topo = c[1]; if (c[1] > base) base = c[1]; }
+    const claro = misturarHex(fill, '#d8c4a4', 0.45);
+    const g = ctx.createLinearGradient(0, lerp(topo, base, 0.45), 0, base);
+    g.addColorStop(0, rgba(claro, 0));
+    g.addColorStop(1, rgba(claro, 0.9 * deLado));
+    ctx.fillStyle = g;
+    ctx.fill(p);
+    ctx.fillStyle = fill;
   }
   // Óleo: o dorso encharcado, a barriga ainda na cor do bicho.
   if (pose?.oleo > 0.02) {
@@ -1415,7 +1455,9 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     ctx.fill(p);
     ctx.fillStyle = fill;
   }
-  if (E.faixa) {
+  // Em silhueta de manada (sem `pose`) a faixa lia como OLHO: sem ela, o
+  // tamanduá se lê pela cauda-bandeira e pelo focinho.
+  if (E.faixa && pose) {
     const fb = new Path2D(), fp = new Path2D();
     contornoSuave(fb, E.faixa, 0, 0);
     contornoSuave(fp, E.faixaPreta, 0, 0);
@@ -1727,23 +1769,26 @@ export function escoadouroNoHorizonte(ctx, o) {
   // Vapor ácido: nuvens soltas subindo da poça, crescendo e sumindo. É o
   // único verde da cena, o complementar do magenta.
   if (vivo > 0.03) {
-    /* Cada nuvem em duas passadas (uma maior e mais rala por fora): com
-       uma só, de borda dura, elas liam como bolas de gude verdes. */
+    /* Cada nuvem é um CACHO de 5 bolhas deslocadas, de raios diferentes,
+       esticado pra cima. Uma bolha só lia como bola de gude; duas
+       concêntricas, como alvo. */
     const cv = misturarHex(ch.vapor ?? ch.meio, o.cor, 0.25);
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 6; i++) {
       const hi = hash2(i, o.semente, 83);
-      const u = (t * lerp(0.07, 0.11, hi) + i / 7) % 1;
-      const r = R * lerp(0.6, 2.6, u) * lerp(0.8, 1.2, hi);
+      const u = (t * lerp(0.07, 0.11, hi) + i / 6) % 1;
+      const r = R * lerp(0.5, 1.9, u) * lerp(0.8, 1.2, hi);
       const cx = xPoca + (hi - 0.5) * R * 1.4 + o.deriva * u * H * 0.8;
       const cy = yb - R * 0.4 - u * H * 1.5;
-      const al = 0.16 * vivo * Math.sin(Math.PI * u);
-      ctx.fillStyle = rgba(cv, al * 0.6);
+      ctx.fillStyle = rgba(cv, lerp(0.15, 0.28, hi) * vivo * Math.sin(Math.PI * u));
       ctx.beginPath();
-      ctx.arc(cx, cy, r * 1.45, 0, TAU);
-      ctx.fill();
-      ctx.fillStyle = rgba(cv, al);
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, 0, TAU);
+      for (let k = 0; k < 5; k++) {
+        const hk = hash2(i * 5 + k, o.semente, 87);
+        const bx = cx + (hk - 0.5) * r * 1.3;
+        const by = cy - (k / 4) * r * 1.2 + (hash2(k, i, 89) - 0.5) * r * 0.4;
+        const br = r * lerp(0.45, 0.85, hk);
+        ctx.moveTo(bx + br, by);
+        ctx.arc(bx, by, br, 0, TAU);
+      }
       ctx.fill();
     }
   }

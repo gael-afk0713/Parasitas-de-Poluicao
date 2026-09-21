@@ -295,24 +295,37 @@ export class Fauna {
     const corpo = pelo;
     let borda;
     if (f.estado === 'dePe') borda = rgba(tema.luz, 0.6);            // luz dourada no dorso
-    else if (oleo > 0.3) borda = rgba('#7fd6c8', 0.45 * oleo);        // fio molhado do óleo
+    // Oleada, sem fio de luz: contorno aceso é linguagem de inimigo.
+    else if (oleo > 0.3) borda = null;
     else if (fogo > 0.05) borda = rgba(chamaDe(this.area).meio, 0.55); // lado do fogo
     else borda = rgba(tema.luz, 0.45);
 
     ctx.save();
-    // Poça de óleo embaixo da capivara: escura, com um fio furta-cor na borda.
+    /* Poça de óleo IRREGULAR (um disco com borda completa lia como placa de
+       pressão) e o furta-cor em dois ou três arcos curtos, como reflexo
+       molhado — nunca contornando a poça inteira. */
     if (oleo > 0.05) {
+      const N = 9, rx = L * 0.8, ry = L * 0.1;
       ctx.fillStyle = rgba('#0d0b0a', 0.7 * oleo);
       ctx.beginPath();
-      ctx.ellipse(f.x, f.y + 2, L * 0.8, L * 0.1, 0, 0, TAU);
+      for (let i = 0; i <= N; i++) {
+        const a = (i % N) / N * TAU;
+        const k = lerp(0.72, 1.28, hash2(i % N, f.h * 97 | 0, 5));
+        const px = f.x + Math.cos(a) * rx * k, py = f.y + 2 + Math.sin(a) * ry * k;
+        i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+      }
+      ctx.closePath();
       ctx.fill();
-      const g = ctx.createLinearGradient(f.x - L * 0.8, 0, f.x + L * 0.8, 0);
-      g.addColorStop(0, rgba('#ff4fd8', 0.35 * oleo));
-      g.addColorStop(0.5, rgba('#46e0d0', 0.35 * oleo));
-      g.addColorStop(1, rgba('#ffe45a', 0.3 * oleo));
-      ctx.strokeStyle = g;
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      ctx.lineWidth = 1.2;
+      ctx.lineCap = 'round';
+      const cores = ['#ff4fd8', '#46e0d0', '#ffe45a'];
+      for (let i = 0; i < 3; i++) {
+        const a0 = lerp(0.3, 2.6, i / 2) + hash2(i, 3, 7) * 0.4;
+        ctx.strokeStyle = rgba(cores[i], 0.4 * oleo);
+        ctx.beginPath();
+        ctx.ellipse(f.x, f.y + 2, rx * 0.8, ry * 0.8, 0, a0, a0 + 0.5);
+        ctx.stroke();
+      }
     }
     // De pé ainda sujo, o óleo PINGA da barriga.
     if (oleo > 0.05 && pose.deitado < 0.5) {

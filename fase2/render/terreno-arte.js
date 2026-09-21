@@ -590,6 +590,48 @@ export class ArteTerreno {
     oleoNaLamina(ctx, x0, x1, y, tempo, this.semente + 3, clamp01(1 - pureza * 1.6), 1.9);
     ctx.restore();
 
+    /* MANCHAS DE ÓLEO: placas escuras boiando sobre metade da lâmina, com a
+       borda de cima em três fios furta-cor deslocados (magenta, verde,
+       ciano) — o arco-íris do óleo só existe na BORDA da mancha. */
+    const oleoF = clamp01(1 - pureza * 1.6);
+    if (oleoF > 0.03) {
+      const passoM = 130;
+      const manchas = new Path2D();
+      const bordas = [new Path2D(), new Path2D(), new Path2D()];
+      for (let i = Math.floor(x0 / passoM) - 1; i * passoM <= x1; i++) {
+        const h = hash2(i, this.semente, 61);
+        if (h > 0.6) continue;
+        const deriva = Math.sin(tempo * 0.12 + h * 9) * 14;
+        const mx0 = Math.max(x0, i * passoM + h * 40 + deriva);
+        const mx1 = Math.min(x1, mx0 + lerp(60, 140, hash2(i, this.semente, 63)));
+        if (mx1 - mx0 < 12) continue;
+        manchas.moveTo(mx0, y + onda(mx0) + 1);
+        for (let px = mx0; px <= mx1; px += 8) manchas.lineTo(px, y + onda(px) - 1.2);
+        manchas.lineTo(mx1, y + onda(mx1) + 1);
+        for (let px = mx1; px >= mx0; px -= 8) {
+          manchas.lineTo(px, y + onda(px) + 4 + 7 * Math.sin((px - mx0) / (mx1 - mx0) * Math.PI));
+        }
+        manchas.closePath();
+        for (let k = 0; k < 3; k++) {
+          const b = bordas[k];
+          const a0 = mx0 + (mx1 - mx0) * lerp(0.05, 0.3, hash2(i, k, 65));
+          const a1 = mx0 + (mx1 - mx0) * lerp(0.6, 0.95, hash2(k, i, 67));
+          b.moveTo(a0, y + onda(a0) - 1.6 - k * 0.8);
+          for (let px = a0; px <= a1; px += 8) b.lineTo(px, y + onda(px) - 1.6 - k * 0.8);
+        }
+      }
+      ctx.save();
+      ctx.fillStyle = rgba('#0d0b0a', 0.85 * oleoF);
+      ctx.fill(manchas);
+      ctx.lineWidth = 1;
+      const coresO = ['#ff4fd8', '#6cff9a', '#46d8f0'];
+      for (let k = 0; k < 3; k++) {
+        ctx.strokeStyle = rgba(coresO[k], 0.35 * oleoF);
+        ctx.stroke(bordas[k]);
+      }
+      ctx.restore();
+    }
+
     /* Tamanho de OBJETO, não de pedrinha: a crítica mediu 6–10 px e leu como
        cascalho. Aqui tudo tem 18–30 px — perto do jogador, é isso que diz
        "lixo". */
@@ -738,12 +780,16 @@ export class ArteTerreno {
       caminho.rect(f.cx0 * t.tile, f.cy * t.tile,
         (f.cx1 + 1 - f.cx0) * t.tile, t.tile);
     }
+    /* Água suja é ESCURA e turva — clara, a várzea poluída lia como um lago
+       bonito cor de oliva. Conforme a área cura, ela clareia. */
+    const turva = 0.55 * (1 - calmaDaFauna(tema.pureza ?? 0));
+    const agua = (k) => misturarHex(misturarHex(tema.luz, tema.bruma, k), '#15130f', turva);
     ctx.save();
     for (const [ySup, caminho] of poças) {
       const g = ctx.createLinearGradient(0, ySup, 0, ySup + t.tile * 8);
-      g.addColorStop(0, rgba(misturarHex(tema.luz, tema.bruma, 0.35), 0.23));
-      g.addColorStop(0.55, rgba(misturarHex(tema.luz, tema.bruma, 0.72), 0.3));
-      g.addColorStop(1, rgba(misturarHex(tema.luz, tema.bruma, 0.96), 0.36));
+      g.addColorStop(0, rgba(agua(0.35), 0.23 + 0.3 * turva));
+      g.addColorStop(0.55, rgba(agua(0.72), 0.3 + 0.3 * turva));
+      g.addColorStop(1, rgba(agua(0.96), 0.36 + 0.3 * turva));
       ctx.fillStyle = g;
       ctx.fill(caminho);
     }
