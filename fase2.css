@@ -312,5 +312,8 @@
        · tremor de câmera e aberração cromática — desligados
        · flash de tela cheia — teto de 0.12
        · HUD: tremor ao perder máscara — desligado
-       · HUD: pulso de invulnerabilidade a 26 Hz — vira esmaecido constante */
+       · HUD: pulso de invulnerabilidade a 26 Hz — vira esmaecido constante
+       · catástrofe (render/catastrofe.js): fogo, fumaça, manadas e bandos do
+         fundo e do horizonte — continuam na tela (são a informação de que o
+         lugar sofre), mas a 1/3 da velocidade (`render.movimentoReduzido`) */
 }

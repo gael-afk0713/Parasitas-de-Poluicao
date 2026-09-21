@@ -24,6 +24,7 @@ import { VAZIO, PLATAFORMA, PERIGO, AGUA } from '../mundo/terreno.js';
 // O mesmo campo de vento do parallax: a samambaia do chão deita na mesma
 // rajada que a folhagem do fundo, senão o primeiro plano lê como maquete.
 import { vento, direcaoLuzArea } from './parallax.js';
+import { calmaDaFauna, oleoNaLamina } from './catastrofe.js';
 
 export class ArteTerreno {
   /** @param {import('../mundo/terreno.js').Terreno} terreno */
@@ -236,41 +237,6 @@ export class ArteTerreno {
 
     this._sombraProjetada(ctx, tema, faixas);
     const pureza = tema.pureza ?? 0;
-
-    /* CORPO D'ÁGUA: UM CAMINHO POR POÇA, UM `fill` SÓ.
-       As duas versões anteriores desenhavam faixa por faixa com alfa menor
-       que 1 e +1 px de sobreposição "pra não deixar fresta". Com alfa, o
-       pixel sobreposto é pintado DUAS vezes: sobrava uma linha a cada 32 px
-       atravessando a poça inteira, e de longe a água lia como persiana — ou
-       como scanline de tubo, que é a última coisa que este jogo quer parecer.
-
-       Retângulos exatos (as bordas de tile são inteiras, então não há
-       antisserrilhado a costurar) somados num `Path2D` e preenchidos de uma
-       vez: composita uma vez só, e a fresta que o +1 px existia pra tapar não
-       chega a existir.
-
-       O degradê é ancorado na SUPERFÍCIE de cada poça, não no tile — linhas
-       vizinhas da mesma poça compartilham o mesmo gradiente por construção. */
-    const poças = new Map();
-    for (const f of faixas) {
-      let prof = 0;
-      for (let cy = f.cy - 1; cy >= 0 && t.em(f.cx0, cy) === AGUA; cy--) prof++;
-      const ySup = (f.cy - prof) * t.tile;
-      let caminho = poças.get(ySup);
-      if (!caminho) { caminho = new Path2D(); poças.set(ySup, caminho); }
-      caminho.rect(f.cx0 * t.tile, f.cy * t.tile,
-        (f.cx1 + 1 - f.cx0) * t.tile, t.tile);
-    }
-    ctx.save();
-    for (const [ySup, caminho] of poças) {
-      const g = ctx.createLinearGradient(0, ySup, 0, ySup + t.tile * 8);
-      g.addColorStop(0, rgba(misturarHex(tema.luz, tema.bruma, 0.35), 0.23));
-      g.addColorStop(0.55, rgba(misturarHex(tema.luz, tema.bruma, 0.72), 0.3));
-      g.addColorStop(1, rgba(misturarHex(tema.luz, tema.bruma, 0.96), 0.36));
-      ctx.fillStyle = g;
-      ctx.fill(caminho);
-    }
-    ctx.restore();
 
     for (const f of faixas) {
       const x0 = f.cx0 * t.tile;
@@ -593,6 +559,131 @@ export class ArteTerreno {
     }
   }
 
+  /** Peixe em `i` só se nenhuma das 8 vagas anteriores também sortear peixe. */
+  _primeiroPeixe(i) {
+    for (let j = i - 8; j < i; j++) {
+      if (hash2(j, this.semente + 2, 53) < 0.14) return false;
+    }
+    return true;
+  }
+
+  /**
+   * O que boia na lâmina jogável. Suja: garrafa, lata, sacola e o furta-cor do
+   * óleo. Restaurada: vitória-régia e flor NAS MESMAS POSIÇÕES — o lixo não
+   * some, ele é substituído, e é a troca de forma no mesmo lugar que o olho
+   * lê como "isto sarou".
+   *
+   * É o único ponto em que a poluição em larga escala do fundo encosta no
+   * espaço de jogo: o jogador passa por cima disso, perto.
+   */
+  _boiando(ctx, tema, x0, x1, y, onda, tempo) {
+    const pureza = tema.pureza ?? 0;
+    const calma = calmaDaFauna(pureza);
+    const sujo = 1 - calma;
+    // Lâmina de óleo com corpo (antes era um fio de 1 px na borda e não lia).
+    // Recortada no trecho de lâmina: sem recorte o arco-íris vazava pela
+    // margem da poça por centenas de pixels.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, y - 12, x1 - x0, 24);
+    ctx.clip();
+    oleoNaLamina(ctx, x0, x1, y, tempo, this.semente + 3, clamp01(1 - pureza * 1.6), 1.9);
+    ctx.restore();
+
+    /* Tamanho de OBJETO, não de pedrinha: a crítica mediu 6–10 px e leu como
+       cascalho. Aqui tudo tem 18–30 px — perto do jogador, é isso que diz
+       "lixo". */
+    const E = 1.9;
+    const passo = 64;
+    const lixo = new Path2D(), rotulos = new Path2D(), sacolas = new Path2D();
+    const tambores = new Path2D(), faixasRisco = new Path2D();
+    const peixes = new Path2D(), barrigas = new Path2D();
+    const folhas = new Path2D(), flores = new Path2D();
+
+    const i0 = Math.ceil(x0 / passo), i1 = Math.floor(x1 / passo);
+    for (let i = i0; i <= i1; i++) {
+      const h = hash2(i, this.semente, 47);
+      if (h > 0.55) continue;
+      const h2 = hash2(i, this.semente + 1, 49);
+      const px = i * passo + (h2 - 0.5) * passo * 0.6;
+      if (px < x0 + 8 || px > x1 - 8) continue;
+      const py = y + onda(px) + 1;
+      const inc = Math.sin(tempo * lerp(0.9, 1.5, h) + h * 9) * 0.25;
+      if (sujo > 0.03) {
+        const c = Math.cos(inc), sn = Math.sin(inc);
+        const P = (u, v) => [px + u * c * E - v * sn * E, py + u * sn * E + v * c * E];
+        const h3 = hash2(i, this.semente + 2, 53);
+        if (h3 < 0.14 && this._primeiroPeixe(i)) {
+          /* UM peixe de barriga pra cima a cada ~9 vagas, no máximo. Um
+             símbolo forte lê mais que dez pontinhos — e é o mais triste da
+             várzea. Decidido pelo índice de MUNDO, não "o primeiro deste
+             trecho": o trecho é recortado pela tela, e o tambor da direita
+             virava peixe quando o peixe da esquerda saía do quadro. */
+          const q = [P(-8, -1), P(-4, -4.5), P(4, -4.5), P(7, -2), P(11, -5), P(11, 1), P(7, -0.5), P(4, 1), P(-4, 1)];
+          peixes.moveTo(...q[0]); for (let k = 1; k < q.length; k++) peixes.lineTo(...q[k]); peixes.closePath();
+          const b = [P(-6, -2.6), P(-3, -4.2), P(4, -4.2), P(5.5, -2.6)];
+          barrigas.moveTo(...b[0]); for (let k = 1; k < 4; k++) barrigas.lineTo(...b[k]); barrigas.closePath();
+        } else if (h3 < 0.3) {
+          // Tambor meio afundado, de pé, com a faixa amarela de risco.
+          const q = [P(-6, 2), P(-6, -9), P(6, -9), P(6, 2)];
+          tambores.moveTo(...q[0]); for (let k = 1; k < 4; k++) tambores.lineTo(...q[k]); tambores.closePath();
+          const f = [P(-6, -5.5), P(-6, -3), P(6, -3), P(6, -5.5)];
+          faixasRisco.moveTo(...f[0]); for (let k = 1; k < 4; k++) faixasRisco.lineTo(...f[k]); faixasRisco.closePath();
+        } else if (h2 < 0.38) {
+          // Garrafa deitada, gargalo pra fora.
+          const q = [P(-7, 0), P(-7, -5), P(3, -5), P(5, -3.5), P(9, -3.5), P(9, -1.5), P(5, -1.5), P(3, 0)];
+          lixo.moveTo(...q[0]); for (let k = 1; k < q.length; k++) lixo.lineTo(...q[k]); lixo.closePath();
+          const r = [P(-4, -0.5), P(-4, -4.5), P(0, -4.5), P(0, -0.5)];
+          rotulos.moveTo(...r[0]); for (let k = 1; k < 4; k++) rotulos.lineTo(...r[k]); rotulos.closePath();
+        } else if (h2 < 0.66) {
+          // Lata amassada.
+          const q = [P(-4, 0), P(-4.5, -6), P(4, -7), P(4.5, 0)];
+          lixo.moveTo(...q[0]); for (let k = 1; k < 4; k++) lixo.lineTo(...q[k]); lixo.closePath();
+        } else {
+          // Sacola: bolha pálida, meio murcha.
+          const inf = (0.85 + 0.2 * Math.sin(tempo * 2.1 + h * 17)) * E;
+          sacolas.moveTo(px - 7 * E, py);
+          sacolas.quadraticCurveTo(px - 8 * inf, py - 7 * inf, px - 1, py - 8 * inf);
+          sacolas.quadraticCurveTo(px + 8 * inf, py - 6 * inf, px + 7 * E, py);
+          sacolas.closePath();
+        }
+      }
+      if (calma > 0.03) {
+        const r = lerp(9, 15, h);
+        const ry = r * 0.28;
+        folhas.moveTo(px, py);
+        folhas.ellipse(px, py, r, ry, 0, 0.2, TAU - 0.2);
+        folhas.closePath();
+        if (h2 > 0.6) {
+          const fx = px + r * 0.25, fy = py - 3;
+          for (let k = 0; k < 5; k++) {
+            const a = -Math.PI / 2 + (k - 2) * 0.48;
+            const ex = fx + Math.cos(a) * 3.4, ey = fy + Math.sin(a) * 3.4;
+            flores.moveTo(ex + Math.cos(a) * 3.6, ey + Math.sin(a) * 3.6);
+            flores.ellipse(ex, ey, 3.6, 1.6, a, 0, TAU);
+          }
+        }
+      }
+    }
+    ctx.save();
+    if (sujo > 0.03) {
+      ctx.globalAlpha = sujo;
+      ctx.fillStyle = misturarHex(tema.terreno, tema.borda, 0.35); ctx.fill(lixo);
+      ctx.fillStyle = misturarHex(tema.terreno, '#d8dccf', 0.45); ctx.fill(rotulos);
+      ctx.fillStyle = rgba(misturarHex(tema.bruma, '#f2efe6', 0.55), 0.85); ctx.fill(sacolas);
+      ctx.fillStyle = misturarHex(tema.terreno, '#4a2a18', 0.4); ctx.fill(tambores);
+      ctx.fillStyle = misturarHex(tema.terreno, '#e6c23a', 0.6); ctx.fill(faixasRisco);
+      ctx.fillStyle = misturarHex(tema.terreno, '#5a6a70', 0.5); ctx.fill(peixes);
+      ctx.fillStyle = misturarHex(tema.bruma, '#f4f0e4', 0.7); ctx.fill(barrigas);
+    }
+    if (calma > 0.03) {
+      ctx.globalAlpha = calma;
+      ctx.fillStyle = misturarHex(tema.terreno, tema.acento, 0.55); ctx.fill(folhas);
+      ctx.fillStyle = misturarHex(tema.crista, '#ffd3ea', 0.6); ctx.fill(flores);
+    }
+    ctx.restore();
+  }
+
   /**
    * Água / poça ácida. Chamada DEPOIS das entidades (ver main.js), pra que
    * quem entra nela apareça submerso em vez de flutuando por cima.
@@ -601,6 +692,47 @@ export class ArteTerreno {
     const t = this.terreno;
     const faixas = this._faixas(camera, AGUA);
     if (!faixas.length) return;
+
+    /* CORPO D'ÁGUA: UM CAMINHO POR POÇA, UM `fill` SÓ.
+       As duas versões anteriores desenhavam faixa por faixa com alfa menor
+       que 1 e +1 px de sobreposição "pra não deixar fresta". Com alfa, o
+       pixel sobreposto é pintado DUAS vezes: sobrava uma linha a cada 32 px
+       atravessando a poça inteira, e de longe a água lia como persiana — ou
+       como scanline de tubo, que é a última coisa que este jogo quer parecer.
+
+       Retângulos exatos (as bordas de tile são inteiras, então não há
+       antisserrilhado a costurar) somados num `Path2D` e preenchidos de uma
+       vez: composita uma vez só, e a fresta que o +1 px existia pra tapar não
+       chega a existir.
+
+       O degradê é ancorado na SUPERFÍCIE de cada poça, não no tile — linhas
+       vizinhas da mesma poça compartilham o mesmo gradiente por construção.
+
+       (Este bloco já morou, por engano, dentro de `desenharPlataformas`: o
+       script que o inseriu procurou um trecho que existe nas duas funções e
+       parou no primeiro. Toda plataforma ganhou um retângulo de água atrás e
+       a água ficou sem corpo nenhum. A âncora agora é a assinatura da função.) */
+    const poças = new Map();
+    for (const f of faixas) {
+      let prof = 0;
+      for (let cy = f.cy - 1; cy >= 0 && t.em(f.cx0, cy) === AGUA; cy--) prof++;
+      const ySup = (f.cy - prof) * t.tile;
+      let caminho = poças.get(ySup);
+      if (!caminho) { caminho = new Path2D(); poças.set(ySup, caminho); }
+      caminho.rect(f.cx0 * t.tile, f.cy * t.tile,
+        (f.cx1 + 1 - f.cx0) * t.tile, t.tile);
+    }
+    ctx.save();
+    for (const [ySup, caminho] of poças) {
+      const g = ctx.createLinearGradient(0, ySup, 0, ySup + t.tile * 8);
+      g.addColorStop(0, rgba(misturarHex(tema.luz, tema.bruma, 0.35), 0.23));
+      g.addColorStop(0.55, rgba(misturarHex(tema.luz, tema.bruma, 0.72), 0.3));
+      g.addColorStop(1, rgba(misturarHex(tema.luz, tema.bruma, 0.96), 0.36));
+      ctx.fillStyle = g;
+      ctx.fill(caminho);
+    }
+    ctx.restore();
+
 
     // A onda é uma soma de três senoides de períodos incomensuráveis. Uma só
     // lê como animação em loop; três nunca repetem visivelmente, e é o que faz
@@ -630,22 +762,7 @@ export class ArteTerreno {
       }
       const superficie = trechos.length > 0;
 
-      // --- corpo ---------------------------------------------------------
-      // O gradiente vai do claro no topo ao escuro no fundo em CADA faixa, o
-      // que dá a sensação de profundidade acumulando: quanto mais fundo, mais
-      // opaco, como água de verdade.
-      /* UM DEGRADÊ POR POÇA, EM COORDENADA ABSOLUTA.
-         A tentativa anterior trocou o degradê-por-tile (que costurava dentro
-         do tile) por COR PLANA por linha. Não resolveu: com a profundidade
-         quantizada em `prof/7`, cada linha de 32 px ganhava um tom e um alfa
-         diferentes do vizinho, e uma poça de 9 tiles saía com nove degraus
-         horizontais atravessando ela inteira — de longe lê como persiana, ou
-         como scanline de tubo, e é a primeira coisa que se vê na sala.
-
-         A correção é ancorar o degradê na SUPERFÍCIE da poça, não no tile:
-         linhas vizinhas da mesma poça produzem exatamente o mesmo gradiente,
-         então a emenda deixa de existir por construção — o recorte muda, o
-         degradê não. */
+      // O corpo d'água já foi pintado antes deste laço, uma vez por poça.
       if (!superficie) continue;
 
       // --- superfície ----------------------------------------------------
@@ -704,6 +821,11 @@ export class ArteTerreno {
         ctx.stroke();
       }
       ctx.restore();
+
+      // 4 · o que a água carrega — ver `_boiando`.
+      for (const [ci, cf] of trechos) {
+        this._boiando(ctx, tema, ci * t.tile, (cf + 1) * t.tile, y, onda, tempo);
+      }
     }
   }
 

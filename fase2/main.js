@@ -141,6 +141,9 @@ if (movimentoReduzido) {
   // ambos entram na regra, e o pulso rápido é também questão de fotossensi-
   // bilidade, não só de preferência.
   hud.movimentoReduzido = true;
+  // Fogo, fumaça, manadas e bandos continuam na tela — eles SÃO a informação
+  // de que o lugar está sofrendo —, mas a um terço da velocidade.
+  render.movimentoReduzido = true;
 }
 
 /* -------------------------------------------------------------------- passo -- */
@@ -165,7 +168,7 @@ function passo(dt) {
 
 function quadro(alpha, dtReal) {
   transicao.atualizar(dtReal);
-  mundo.atualizarApresentacao(dtReal);
+  mundo.atualizarApresentacao(dtReal, laco.pausado || mapa.aberta || !!paineis?.bloqueiaJogo);
   audio.atualizar(dtReal, mundo);
 
   const tema = mundo.tema;
@@ -198,6 +201,8 @@ function quadro(alpha, dtReal) {
   //      pertence ao cenário, não deve tapar inimigo nem jogador.
   render.camada(1, (ctx) => mundo.decor.desenhar(ctx, tema));
   render.emissivo(1, (ctx) => mundo.decor.desenharLuz(ctx, tema));
+  // 7c · as aves pousadas nas bordas — reagem ao jogador (ver render/fauna.js)
+  render.camada(1, (ctx) => mundo.fauna?.desenhar(ctx, tema, laco.tempo, render.movimentoReduzido));
 
   /* 8 · SOMBRAS DE CONTATO, e só depois as entidades.
      Sem elas, personagem e criatura ficam colados POR CIMA do plano em vez de
@@ -257,7 +262,9 @@ function quadro(alpha, dtReal) {
 
   // 9 · água — DEPOIS das entidades, de propósito: quem entra nela precisa
   //     aparecer submerso, e isso só acontece com a lâmina por cima.
-  render.camada(1, (ctx) => mundo.arteTerreno.desenharAgua(ctx, tema, camera, laco.tempo));
+  // Movimento reduzido: a lâmina e o que boia nela andam a 1/3, como o resto.
+  render.camada(1, (ctx) => mundo.arteTerreno.desenharAgua(ctx, tema, camera,
+    render.movimentoReduzido ? laco.tempo * 0.33 : laco.tempo));
 
   // 10 · névoa rasteira + partículas
   desenharNevoa(render, mundo);

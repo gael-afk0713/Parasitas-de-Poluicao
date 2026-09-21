@@ -44,9 +44,10 @@
       fundo de verdade.
 
    Tudo é função determinística da posição de mundo — nenhum estado, nenhuma
-   lista de objetos, nenhuma alocação por quadro além de gradientes. A mesma
-   coluna desenha sempre a mesma silhueta, então nada pisca ou "nada" quando
-   a câmera se move.
+   lista de objetos. As alocações por quadro são pequenas e de vida curta
+   (gradientes e os `Path2D` do fogo, da fumaça e da fauna). A mesma coluna
+   desenha sempre a mesma silhueta, então nada pisca ou "nada" quando a
+   câmera se move.
    ========================================================================= */
 
 import {
@@ -54,6 +55,11 @@ import {
   misturarHex, ajustarBrilho, hexParaRgb, rgbParaHex,
 } from '../core/mat.js';
 import { feixeLuz } from './renderizador.js';
+import {
+  FORMAS_CATASTROFE, FORMAS_LUZ, confCatastrofe, forcaFogo, forcaFumaca,
+  calmaDaFauna, chamaDe, frenteDeFogo, claraoDeFogo, pluma,
+  desenharManada, desenharBando, coresDeFumaca,
+} from './catastrofe.js';
 
 /* =========================================================================
    1 · COR E PROFUNDIDADE
@@ -158,7 +164,20 @@ const _amb = {
   camera: null, tema: null, tempo: 0, pureza: 0, ang: 0,
   p: 1, x0: 0, x1: 0, vw: 0, vh: 0, ancora: 0,
   cor: '#000', corAlto: '#000', corBase: '#000', corTras: '#000',
+  // --- catástrofe (ver catastrofe.js) — preenchidos a cada camada
+  area: 'raizes', fogo: 0, fumaca: 0, calma: 0, fuga: -1, chama: null,
+  tempoAnim: 0, ventoAqui: 0, inclinaFogo: 0,
 };
+/* Auxiliares entregues às formas de `catastrofe.js` pelo próprio ambiente:
+   assim aquele arquivo não precisa importar este, e não nasce um ciclo. */
+_amb.y = (rel) => yDe(_amb, rel);
+_amb.perfil = (x, s) => perfilAltura(x, s);
+
+/* Movimento reduzido: o `main.js` liga isto. Fogo, bando e manada continuam
+   existindo — eles SÃO a informação da cena —, mas andam a um terço. */
+let _reduzido = false;
+// x de MUNDO do jogador, pra máscara que tira força do fogo perto dele.
+let _jogMundoX = 0;
 
 function prepararAmb(camera, sala, tema, tempo, p, c, cAlto, cBase, cTras, ang) {
   const vw = camera.largura / camera.zoom;
@@ -174,6 +193,20 @@ function prepararAmb(camera, sala, tema, tempo, p, c, cAlto, cBase, cTras, ang) 
   // que é exatamente o parallax vertical que faltava.
   _amb.ancora = sala.altura * 0.5;
   _amb.cor = c; _amb.corAlto = cAlto; _amb.corBase = cBase; _amb.corTras = cTras;
+
+  const area = sala.area;
+  _amb.area = area;
+  _amb.fogo = forcaFogo(area, _amb.pureza);
+  _amb.fumaca = forcaFumaca(area, _amb.pureza);
+  _amb.calma = calmaDaFauna(_amb.pureza);
+  _amb.fuga = confCatastrofe(area).fuga;
+  _amb.chama = chamaDe(area);
+  _amb.tempoAnim = _reduzido ? tempo * 0.33 : tempo;
+  // O jogador no espaço DESTE plano: x de tela + deslocamento do plano.
+  _amb.jogX = _jogMundoX - camera.viewX + camera.viewX * p;
+  _amb.ventoAqui = vento(_amb.tempoAnim, _amb.x0 + vw * 0.5);
+  // O fogo tomba pro lado da fuga, mais forte na rajada.
+  _amb.inclinaFogo = _amb.fuga * (0.16 + 0.14 * clamp01(_amb.ventoAqui));
   return _amb;
 }
 
@@ -1220,6 +1253,7 @@ const FORMAS = {
   massa, dentes, arcos, raizes, juncos, troncos, agua,
   chamines, torres, esteiras, cabos, fumaca,
   troncosColossais, galhos, folhagem, organico, escombros,
+  ...FORMAS_CATASTROFE,
 };
 
 /* =========================================================================
@@ -1269,6 +1303,10 @@ const CAMADAS = {
      Estas são as três primeiras salas do jogo. */
   raizes: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
+      /* O fogo já passou por aqui e segue queimando ALÉM: colunas de fumaça
+         subindo de trás da mata distante, a base avermelhada pelo que arde. */
+      { f: 'colunaFumaca', rel: 0.66, passo: 560, dens: 0.62, altMin: 0.7, altMax: 1.35,
+        largMin: 26, largMax: 62, semente: 15 },
       { f: 'massa', lado: 'baixo', rel: 0.66, amp: 44, escala: 0.0011, semente: 19, passo: 18 },
       { f: 'troncosColossais', rel: 0.62, passo: 120, dens: 0.92,
         largMin: 5, largMax: 13, semente: 11, altura: [0.30, 0.46] },
@@ -1343,6 +1381,9 @@ const CAMADAS = {
       { f: 'massa', lado: 'baixo', rel: 0.52, amp: 96, escala: 0.0009, semente: 101, passo: 18 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
+      // Fumaça industrial ao longe: a várzea não queima, ela recebe.
+      { f: 'colunaFumaca', rel: 0.58, passo: 900, dens: 0.4, altMin: 0.6, altMax: 1.1,
+        largMin: 20, largMax: 44, semente: 105 },
       { f: 'massa', lado: 'baixo', rel: 0.60, amp: 86, escala: 0.0016, semente: 103, passo: 16 },
       { f: 'troncos', rel: 0.58, passo: 340, dens: 0.6, compMin: 90, compMax: 200, semente: 107 },
       { f: 'juncos', rel: 0.60, passo: 70, dens: 0.7, compMin: 34, compMax: 90, escalaLarg: 0.6, semente: 109 },
@@ -1353,10 +1394,16 @@ const CAMADAS = {
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'agua', rel: 0.70, altura: 420, semente: 131 },
+      // O furta-cor do petróleo e o que boia: é aqui que a várzea adoece.
+      { f: 'oleo', rel: 0.70, escala: 1.4, semente: 133 },
       { f: 'troncos', rel: 0.70, passo: 400, dens: 0.66, compMin: 150, compMax: 330, semente: 137 },
+      { f: 'lixo', rel: 0.70, passo: 130, dens: 0.7, escala: 1.6, semente: 135 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.82, amp: 66, escala: 0.0034, semente: 139, passo: 12 },
+      // Capivara é bicho de várzea — é ela que foge por aqui.
+      { f: 'manada', rel: 0.82, solo: { amp: 66, escala: 0.0034, semente: 139 },
+        especies: ['capivara'], tamMin: 34, tamMax: 50, passo: 1900, periodo: 17, semente: 141 },
       { f: 'juncos', rel: 0.82, passo: 96, dens: 0.8, compMin: 90, compMax: 250, semente: 149 },
     ] },
     { p: 0.60, d: 0.24, cor: 'proximo', brilho: -0.45, formas: [
@@ -1391,8 +1438,12 @@ const CAMADAS = {
       // A borda da mata no horizonte: baixa, densa, quase dissolvida na bruma.
       { f: 'troncosColossais', rel: 0.86, passo: 110, dens: 0.9,
         largMin: 4, largMax: 11, semente: 201, altura: [0.26, 0.40] },
+      { f: 'colunaFumaca', rel: 0.9, passo: 560, dens: 0.55, altMin: 0.7, altMax: 1.2,
+        largMin: 32, largMax: 74, semente: 205 },
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 70, escala: 0.0009, semente: 203,
         passo: 18, picos: 0.5 },
+      { f: 'incendio', rel: 0.92, solo: { amp: 70, escala: 0.0009, semente: 203, picos: 0.5 },
+        escala: 12, passo: 9, clarao: 0.3, semente: 209 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 0.88, passo: 165, dens: 0.78,
@@ -1405,13 +1456,20 @@ const CAMADAS = {
     { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'troncosColossais', rel: 0.90, passo: 300, dens: 0.5,
         largMin: 12, largMax: 28, semente: 215, altura: [0.55, 0.8] },
+      // As árvores que ainda queimam: base atrás da crista, copa em chamas.
+      { f: 'arvoreEmChamas', rel: 0.92, passo: 340, dens: 0.75, altMin: 130, altMax: 260,
+        largMin: 6, largMax: 12, semente: 216 },
       { f: 'massa', lado: 'baixo', rel: 0.88, amp: 82, escala: 0.0022, semente: 217,
         passo: 14, picos: 0.7 },
+      { f: 'incendio', rel: 0.88, solo: { amp: 82, escala: 0.0022, semente: 217, picos: 0.7 },
+        escala: 20, passo: 12, clarao: 0.22, semente: 219 },
       { f: 'torres', rel: 0.84, passo: 340, dens: 0.6, altMin: 110, altMax: 260, escalaLarg: 0.75, semente: 223 },
       { f: 'chamines', rel: 0.84, passo: 300, dens: 0.5, altMin: 140, altMax: 330,
         escalaLarg: 0.8, torcao: 0.22, semente: 227 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
+      { f: 'arvoreEmChamas', rel: 0.84, passo: 520, dens: 0.65, altMin: 220, altMax: 400,
+        largMin: 10, largMax: 18, semente: 228 },
       { f: 'esteiras', rel: 0.62, passo: 480, dens: 0.7, escalaLarg: 0.85, semente: 229 },
       { f: 'massa', lado: 'baixo', rel: 0.80, amp: 80, escala: 0.003, semente: 233, passo: 13, picos: 0.6 },
       { f: 'escombros', rel: 0.80, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
@@ -1436,7 +1494,19 @@ const CAMADAS = {
   /* --- DOSSEL: a árvore-mãe, troncos colossais e folhagem ---------------- */
   dossel: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
+      { f: 'colunaFumaca', rel: 0.95, passo: 640, dens: 0.55, altMin: 0.8, altMax: 1.4,
+        largMin: 30, largMax: 70, semente: 303 },
       { f: 'troncosColossais', rel: 1.35, passo: 300, dens: 0.85, largMin: 40, largMax: 110, semente: 301 },
+    ] },
+    /* O DESMATE visto de cima. Entre os troncos colossais aparece o que
+       sobrou da encosta: um morro pelado, a fileira de tocos claros e a
+       máquina parada na borda, com o farol aceso. */
+    { p: 0.07, d: 0.93, cor: 'distante', brilho: -0.09, formas: [
+      { f: 'massa', lado: 'baixo', rel: 0.86, amp: 60, escala: 0.0014, semente: 304, passo: 16 },
+      { f: 'tocos', rel: 0.86, solo: { amp: 60, escala: 0.0014, semente: 304 },
+        passo: 46, dens: 0.8, escala: 0.45, semente: 305 },
+      { f: 'maquina', rel: 0.86, solo: { amp: 60, escala: 0.0014, semente: 304 },
+        passo: 1400, dens: 0.6, escala: 0.42, semente: 306 },
     ] },
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 1.4, passo: 340, dens: 0.7, largMin: 30, largMax: 90, semente: 307 },
@@ -1445,6 +1515,8 @@ const CAMADAS = {
     { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'galhos', rel: 0.20, passo: 380, dens: 0.7, escalaLarg: 0.7, semente: 313 },
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 88, escala: 0.0021, semente: 317, passo: 14 },
+      { f: 'tocos', rel: 0.92, solo: { amp: 88, escala: 0.0021, semente: 317 },
+        passo: 110, dens: 0.65, escala: 0.9, semente: 319 },
       { f: 'folhagem', rel: 0.30, passo: 250, dens: 0.72, rMin: 60, rMax: 150, semente: 331 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
@@ -1484,6 +1556,9 @@ const CAMADAS = {
   coracao: [
     { p: 0.045, d: 1.00, cor: 'distante', brilho: -0.05, formas: [
       // Linha do horizonte: árvores doentes, baixas, quase dissolvidas.
+      // Pluma química: a mesma coluna, na cor da área.
+      { f: 'colunaFumaca', rel: 1.0, passo: 600, dens: 0.6, altMin: 0.8, altMax: 1.4,
+        largMin: 30, largMax: 66, semente: 400 },
       { f: 'troncosColossais', rel: 1.04, passo: 130, dens: 0.85,
         largMin: 5, largMax: 14, semente: 401, altura: [0.24, 0.40] },
       { f: 'organico', rel: 1.12, passo: 300, dens: 0.9, rMin: 120, rMax: 300, semente: 403 },
@@ -1585,8 +1660,17 @@ export function desenharRaios(render, sala, mundo) {
   const yBoca = -90;
   const alcance = (sala.altura + 260) * 1.2;
 
+  /* Com fumaça no céu, o sol quase não passa — e o pouco que passa sai
+     laranja. Os fachos frios vindos de cima eram a luz mais clara da tela e
+     contradiziam o fogo como fonte; agora eles ficam como RECOMPENSA do
+     estado limpo. */
+  const abafa = lerp(1, 0.4, forcaFumaca(sala.area, mundo.tema?.pureza ?? 0));
+  const aquece = forcaFogo(sala.area, mundo.tema?.pureza ?? 0);
+  const chF = chamaDe(sala.area);
+
   render.camada(P, (ctx, t, camera) => {
     const comp = Math.max(alcance, camera.altura / camera.zoom * 1.4);
+    const corF = aquece > 0.02 ? misturarHex(t.luz, chF.meio, 0.55 * aquece) : t.luz;
     ctx.globalCompositeOperation = 'screen';
     for (let i = 0; i < luzes.length; i++) {
       const l = luzes[i];
@@ -1602,9 +1686,9 @@ export function desenharRaios(render, sala, mundo) {
       // não declarar `feixe`. Ao tirar esse fator, manter os mesmos números
       // aqui triplicava a luz — e numa área restaurada, com brilhoBloom 0.85,
       // o feixe estourava num borrão branco sem forma nenhuma.
-      feixeLuz(ctx, x, yBoca, comp, 230, ang, t.luz, inten * 0.2);
-      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, t.luz, inten * 0.22);
-      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, t.luz, inten * 0.26);
+      feixeLuz(ctx, x, yBoca, comp, 230, ang, corF, inten * 0.2 * abafa);
+      feixeLuz(ctx, x - 26, yBoca, comp * 0.88, 104, ang + 0.045, corF, inten * 0.22 * abafa);
+      feixeLuz(ctx, x + 30, yBoca, comp * 0.94, 52, ang - 0.035, corF, inten * 0.26 * abafa);
       poeiraNoFeixe(ctx, t, x, yBoca, comp, 210, ang, inten, tempo, i);
     }
     ctx.globalCompositeOperation = 'source-over';
@@ -1613,6 +1697,7 @@ export function desenharRaios(render, sala, mundo) {
 
   render.emissivo(P, (ctx, t, camera) => {
     const comp = Math.max(alcance, camera.altura / camera.zoom * 1.3);
+    const corF = aquece > 0.02 ? misturarHex(t.luz, chF.meio, 0.55 * aquece) : t.luz;
     for (const l of luzes) {
       const inten = l.intensidade ?? 1;
       const x = l.x + Math.sin(ang) * (l.y - yBoca);
@@ -1620,8 +1705,8 @@ export function desenharRaios(render, sala, mundo) {
       // brilhoBloom (0.85 no Coração restaurado): o que entra aqui tem que
       // ser bem mais fraco do que parece necessário olhando só este trecho.
       const g = lerp(1, 0.5, clamp01(t.brilhoBloom ?? 0.4));
-      feixeLuz(ctx, x, yBoca, comp, 44, ang, t.luz, inten * 0.13 * g);
-      feixeLuz(ctx, x, yBoca, comp * 0.6, 16, ang, t.luz, inten * 0.16 * g);
+      feixeLuz(ctx, x, yBoca, comp, 44, ang, corF, inten * 0.13 * g * abafa);
+      feixeLuz(ctx, x, yBoca, comp * 0.6, 16, ang, corF, inten * 0.16 * g * abafa);
     }
   });
 }
@@ -1670,6 +1755,8 @@ export function desenharParallax(render, sala, mundo) {
   const ang = anguloLuzArea(sala.area);
   const quandoRaios = RAIOS_APOS[sala.area] ?? 3;
 
+  _reduzido = !!render.movimentoReduzido;
+  _jogMundoX = mundo.jogador?.centroX ?? 0;
   desenharBrilhoDeFundo(render, sala, mundo);
 
   // A cor da camada ANTERIOR é o que as aberturas em arco usam pra parecerem
@@ -1698,6 +1785,15 @@ export function desenharParallax(render, sala, mundo) {
       ctx.globalCompositeOperation = 'source-over';
     });
 
+    /* O que QUEIMA também entra no bloom — mas no mesmo plano de parallax da
+       camada, senão o brilho desliza por cima da silhueta ao andar. */
+    if (s.formas.some((f) => FORMAS_LUZ[f.f])) {
+      render.emissivo(s.p, (ctx, t, camera) => {
+        const a = prepararAmb(camera, sala, t, tempo, s.p, c, cAlto, cBase, cTras, ang);
+        for (const f of s.formas) FORMAS_LUZ[f.f]?.(ctx, a, f);
+      });
+    }
+
     corTras = c;
 
     // Véu só nas junções que precisam: uma névoa de tela cheia por camada é
@@ -1709,6 +1805,12 @@ export function desenharParallax(render, sala, mundo) {
     if (veu > 0) render.velarProfundidade(veu);
 
     if (i === quandoRaios) desenharRaios(render, sala, mundo);
+    /* A fauna do horizonte entra DEPOIS dos dois planos mais distantes: antes
+       deles, os troncos finos do fundo cortavam cada veado ao meio e a manada
+       virava um emaranhado. É uma trapaça de profundidade (o horizonte é mais
+       longe que esses troncos), e ninguém percebe — um bicho partido ao meio
+       todo mundo percebe. */
+    if (i === 1) desenharFaunaHorizonte(render, sala, mundo);
   }
 }
 
@@ -1768,6 +1870,9 @@ const MOLDURA = {
   coracao: { base: 'lobo', topo: 'lobo' },
 };
 
+// Área da sala sendo emoldurada — as molduras precisam saber se ali queima.
+let areaAtual = 'raizes';
+
 export function desenharPrimeiroPlano(render, mundo) {
   const sala = mundo.sala;
   if (!sala) return;
@@ -1799,6 +1904,7 @@ export function desenharPrimeiroPlano(render, mundo) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
+    areaAtual = sala.area;
     desenharMolduraBase(ctx, molde.base, esq, vw, vh, yBase, refX, tempo, t);
     desenharMolduraTopo(ctx, molde.topo, esq, vw, vh, yTopo, refX, tempo, t);
     ctx.globalAlpha = 1;
@@ -2053,6 +2159,19 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
         const d = lerp(16, 40, h2);
         ctx.fillRect(px - d * 0.5, yTopo - 30, d, comp);
         ctx.fillRect(px - d * 0.85, yTopo + comp - d * 0.5, d * 1.7, d * 0.5);
+        /* Com o céu aceso pelo incêndio, cano preto chapado era o contraste
+           mais duro da tela e lia como arte faltando. O lado de baixo pega o
+           reflexo do fogo: um fio quente nas arestas. */
+        const fogoAqui = forcaFogo(areaAtual, tema.pureza ?? 0);
+        if (fogoAqui > 0.05) {
+          const chC = chamaDe(areaAtual);
+          ctx.save();
+          ctx.strokeStyle = rgba(chC.meio, 0.4 * fogoAqui);
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(px - d * 0.5, yTopo - 30, d, comp - d * 0.5 + 30);
+          ctx.strokeRect(px - d * 0.85, yTopo + comp - d * 0.5, d * 1.7, d * 0.5);
+          ctx.restore();
+        }
         // cotovelo quebrado
         if (h3 > 0.55) {
           ctx.save();
@@ -2148,6 +2267,64 @@ function perfilHorizonte(xm, s, amp, tipo) {
 }
 
 /**
+ * Manada correndo pela crista da banda próxima do horizonte, bando cruzando o
+ * clarão logo acima. O horizonte é o único lugar SEMPRE na altura do olho:
+ * nas cristas do meio do fundo, em sala baixa, a manada caía atrás das
+ * plataformas e não aparecia. Chamado por `desenharParallax` depois dos dois
+ * planos mais distantes (ver o comentário lá).
+ */
+function desenharFaunaHorizonte(render, sala, mundo) {
+  const conf = HORIZONTE[sala.area] ?? HORIZONTE.raizes;
+  const camera = render.camera;
+  render.camadaTela((ctx, tema, w, h) => {
+    const yH = render.alturaHorizonte(sala.altura);
+    if (yH < -200 || yH > h + 200) return;
+    const t = mundo.laco?.tempo ?? 0;
+    const tAnim = render.movimentoReduzido ? t * 0.33 : t;
+    const cc = confCatastrofe(sala.area);
+    const fuga = cc.fuga;
+    const fogo = forcaFogo(sala.area, tema.pureza ?? 0);
+    const ch = chamaDe(sala.area);
+    const calma = calmaDaFauna(tema.pureza ?? 0);
+    const amp1 = h * conf.alt * 1.45;
+    const y01 = yH + h * 0.028;
+    const desl1 = camera.viewX * 0.045;
+    const s1 = conf.semente + 101;
+    /* Contraluz: o bicho está entre o olho e o fogo, então é quase preto — e
+       ganha uma lasca de luz nas costas na cor do que o ilumina (fogo onde há
+       fogo, céu onde não há). */
+    const silhueta = misturarHex(cor(tema, 'distante', 0.8, -0.24), tema.primeiroPlano, 0.7);
+    const borda = fogo > 0.05
+      ? rgba(misturarHex(ch.meio, ch.borda, 0.25), 0.3 + 0.45 * fogo)
+      : rgba(tema.luz, 0.4);
+    if (cc.bichos) {
+      desenharManada(ctx, {
+        x0: -60, x1: w + 60, dx: desl1,
+        yEm: (x) => y01 - perfilHorizonte(x + desl1, s1, amp1, conf.tipo) + 2,
+        especies: cc.bichos, dir: fuga, t: tAnim, calma,
+        cor: silhueta, borda, bordaPasto: rgba(tema.luz, 0.4),
+        // Calmo, o bicho do horizonte é recortado contra céu claro e LONGE:
+        // leva um pouco da bruma, senão fica mais preto que tudo à volta.
+        corPasto: misturarHex(silhueta, tema.bruma, 0.3),
+        // ~1,7x o tamanho anterior: a 20 px o veado era um borrão.
+        tamMin: h * 0.052, tamMax: h * 0.068,
+        evitarX: ((mundo.jogador?.centroX ?? 0) - camera.viewX) * camera.zoom,
+        passo: 1100, percurso: 1600, periodo: 12, semente: conf.semente + 7,
+        dens: 0.9, passoPasto: 520, densPasto: 0.75,
+      });
+    }
+    desenharBando(ctx, {
+      x0: -60, x1: w + 60, dx: camera.viewX * 0.03,
+      y0: yH - h * 0.2, faixa: h * 0.12, t: tAnim, calma, dir: fuga,
+      cor: misturarHex(cor(tema, 'distante', 0.85, -0.3), tema.primeiroPlano, 0.55),
+      envergadura: h * 0.011,
+      passo: 1500, percurso: 2400, periodo: 9, semente: conf.semente + 11,
+      dens: 0.85, soCalma: !cc.bichos, passoCalmo: 700,
+    });
+  });
+}
+
+/**
  * A silhueta do horizonte. Chamar LOGO DEPOIS do céu e antes do parallax.
  */
 export function desenharHorizonte(render, sala, mundo) {
@@ -2159,7 +2336,64 @@ export function desenharHorizonte(render, sala, mundo) {
     // Fora da tela por completo: nada a fazer (salas altas, câmera lá em cima).
     if (yH < -200 || yH > h + 200) return;
 
+    const fogo = forcaFogo(sala.area, tema.pureza ?? 0);
+    const fumaca = forcaFumaca(sala.area, tema.pureza ?? 0);
+    const ch = chamaDe(sala.area);
+    const t = mundo.laco?.tempo ?? 0;
+    const tAnim = render.movimentoReduzido ? t * 0.33 : t;
+    const fuga = confCatastrofe(sala.area).fuga;
+
     for (let banda = 0; banda < 2; banda++) {
+      /* O INCÊNDIO NO HORIZONTE vive entre as duas bandas: o clarão e as
+         colunas nascem ATRÁS da banda distante (ela recorta a base delas), e
+         as chamas correm sobre a crista dela. A banda mais próxima, desenhada
+         depois, tapa um pedaço do fogo — e é esse recorte que diz "longe". */
+      if (banda === 0 && (fogo > 0.02 || fumaca > 0.03)) {
+        const amp0 = h * conf.alt;
+        const y00 = yH + h * 0.008;
+        const desl0 = camera.viewX * 0.018;
+        const s0 = conf.semente;
+        /* Clarão largo e QUENTE: o fogo tem que ser a luz principal do céu.
+           Com 0,2·h e o alfa de antes, em Raízes a faixa acima do fogo ficava
+           neutra (matiz 211°, saturação 0,05) — o fogo não iluminava nada. */
+        claraoDeFogo(ctx, 0, w, y00 - amp0 - h * 0.34, y00, ch, Math.min(1, fogo * 1.6));
+        if (fumaca > 0.03) {
+          const { baixa: baseBaixa, alta: base } = coresDeFumaca(
+            tema, cor(tema, 'distante', 0.9, -0.2), ch, fogo);
+          const passoC = 520;
+          const i0 = Math.floor((desl0 - 200) / passoC);
+          const i1 = Math.ceil((desl0 + w + 200) / passoC);
+          for (let i = i0; i <= i1; i++) {
+            const hc = hash2(i, s0, 17);
+            if (hc > 0.75) continue;
+            const xm = i * passoC + hc * passoC * 0.8;
+            const x = xm - desl0;
+            pluma(ctx, {
+              x, y: y00 - perfilHorizonte(xm, s0, amp0, conf.tipo) + 4,
+              // Colunas que SAEM pelo topo do quadro, largas lá em cima: a
+              // fumaça tem que ocupar o céu, não enfeitar o horizonte.
+              alt: h * lerp(0.75, 1.1, hash2(i, s0, 19)), larg: h * lerp(0.03, 0.05, hc),
+              t: tAnim, vel: 0.014, semente: i * 7 + s0,
+              deriva: fuga * 0.45,
+              corBaixa: baseBaixa, corAlta: base,
+              alfa: 0.5 * fumaca,
+            });
+          }
+        }
+      }
+      if (banda === 1 && fogo > 0.02) {
+        const amp0 = h * conf.alt;
+        const y00 = yH + h * 0.008;
+        const desl0 = camera.viewX * 0.018;
+        frenteDeFogo(ctx, {
+          x0: -12, x1: w + 12, dx: desl0, passo: 7,
+          yEm: (x) => y00 - perfilHorizonte(x + desl0, conf.semente, amp0, conf.tipo),
+          // ~3x a altura de antes: a 6 px efetivos o incêndio era um pavio.
+          escala: h * 0.036, t: tAnim, semente: conf.semente + 5, ch, inten: Math.min(1, fogo * 1.3),
+          inclina: fuga * 0.22, alfa: 0.92,
+        });
+      }
+
       const p = banda === 0 ? 0.018 : 0.045;
       const d = banda === 0 ? 0.97 : 0.86;
       const amp = h * conf.alt * (banda === 0 ? 1 : 1.45);
@@ -2209,12 +2443,22 @@ export function desenharHorizonte(render, sala, mundo) {
         ctx.closePath();
         // Dois galhos secos em V, só nos vultos mais altos: é o detalhe que
         // diz "árvore morta" a essa distância, e custa quatro linhas.
+        /* Restaurado, o vulto seco ganha copa: um tronco morto na linha do
+           horizonte limpo desmentia a restauração inteira. */
+        const copa = calmaDaFauna(tema.pureza ?? 0);
+        if (copa > 0.05 && conf.tipo !== 'brejo') {
+          const r = alt * lerp(0.2, 0.34, hx) * copa;
+          ctx.moveTo(x + r, base - alt);
+          ctx.ellipse(x, base - alt, r, r * 0.78, 0, 0, TAU);
+        }
         if (conf.tipo !== 'brejo' && hy > 0.55) {
           const gy = base - alt * 0.72;
           const gl = alt * 0.3;
+          // Sentido horário, igual à copa do estado restaurado: no sentido
+          // oposto a regra nonzero abria um corte claro atravessando a copa.
           ctx.moveTo(x, gy);
-          ctx.lineTo(x - gl, gy - gl * 0.75);
           ctx.lineTo(x - gl * 0.82, gy - gl * 0.55);
+          ctx.lineTo(x - gl, gy - gl * 0.75);
           ctx.closePath();
           ctx.moveTo(x, gy + alt * 0.1);
           ctx.lineTo(x + gl * 0.9, gy - gl * 0.55);
@@ -2224,5 +2468,6 @@ export function desenharHorizonte(render, sala, mundo) {
       }
       ctx.fill();
     }
+
   });
 }

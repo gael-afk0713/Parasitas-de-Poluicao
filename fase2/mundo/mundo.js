@@ -19,6 +19,7 @@ import { carregarSala, todasAsSalas, idsDeArea, PORTA_OPOSTA } from './salas.js'
 import { AREAS, resolver } from '../render/paleta.js';
 import { ArteTerreno } from '../render/terreno-arte.js';
 import { Decor } from '../render/decor.js';
+import { Fauna } from '../render/fauna.js';
 import { Jogador } from '../entidades/jogador.js';
 import { ArteJogador } from '../entidades/jogador-arte.js';
 import { FRAGMENTOS_POR_VIDA } from '../entidades/catalogo.js';
@@ -50,6 +51,7 @@ export class Mundo {
     this.sala = null;
     this.arteTerreno = null;
     this.decor = null;
+    this.fauna = null;
     this.entidades = [];
     this.particulas = [];
 
@@ -92,6 +94,7 @@ export class Mundo {
     this.sala = sala;
     this.arteTerreno = new ArteTerreno(sala.terreno, sala.def.semente ?? 7);
     this.decor = new Decor(sala.terreno, sala.area, sala.def.semente ?? 7);
+    this.fauna = new Fauna(sala.terreno, sala.area, sala.def.semente ?? 7);
     sala.visitada = true;
 
     if (!this.pureza.has(id)) this.pureza.set(id, 0);
@@ -339,8 +342,14 @@ export class Mundo {
   }
 
   /** Chamado fora do passo fixo — animação puramente visual. */
-  atualizarApresentacao(dtReal) {
+  atualizarApresentacao(dtReal, pausado = false) {
     this.arteJogador.atualizar(dtReal, this.jogador);
+    /* As aves reagem ao jogador, mas são apresentação: andam no tempo real,
+       não no passo fixo. E PARAM com a pausa, o mapa e a tela de abertura —
+       senão o pânico aleatório seguia sorteando com o jogo parado (em dois
+       minutos de pausa quase toda ave da sala suja fugia pra sempre) e a
+       carência de entrada passava inteira atrás da tela de abertura. */
+    if (this.sala && !pausado) this.fauna?.atualizar(dtReal, this.jogador, this._purezaExibida);
   }
 
   /**

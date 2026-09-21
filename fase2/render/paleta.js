@@ -252,15 +252,20 @@ export const AREAS = {
     restaurado: {
       // Mesma correção de escada e de valor da raiz — ver o comentário
       // longo em `raizes.restaurado`.
-      ceuTopo: '#1c2a16', ceuBase: '#cbbe83',
-      bruma: '#7f9257',
-      distante: '#26301a', medio: '#1b2412', proximo: '#12180b',
-      terreno: '#3a4820', terrenoFundo: '#080c05',
-      borda: '#080d04', crista: '#7fa855',
-      primeiroPlano: '#050703',
-      luz: '#e2d69a', luzAmbiente: '#243015',
-      particula: '#a8b878', acento: '#7ab84a',
-      densidadeBruma: 0.44, vinheta: 0.60, saturacao: 0.88, brilhoBloom: 0.60,
+      /* SAIU DO OLIVA. Medido na tela: a clareira limpa caía em matiz 73–77°,
+         exatamente o verde-oliva da VÁRZEA SUJA (75–78°) — a cor que o jogo
+         usa pra "tóxico". O alívio lia como névoa venenosa. Agora a bruma e
+         os planos vão pra 115–125° (verde de folha, não de lodo), a névoa
+         cede um pouco e o céu clareia: restaurar tem que ABRIR o ar. */
+      ceuTopo: '#14301f', ceuBase: '#d6d8a0',
+      bruma: '#6fa06e',
+      distante: '#1f3a24', medio: '#16301b', proximo: '#0e2012',
+      terreno: '#2e5428', terrenoFundo: '#06100a',
+      borda: '#050e07', crista: '#86c46a',
+      primeiroPlano: '#030804',
+      luz: '#e6e4a8', luzAmbiente: '#18351f',
+      particula: '#a8d894', acento: '#6fd07a',
+      densidadeBruma: 0.36, vinheta: 0.58, saturacao: 0.9, brilhoBloom: 0.64,
     },
   },
 
@@ -290,15 +295,18 @@ export const AREAS = {
       /* O dossel é a área mais alta e a mais aberta: restaurada, ela tem
          que ser a mais CLARA das cinco. Estava em `ceuBase` 70 contra 159 no
          poluído — ver o comentário longo em `raizes.restaurado`. */
-      ceuTopo: '#1a3018', ceuBase: '#e0d492',
-      bruma: '#9aad64',
-      distante: '#2a3c18', medio: '#1e2c11', proximo: '#141d0b',
-      terreno: '#33501e', terrenoFundo: '#070d04',
-      borda: '#060c04', crista: '#9cc861',
-      primeiroPlano: '#040802',
-      luz: '#f6ebae', luzAmbiente: '#22350f',
-      particula: '#d8dc90', acento: '#e0c040',
-      densidadeBruma: 0.48, vinheta: 0.50, saturacao: 0.95, brilhoBloom: 0.80,
+      /* Também saiu do oliva (79°) — mesmo motivo da clareira. O dourado
+         continua no `acento` e na luz, que são a identidade do Dossel Aceso;
+         o que mudou foi o ar entre as folhas, que era cor de lodo. */
+      ceuTopo: '#163319', ceuBase: '#e8e0a0',
+      bruma: '#86b870',
+      distante: '#24441f', medio: '#1a3417', proximo: '#11240f',
+      terreno: '#2e5a22', terrenoFundo: '#060e05',
+      borda: '#050c04', crista: '#a6d86a',
+      primeiroPlano: '#030802',
+      luz: '#f6ebae', luzAmbiente: '#1c3812',
+      particula: '#d8e6a0', acento: '#e8c848',
+      densidadeBruma: 0.38, vinheta: 0.50, saturacao: 0.95, brilhoBloom: 0.80,
     },
   },
 

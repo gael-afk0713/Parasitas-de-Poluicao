@@ -204,6 +204,27 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
 - **Contraste invertido entre herói e inimigo**: ele é claro sobre escuro,
   eles são buracos pretos com dois pontos de luz. Numa tela escura os dois
   continuam legíveis e nunca se confundem.
+- **A poluição é um EVENTO, não um estado** (`render/catastrofe.js`). Morto é
+  estático, e estático não dói: o fundo mostra a catástrofe ACONTECENDO —
+  horizonte queimando, fumaça iluminada por baixo, cinza caindo, brasas
+  subindo, manadas e bandos fugindo. Cada área é uma face dela (raízes: o fogo
+  acabou de passar; várzea: óleo e lixo; clareira: o incêndio está aqui;
+  dossel: desmatamento; coração: chama química e nenhum bicho). Regras:
+  - **Tudo é função da pureza, e a restauração roda o filme ao contrário.**
+    O fogo apaga primeiro (`forcaFogo`), a fumaça depois (`forcaFumaca`), e
+    só então os bichos param de fugir e voltam a pastar (`calmaDaFauna`).
+    Restaurar precisa trocar FORMA, não só cor: animal correndo → animal de
+    cabeça baixa, lixo → vitória-régia no mesmo lugar, toco → broto.
+  - **Silhueta só lê contra luz.** Bicho e ave vão na crista do HORIZONTE,
+    recortados contra a linha de fogo — o horizonte é o único lugar sempre na
+    altura do olho. Nas cristas do meio do fundo, em sala baixa, eles caíam
+    atrás das plataformas e não apareciam.
+  - **O fogo não usa o âmbar do Guardião.** A faixa dele continua sendo a
+    única coisa quente PERTO do jogador; o fogo é mais vermelho e fica longe.
+  - **Aves pousadas no espaço de jogo** (`render/fauna.js`) reagem ao
+    jogador: na sala suja são poucas, ariscas e não voltam; na limpa são
+    muitas, mansas e voltam. Quando a sala é restaurada com o jogador dentro,
+    as que faltavam CHEGAM voando.
 
 ### Princípios técnicos
 
