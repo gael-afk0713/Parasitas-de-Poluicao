@@ -18,7 +18,7 @@
    reage ao jogador, e é essa reação que faz o lugar parecer habitado.
    ========================================================================= */
 
-import { TAU, lerp, clamp01, hash2, misturarHex, rgba, damp } from '../core/mat.js';
+import { TAU, lerp, clamp01, hash2, misturarHex, rgba, damp, ruido1 } from '../core/mat.js';
 import {
   calmaDaFauna, confCatastrofe, desenharAnimal, forcaFogo, chamaDe,
 } from './catastrofe.js';
@@ -132,7 +132,10 @@ export class Fauna {
           if (terreno.em(cx, cy) !== VAZIO) continue;
           if (!terreno.solido(Math.floor((x - 26) / terreno.tile), Math.floor((y + 4) / terreno.tile))) continue;
           if (!terreno.solido(Math.floor((x + 26) / terreno.tile), Math.floor((y + 4) / terreno.tile))) continue;
-          const n = Math.abs(dx - (dMin + dMax) * 0.5) + dy * 1.5;
+          // No CHÃO do caminho do jogador, não no alto de um pilar: acima da
+          // entrada ninguém olha, e contra tronco escuro ninguém vê.
+          const n = Math.abs(dx - (dMin + dMax) * 0.5) + dy * 1.5
+            + (y < entrada.y - 40 ? 420 : 0);
           if (n < nota) { nota = n; melhor = { x, y }; }
         }
         percorrido += comp;
@@ -143,7 +146,8 @@ export class Fauna {
       ...melhor, especie, h: hash2(Math.round(melhor.x), 5, semente),
       // Olha pra onde o jogador entrou.
       dir: entrada.x > melhor.x ? 1 : -1,
-      deitado: 1, ergue: 0, iniciado: false,
+      ergue: 0, iniciado: false,
+      estado: 'caido', tl: 0,
     };
   }
 
@@ -214,15 +218,18 @@ export class Fauna {
     }
     const f = this.ferido;
     if (f) {
-      // Primeira vez: já no estado certo. Depois, se levanta devagar
-      // (restauração) — o jogador tem que VER o bicho se erguer.
-      const alvo = 1 - calma;
-      if (!f.iniciado) { f.deitado = alvo; f.iniciado = true; }
-      f.deitado = damp(f.deitado, alvo, 0.9, dt);
+      /* caído → levantando → de pé. Entrando numa sala já restaurada, o bicho
+         já está de pé. Restaurando com o jogador dentro, ele LEVANTA na frente
+         dele — é o momento que o par antes/depois existe pra mostrar. */
+      if (!f.iniciado) { f.estado = calma > 0.5 ? 'dePe' : 'caido'; f.iniciado = true; }
+      f.tl += dt;
+      if (f.estado === 'caido' && calma > 0.5) { f.estado = 'levantando'; f.tl = 0; }
+      if (f.estado === 'levantando' && f.tl > 2.6) { f.estado = 'dePe'; f.tl = 0; }
       const dx = jogador.centroX - f.x, dy = jogador.centroY - f.y;
       const perto = dx * dx + dy * dy < 170 * 170;
-      f.ergue = damp(f.ergue, perto && f.deitado > 0.5 ? 1 : 0, perto ? 0.5 : 1.2, dt);
-      if (perto && f.deitado > 0.5) f.dir = dx > 0 ? 1 : -1;
+      // Caído, ele só consegue erguer um pouco a cabeça quando alguém chega.
+      f.ergue = damp(f.ergue, perto && f.estado === 'caido' ? 1 : 0, perto ? 0.6 : 1.4, dt);
+      f.olhaPara = dx > 0 ? 1 : -1;
     }
     this._primeiro = false;
   }
@@ -267,43 +274,117 @@ export class Fauna {
     const f = this.ferido;
     const L = 64;
     const fogo = forcaFogo(this.area, tema.pureza ?? 0);
-    /* PELAGEM, não silhueta. Preto chapado funciona contra céu; no plano do
-       jogo o bicho fica na frente de TERRA escura e sumia — só o contorno
-       aparecia, e ele lia como tronco caído. Marrom-acinzentado tocado pela
-       luz da área: mais claro que o chão, bem mais escuro que o Guardião, e
-       longe do preto dos parasitas (ninguém confunde bicho com inimigo).
-       Na várzea, o óleo escurece a pelagem e o fio de luz é furta-cor. */
-    const oleado = this.area === 'varzea' ? f.deitado : 0;
-    const corpo = misturarHex(
-      misturarHex(misturarHex(tema.terreno, '#7a5a44', 0.55), tema.luz, 0.12),
-      '#15181a', 0.55 * oleado);
+    const oleado = this.area === 'varzea';
+    const pose = this._poseFerido(f, tempo);
+
+    /* PELAGEM, não silhueta: preto chapado sumia contra a terra escura do
+       plano de jogo e o bicho lia como tronco caído. Marrom-acinzentado
+       tocado pela luz da área — mais claro que o chão, bem mais escuro que o
+       Guardião, longe do preto dos parasitas. A capivara da várzea, caída, é
+       PRETA DE ÓLEO e brilha; o brilho vai sumindo conforme ela se levanta. */
+    const pelo = misturarHex(misturarHex(tema.terreno, '#7a5a44', 0.55), tema.luz, 0.12);
+    const oleo = oleado ? pose.sujo : 0;
+    const corpo = misturarHex(pelo, '#0e1012', 0.9 * oleo);
     let borda;
-    if (this.area === 'varzea' && f.deitado > 0.3) borda = rgba('#8fe8d8', 0.55 * f.deitado);
-    else if (fogo > 0.05) borda = rgba(chamaDe(this.area).meio, 0.5);
+    if (f.estado === 'dePe') borda = rgba(tema.luz, 0.6);            // luz dourada no dorso
+    else if (oleo > 0.3) borda = rgba('#f4f4f0', 0.4 * oleo);         // brilho molhado do óleo
+    else if (fogo > 0.05) borda = rgba(chamaDe(this.area).meio, 0.55); // lado do fogo
     else borda = rgba(tema.luz, 0.45);
+
     ctx.save();
+    // Poça furta-cor embaixo da capivara oleada.
+    if (oleo > 0.05) {
+      const g = ctx.createLinearGradient(f.x - L * 0.8, 0, f.x + L * 0.8, 0);
+      g.addColorStop(0, rgba('#ff4fd8', 0));
+      g.addColorStop(0.3, rgba('#ff4fd8', 0.32 * oleo));
+      g.addColorStop(0.55, rgba('#46e0d0', 0.32 * oleo));
+      g.addColorStop(0.8, rgba('#ffe45a', 0.28 * oleo));
+      g.addColorStop(1, rgba('#ffe45a', 0));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.ellipse(f.x, f.y + 2, L * 0.8, L * 0.1, 0, 0, TAU);
+      ctx.fill();
+    }
     // Sombra de contato: o corpo caído ENCOSTA no chão.
-    const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, L * 0.75);
-    g.addColorStop(0, rgba(tema.primeiroPlano, 0.45));
-    g.addColorStop(1, rgba(tema.primeiroPlano, 0));
-    ctx.fillStyle = g;
+    const gs = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, L * 0.75);
+    gs.addColorStop(0, rgba(tema.primeiroPlano, 0.45));
+    gs.addColorStop(1, rgba(tema.primeiroPlano, 0));
+    ctx.fillStyle = gs;
     ctx.beginPath();
     ctx.ellipse(f.x, f.y + 1, L * 0.75, L * 0.16, 0, 0, TAU);
     ctx.fill();
+
+    // Fio de fumaça saindo do pelo chamuscado — só enquanto está caído.
+    if (pose.sujo > 0.05 && !oleado) {
+      for (let i = 0; i < 4; i++) {
+        const u = ((tempo * 0.32 + i / 4) % 1);
+        const sx = f.x - f.dir * L * 0.25 + Math.sin(tempo * 1.1 + i * 2) * 5 * u;
+        const sy = f.y - L * 0.2 - u * L * 1.1;
+        ctx.fillStyle = rgba(tema.particula, 0.22 * (1 - u) * pose.sujo);
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2.5 + u * 9, 0, TAU);
+        ctx.fill();
+      }
+    }
+    // Cinza saindo do corpo enquanto ele se sacode.
+    if (pose.cinza > 0.02) {
+      ctx.fillStyle = rgba(misturarHex(tema.particula, '#a8988a', 0.5), 0.8 * pose.cinza);
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU + f.h * 9;
+        const r = L * (0.3 + (1 - pose.cinza) * 0.7);
+        ctx.beginPath();
+        ctx.arc(f.x + Math.cos(a) * r, f.y - L * 0.35 + Math.sin(a) * r * 0.5, 1.6, 0, TAU);
+        ctx.fill();
+      }
+    }
+
     ctx.translate(f.x, f.y + 1);
-    ctx.scale(f.dir * L, L);
+    ctx.scale(pose.dir * L, L);
     ctx.fillStyle = corpo;
     ctx.strokeStyle = corpo;
-    /* Cabeça MEIO ERGUIDA por padrão, caindo e voltando devagar: com a cabeça
-       apoiada no chão o bicho deitado virava uma placa escura — o que diz
-       "veado caído" é o pescoço de pé. O balanço lento é o cansaço. */
-    // O veado deitado se reconhece pelo PESCOÇO DE PÉ; os outros, pelo corpo.
-    const base = f.especie === 'veado' ? 0.86 : 0.72;
-    const cansaco = (base + 0.12 * Math.sin(tempo * 0.45 + f.h * 5)) * f.deitado;
-    desenharAnimal(ctx, f.especie, 0, 0, tempo, f.h, borda,
-      { deitado: f.deitado, ergue: Math.max(f.ergue, cansaco),
-        contorno: rgba(tema.primeiroPlano, 0.75) });
+    desenharAnimal(ctx, f.especie, 0, 0, tempo, f.h, borda, {
+      deitado: pose.deitado, deLado: pose.deLado, ergue: pose.ergue, sacode: pose.sacode,
+      peito: pose.peito, fuligem: pose.sujo * (oleado ? 0 : 1),
+      olho: rgba('#f6f2ea', 0.9), contorno: rgba(tema.primeiroPlano, 0.75),
+    });
     ctx.restore();
+  }
+
+  /**
+   * A pose do bicho em cada momento. Caído: de lado, respiração IRREGULAR —
+   * duas ou três arfadas e uma pausa longa; é a pausa que assusta. Levantando
+   * (2,6 s): rola pro peito e ergue a cabeça, apoia as patas, fica de pé, se
+   * sacode (a cinza sai do corpo), vira pro Guardião. De pé: alerta, olhando,
+   * e de tempos em tempos baixa a cabeça pra pastar.
+   */
+  _poseFerido(f, tempo) {
+    const suave = (a, b, t) => { const k = clamp01((t - a) / (b - a)); return k * k * (3 - 2 * k); };
+    if (f.estado === 'caido') {
+      const T = 4.6 + ruido1(tempo * 0.07 + f.h * 13, 5) * 2.4;
+      const u = ((tempo + f.h * 11) % T) / T;
+      const arfa = u < 0.45 ? Math.max(0, Math.sin((u / 0.45) * Math.PI * 3)) : 0;
+      return {
+        deitado: 1, deLado: 1 - f.ergue * 0.4, ergue: f.ergue * 0.45,
+        peito: 1 + arfa * 0.07, sacode: 0, sujo: 1, cinza: 0, dir: f.dir,
+      };
+    }
+    if (f.estado === 'levantando') {
+      const t = f.tl;
+      const deLado = 1 - suave(0, 0.6, t);
+      const deitado = 1 - suave(0.6, 1.5, t);
+      const agita = t > 1.5 && t < 1.95 ? (1 - (t - 1.5) / 0.45) : 0;
+      return {
+        deitado, deLado, ergue: suave(0.1, 0.7, t),
+        peito: 1, sacode: Math.sin(t * 46) * 0.035 * agita,
+        sujo: 1 - suave(1.5, 1.95, t), cinza: agita, dir: t > 1.95 ? f.olhaPara : f.dir,
+      };
+    }
+    // De pé: alterna olhar (cabeça alta) e pastar.
+    const olhando = (Math.sin(tempo * 0.38 + f.h * 7) + 1) * 0.5;
+    return {
+      deitado: 0, deLado: 0, ergue: suave(0.35, 0.65, olhando),
+      peito: 1, sacode: 0, sujo: 0, cinza: 0, dir: f.dir,
+    };
   }
 
   /** Pousada: corpo em gota, cabeça que bica o chão de vez em quando. */

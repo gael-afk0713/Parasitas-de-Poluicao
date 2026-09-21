@@ -905,7 +905,7 @@ const ESPECIES = {
     // Galope ESTICADO (amp alta, cabeça baixa à frente): com 0,95 e cabeça
     // erguida o veado lia como bicho trotando, não fugindo.
     freq: 2.1, amp: 1.2, salto: 0.13, cabecaFuga: 0.45, cabecaPasto: 2.0, pastoInclina: 0.16,
-    cabecaDeitado: 1.35,
+    cabecaDeitado: 1.35, cabecaLado: 1.3, olho: [0.22, -0.31],
   },
   capivara: {
     corpo: [[-0.52, -0.3], [-0.5, -0.43], [-0.38, -0.53], [-0.1, -0.57], [0.18, -0.56],
@@ -918,7 +918,7 @@ const ESPECIES = {
     quadris: [[0.26, -0.26], [-0.34, -0.26]],
     perna: [0.13, 0.13], grossura: [0.09, 0.06],
     freq: 2.6, amp: 0.85, salto: 0.06, cabecaFuga: 0.25, cabecaPasto: 0.9, pastoInclina: 0.06,
-    cabecaDeitado: 0.7,
+    cabecaDeitado: 0.7, cabecaLado: 0.95, olho: [0.17, -0.12],
   },
   /* Tamanduá-bandeira: lia como raposa. O que identifica o bicho são duas
      coisas e as duas faltavam — o FOCINHO tubular longo apontado pra baixo
@@ -936,7 +936,10 @@ const ESPECIES = {
     // luz, pintado antes, aparecia pela fresta como um fio piscando.
     cauda: [[-0.3, -0.32], [-0.5, -0.27], [-0.76, -0.24], [-0.98, -0.3],
       [-1.02, -0.46], [-0.86, -0.58], [-0.52, -0.6], [-0.3, -0.47]],
-    faixa: [[0.3, -0.56], [0.12, -0.58], [-0.12, -0.4], [-0.02, -0.36]],
+    /* A faixa do tamanduá é PRETA com borda BRANCA, na diagonal do ombro. Uma
+       elipse laranja ali lia como olho — o bicho virava peixe. */
+    faixa: [[0.32, -0.57], [0.16, -0.6], [-0.14, -0.39], [0.0, -0.35]],
+    faixaPreta: [[0.24, -0.58], [0.14, -0.59], [-0.1, -0.4], [-0.02, -0.37]],
     pivo: [0.34, -0.46],
     // Focinho RETO afinando — tubo, não tromba. Curvado pra baixo ele lia
     // como foice.
@@ -945,7 +948,7 @@ const ESPECIES = {
     quadris: [[0.22, -0.3], [-0.28, -0.3]],
     perna: [0.14, 0.15], grossura: [0.09, 0.06],
     freq: 1.3, amp: 0.6, salto: 0.02, cabecaFuga: 0.22, cabecaPasto: 0.8, pastoInclina: 0.04,
-    cabecaDeitado: 0.2,
+    cabecaDeitado: 0.2, cabecaLado: 0.22, olho: [0.16, -0.05],
   },
 };
 
@@ -978,23 +981,40 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
      (0..1): levanta a cabeça pra olhar alguém que chega perto. */
   const deitado = pose?.deitado ?? 0;
   const ergue = pose?.ergue ?? 0;
+  /* `pose.deLado` (0..1): caído DE LADO — pernas esticadas pra fora, cabeça
+     no chão com o pescoço estendido. Deitado sobre o peito, de cabeça
+     erguida, é a pose do bicho saudável descansando; de lado é a do bicho
+     que não aguenta mais. `pose.peito` substitui a respiração regular (quem
+     chama decide o ritmo — e as pausas). `pose.sacode`: deslocamento lateral
+     de quem se sacode pra tirar a cinza. */
+  const deLado = pose?.deLado ?? 0;
   // Suspensão: no galope o corpo inteiro sai do chão numa fase do ciclo.
   const salto = E.salto * Math.pow(Math.max(0, Math.sin(fase + 1.2)), 2) * galope;
   /* Pastando, o corpo INCLINA pra frente em volta do quadril de trás: só
      girar o pescoço não leva a boca ao chão (a cernelha fica alta demais),
      e o veado "pastando" lia como mesa com cabeça. */
-  const arfagem = Math.sin(fase) * 0.06 * galope + (1 - galope) * (E.pastoInclina ?? 0);
+  // Deitado não pasta: sem isso o bicho caído mergulhava o focinho no chão.
+  const arfagem = Math.sin(fase) * 0.06 * galope
+    + (1 - galope) * (1 - deitado) * (E.pastoInclina ?? 0);
   const yCorpo = -salto;
 
   ctx.save();
-  ctx.translate(0, yCorpo);
+  ctx.translate(pose?.sacode ?? 0, yCorpo);
+  // Onde fica o chão no espaço local do corpo (pra nenhuma pata atravessá-lo
+  // enquanto o bicho se deita ou levanta).
+  let chao = -yCorpo;
   if (deitado > 0) {
-    // Afunda até a barriga encostar no chão, e respira: o corpo inteiro sobe
-    // e desce devagar, sempre a partir do chão.
-    const perna = E.perna[0] + E.perna[1];
-    const resp = 1 + Math.sin(tempo * 1.7 + h * 9) * 0.035 * deitado;
-    ctx.translate(0, perna * 0.82 * deitado);
-    ctx.scale(1, resp);
+    /* Afunda até a BARRIGA encostar no chão, e respira: o corpo sobe e desce
+       sempre a partir da barriga. De lado ele ainda achata um pouco. A
+       escala é em volta da barriga, não da origem — em volta da origem o
+       achatamento afundava o bicho caído 10 px dentro do chão. */
+    const barriga = E.barriga ?? Math.max(...E.corpo.map((c) => c[1]));
+    const resp = pose?.peito ?? (1 + Math.sin(tempo * 1.7 + h * 9) * 0.035 * deitado);
+    const k = resp * (1 - 0.14 * deLado);
+    const esc = lerp(1, k, deitado), desce = (0.02 - barriga * k) * deitado;
+    ctx.translate(0, desce);
+    ctx.scale(1, esc);
+    chao = (chao - desce) / esc;
   }
   if (galope < 1) {
     const [qx, qy] = E.quadris[1];
@@ -1029,8 +1049,31 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
       th = lerp(th, frente ? 1.45 : 1.35, deitado);
       baixo = lerp(baixo, -1.5, deitado);
     }
-    const kx = hx + Math.sin(th) * q1, ky = hy + Math.cos(th) * q1;
-    const fx = kx + Math.sin(baixo) * q2, fy = ky + Math.cos(baixo) * q2;
+    // Em pé e parado, um joelho: perna reta de ponta a ponta lia como pé de
+    // mesa.
+    if (galope < 0.02 && deitado < 0.02) baixo += frente ? -0.14 : 0.18;
+    let kx = hx + Math.sin(th) * q1, ky = hy + Math.cos(th) * q1;
+    let fx = kx + Math.sin(baixo) * q2, fy = ky + Math.cos(baixo) * q2;
+    /* De lado: as patas ESTICADAS rentes ao chão — as da frente pra frente,
+       as de trás pra trás; o bicho vira um comprido estirado, a leitura de
+       "caído" que o deitado de peito não tinha. A transição interpola as
+       POSIÇÕES de joelho e casco, não os ângulos: girando o ângulo, a perna
+       de trás passava por "reta pra baixo" no meio do rolamento e atravessava
+       o chão. */
+    if (deLado > 0) {
+      const t2 = frente ? 1.36 : -1.3, b2 = frente ? 1.56 : -1.6;
+      const kx2 = hx + Math.sin(t2) * q1, ky2 = hy + Math.cos(t2) * q1;
+      kx = lerp(kx, kx2, deLado); ky = lerp(ky, ky2, deLado);
+      fx = lerp(fx, kx2 + Math.sin(b2) * q2, deLado);
+      fy = lerp(fy, ky2 + Math.cos(b2) * q2, deLado);
+    }
+    // No meio do deitar/levantar, os ângulos intermediários pediam uma perna
+    // mais comprida que a distância até o chão: o casco afundava. A perna
+    // encolhe na vertical e abre pro lado, como quem apoia o peso.
+    if (deitado > 0.02 && Math.max(fy, ky) > chao && chao > hy) {
+      const f = (chao - hy) / (Math.max(fy, ky) - hy);
+      ky = hy + (ky - hy) * f; fy = hy + (fy - hy) * f;
+    }
     ctx.lineWidth = E.grossura[0];
     ctx.beginPath(); ctx.moveTo(hx, hy); ctx.lineTo(kx, ky); ctx.stroke();
     ctx.lineWidth = E.grossura[1];
@@ -1051,6 +1094,7 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
   // Deitado, a cabeça descansa à frente, rente ao chão; erguer a devolve ao
   // alto (olhando), com um tremor fraco.
   rotCabeca = lerp(rotCabeca, E.cabecaDeitado ?? 1.2, deitado);
+  rotCabeca = lerp(rotCabeca, E.cabecaLado ?? 1.2, deLado);
   rotCabeca = lerp(rotCabeca, -0.15 + Math.sin(tempo * 7) * 0.03, ergue);
   contornoSuave(p, E.cabeca, E.pivo[0], E.pivo[1], rotCabeca);
   /* Contorno escuro: separa o bicho de um fundo de valor parecido (a pelagem
@@ -1081,14 +1125,36 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     ctx.fillStyle = fill;
   }
   ctx.fill(p);
+  const fill = ctx.fillStyle;
+  // Fuligem: o terço de trás do corpo escurecido — o bicho passou pelo fogo.
+  if (pose?.fuligem > 0.02) {
+    const g = ctx.createLinearGradient(-0.55, 0, 0.1, 0);
+    g.addColorStop(0, rgba('#0c0a09', 0.62 * pose.fuligem));
+    g.addColorStop(1, rgba('#0c0a09', 0));
+    ctx.fillStyle = g;
+    ctx.fill(p);
+    ctx.fillStyle = fill;
+  }
   if (E.faixa) {
-    const fill = ctx.fillStyle;
-    const f = new Path2D();
-    contornoSuave(f, E.faixa, 0, 0);
-    ctx.fillStyle = borda ?? misturarHex(fill, '#d8d0c0', 0.45);
-    ctx.globalAlpha *= 0.85;
-    ctx.fill(f);
-    ctx.globalAlpha /= 0.85;
+    const fb = new Path2D(), fp = new Path2D();
+    contornoSuave(fb, E.faixa, 0, 0);
+    contornoSuave(fp, E.faixaPreta, 0, 0);
+    ctx.fillStyle = misturarHex(typeof fill === 'string' ? fill : '#302820', '#ece6d8', 0.6);
+    ctx.fill(fb);
+    ctx.fillStyle = '#12100e';
+    ctx.fill(fp);
+    ctx.fillStyle = fill;
+  }
+  // Olho: um ponto claro gira junto com a cabeça. Sem ele a capivara caída
+  // lia como pedra.
+  if (pose?.olho && E.olho) {
+    const c = Math.cos(rotCabeca), sn = Math.sin(rotCabeca);
+    const ox = E.pivo[0] + E.olho[0] * c - E.olho[1] * sn;
+    const oy = E.pivo[1] + E.olho[0] * sn + E.olho[1] * c;
+    ctx.fillStyle = pose.olho;
+    ctx.beginPath();
+    ctx.arc(ox, oy, 0.028, 0, TAU);
+    ctx.fill();
     ctx.fillStyle = fill;
   }
 
