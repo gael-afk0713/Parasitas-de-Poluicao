@@ -313,7 +313,10 @@
        · flash de tela cheia — teto de 0.12
        · HUD: tremor ao perder máscara — desligado
        · HUD: pulso de invulnerabilidade a 26 Hz — vira esmaecido constante
-       · catástrofe (render/catastrofe.js): fogo, fumaça, manadas e bandos do
-         fundo e do horizonte — continuam na tela (são a informação de que o
-         lugar sofre), mas a 1/3 da velocidade (`render.movimentoReduzido`) */
+       · catástrofe (render/catastrofe.js): fogo (frentes, paredes de fogo,
+         árvores-tocha, tocos em brasa com fagulhas), fumaça e pirocúmulo,
+         o jorro de lodo e o vapor da fonte do Coração, manadas e bandos do
+         fundo e do horizonte, e o bicho exausto (respiração e o levantar) —
+         continuam na tela (são a informação de que o lugar sofre), mas a 1/3
+         da velocidade (`render.movimentoReduzido`) */
 }

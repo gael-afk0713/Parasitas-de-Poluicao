@@ -58,7 +58,7 @@ import { feixeLuz } from './renderizador.js';
 import {
   FORMAS_CATASTROFE, FORMAS_LUZ, confCatastrofe, forcaFogo, forcaFumaca,
   calmaDaFauna, chamaDe, frenteDeFogo, claraoDeFogo, pluma,
-  desenharManada, desenharBando, coresDeFumaca, fogueira, focoDeLuz,
+  desenharManada, desenharBando, coresDeFumaca, tocoEmBrasa, focoDeLuz, escoadouroNoHorizonte,
 } from './catastrofe.js';
 
 /* =========================================================================
@@ -1605,6 +1605,7 @@ const CAMADAS = {
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'organico', rel: 1.02, passo: 300, dens: 0.7, rMin: 100, rMax: 260, semente: 431 },
       { f: 'organico', rel: 1.2, passo: 280, dens: 0.7, rMin: 110, rMax: 270, semente: 433 },
+
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'troncosColossais', rel: 1.14, passo: 480, dens: 0.45,
@@ -1953,7 +1954,7 @@ export function desenharPrimeiroPlano(render, mundo) {
 }
 
 /**
- * Fogueiras na moldura de baixo — o FOGO PERTO. Com o fogo só no horizonte e
+ * Tocos em brasa na moldura de baixo — o FOGO PERTO. Com o fogo só no horizonte e
  * no meio do fundo, o incêndio era sempre uma coisa lá longe; aqui ele queima
  * na borda da tela, entre o jogador e a câmera. Obedecem à mesma máscara da
  * moldura: somem conforme se aproximam do Guardião, então nunca ficam na
@@ -1972,14 +1973,15 @@ function fogueirasDaFrente(ctx, tema, area, esq, vw, vh, yBase, refX, tempo, luz
     const alfa = opacidadeDeBorda(px - refX, vw);
     if (alfa < 0.04) continue;
     const larg = lerp(110, 170, hash2(x, 883, 3));
-    const alt = vh * lerp(0.2, 0.3, h) * fogo;
+    const alt = vh * lerp(0.16, 0.24, h);
     if (luz) {
       const g = lerp(1, 0.5, clamp01(tema.brilhoBloom ?? 0.4));
-      focoDeLuz(ctx, px, yBase - alt * 0.5, alt * 1.3, ch.meio, 0.5 * alfa * g * fogo);
+      focoDeLuz(ctx, px, yBase - alt * 0.45, alt * 1.1, ch.meio, 0.4 * alfa * g * fogo);
       continue;
     }
     ctx.globalAlpha = alfa;
-    fogueira(ctx, px, yBase, larg, alt, tempo, x, ch, alfa * clamp01(0.4 + fogo), tema.primeiroPlano);
+    tocoEmBrasa(ctx, px, yBase, larg, alt, tempo, x, ch, fogo, tema.primeiroPlano,
+      hash2(x, 887, 3) > 0.5 ? 1 : -1);
   }
 }
 
@@ -2381,7 +2383,9 @@ function desenharFaunaHorizonte(render, sala, mundo) {
         // ~1,7x o tamanho anterior: a 20 px o veado era um borrão.
         tamMin: h * 0.052, tamMax: h * 0.068,
         evitarX: ((mundo.jogador?.centroX ?? 0) - camera.viewX) * camera.zoom,
-        passo: 1100, percurso: 1600, periodo: 12, semente: conf.semente + 7,
+        // Uma manada por vez: com o passo menor que o percurso, duas manadas
+        // vizinhas cruzavam o mesmo trecho e empilhavam bicho sobre bicho.
+        passo: 2300, percurso: 1600, periodo: 12, semente: conf.semente + 7,
         dens: 0.9, passoPasto: 520, densPasto: 0.75,
       });
     }
@@ -2465,7 +2469,37 @@ export function desenharHorizonte(render, sala, mundo) {
               alfa: 0.5 * fumaca,
             });
           }
+          /* PIROCÚMULO. Várias colunas do mesmo tamanho liam como chaminés
+             de fábrica; incêndio grande tem UMA coluna que domina o céu —
+             larga, densa, a barriga acesa pelo fogo embaixo, tombando com o
+             vento pro lado da fuga. Fica do lado do fogo e quase não anda
+             com a câmera (é a coisa mais distante da cena). */
+          const uDom = fuga < 0 ? 0.8 : 0.2;
+          const meio = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
+          const xDom = uDom * w - (camera.viewX - meio) * 0.012;
+          pluma(ctx, {
+            x: xDom, y: y00 - perfilHorizonte(xDom + desl0, s0, amp0, conf.tipo) + 6,
+            alt: h * 1.2, larg: h * 0.07,
+            t: tAnim, vel: 0.009, semente: s0 + 999,
+            deriva: fuga * 0.55,
+            corBaixa: misturarHex(baseBaixa, ch.meio, 0.35 * fogo), corAlta: base,
+            alfa: Math.min(0.85, 0.72 * fumaca + 0.1),
+          });
         }
+      }
+      /* A FONTE do Coração: entre as duas bandas, do lado do fogo. A banda da
+         frente, pintada logo depois, cobre o pé do jorro. */
+      if (banda === 1 && sala.area === 'coracao') {
+        const meio = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
+        const xF = (fuga < 0 ? 0.74 : 0.26) * w - (camera.viewX - meio) * 0.03;
+        const yF = yH + h * 0.008 - perfilHorizonte(xF + camera.viewX * 0.018, conf.semente, h * conf.alt, conf.tipo);
+        escoadouroNoHorizonte(ctx, {
+          x: xF, yChao: yF + h * 0.03, esc: h / 720 * 0.62, lado: fuga < 0 ? -1 : 1,
+          t: tAnim, ch, vivo: clamp01(1 - (tema.pureza ?? 0) * 1.6),
+          calma: calmaDaFauna(tema.pureza ?? 0),
+          cor: cor(tema, 'distante', 0.93, -0.1), verde: misturarHex(cor(tema, 'distante', 0.93, -0.1), tema.acento, 0.45),
+          deriva: fuga * 0.5, semente: conf.semente + 41,
+        });
       }
       if (banda === 1 && fogo > 0.02) {
         const amp0 = h * conf.alt;
@@ -2476,7 +2510,7 @@ export function desenharHorizonte(render, sala, mundo) {
           yEm: (x) => y00 - perfilHorizonte(x + desl0, conf.semente, amp0, conf.tipo),
           // ~3x a altura de antes: a 6 px efetivos o incêndio era um pavio.
           escala: h * 0.042, t: tAnim, semente: conf.semente + 5, ch, inten: Math.min(1, fogo * 1.3),
-          inclina: fuga * 0.22, alfa: 0.92,
+          inclina: fuga * 0.22, alfa: 0.92, massa: 1,
           lateral: (x) => ladoDoFogo(x / w, fuga),
         });
       }

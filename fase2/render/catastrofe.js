@@ -163,8 +163,9 @@ function preencherFogo(ctx, pb, pm, pn, ch, alfa) {
 export function frenteDeFogo(ctx, o) {
   const passo = o.passo;
   const pb = new Path2D(), pm = new Path2D(), pn = new Path2D();
-  const brasa = new Path2D();
-  let emBrasa = false;
+  const brasa = new Path2D(), cinzaViva = new Path2D(), corpo = new Path2D();
+  let emBrasa = false, temCorpo = false;
+  let yMin = Infinity, yMax = -Infinity;
   /* `dx` separa onde se DESENHA de onde se SORTEIA: no horizonte o desenho é
      em coordenada de tela, mas a mancha de fogo precisa ficar presa ao mundo,
      senão o incêndio anda junto com a câmera. */
@@ -181,19 +182,49 @@ export function frenteDeFogo(ctx, o) {
        oposto ao da fuga. Espalhado igual pelo horizonte inteiro, qualquer
        direção de corrida levava a manada PRA DENTRO de alguma chama, e não
        havia lado seguro legível. */
-    const foco = clamp01((n - 0.42) / 0.34) * o.inten * (o.lateral ? o.lateral(x) : 1);
+    const lado = o.lateral ? o.lateral(x) : 1;
+    let foco = clamp01((n - 0.42) / 0.34) * o.inten * lado;
+    /* MASSA. Línguas soltas, todas do mesmo tamanho, liam como fileira de
+       velas — enfeite de borda, não incêndio. Em alguns trechos a frente vira
+       PAREDE: as línguas engrossam, sobem três vezes mais e se fundem num
+       corpo de fogo contínuo, com um miolo de luz por trás. É a escala que
+       diz "isto está consumindo a mata", e não "isto está aceso". */
+    const zona = o.massa
+      ? o.massa * clamp01((ruido1(xm * 0.0012 + o.t * 0.01, o.semente + 7) - 0.6) / 0.2) * o.inten * lado
+      : 0;
+    foco = Math.max(foco, zona);
     const yb = o.yEm(x);
-    // A linha de brasa corre por baixo de TODA mancha, viva ou morrendo.
-    if (n > 0.3 && o.inten > 0.02) {
+    /* Brasa: uma linha contínua por baixo das chamas VIVAS; onde o fogo já
+       passou, só pontos soltos. Contínua de ponta a ponta ela lia como cano
+       de lava correndo pelo morro. */
+    if (foco > 0.05) {
       if (!emBrasa) { brasa.moveTo(x, yb); emBrasa = true; } else brasa.lineTo(x, yb);
-    } else emBrasa = false;
+    } else {
+      emBrasa = false;
+      if (n > 0.3 && o.inten > 0.02 && hash2(xm | 0, o.semente, 29) < 0.3) {
+        cinzaViva.moveTo(x, yb);
+        cinzaViva.lineTo(x + passo * 0.5, o.yEm(x + passo * 0.5));
+      }
+    }
     if (foco < 0.05) continue;
     // Labareda: de vez em quando um trecho sobe três vezes mais alto.
     const lab = clamp01((ruido1(xm * 0.012 + o.t * 0.09, o.semente + 3) - 0.6) / 0.4);
+    // Dentro da parede, a altura ONDULA: cristas mais altas rolando ao longo
+    // dela. Sem isso a parede era um pente — todas as pontas no mesmo nível.
+    const onda = zona > 0.05 ? lerp(0.55, 1.45, ruido1(xm * 0.018 + o.t * 0.22, o.semente + 9)) : 1;
+    const sobe = Math.max(lab * lab, zona * 0.85 * onda);
     const fa = o.ch.forma?.alt ?? 1, fl = o.ch.forma?.larg ?? 1;
-    const alt = o.escala * lerp(0.35, 1.3, h) * (0.2 + 0.8 * foco) * (1 + 2.2 * lab * lab) * fa;
-    const larg = passo * lerp(1.2, 2.1, hash2(xm | 0, o.semente, 17)) * fl;
-    tufo(pb, pm, pn, x + (h - 0.5) * passo * 0.5, yb + 1, alt, larg, o.t, h, o.inclina);
+    const alt = o.escala * lerp(0.35, 1.3, h) * (0.2 + 0.8 * foco) * (1 + 2.2 * sobe) * fa;
+    const larg = passo * lerp(1.2, 2.1, hash2(xm | 0, o.semente, 17)) * fl * (1 + 0.6 * zona);
+    const xf = x + (h - 0.5) * passo * 0.5;
+    tufo(pb, pm, pn, xf, yb + 1, alt, larg, o.t, h, o.inclina);
+    if (zona > 0.08) {
+      // O corpo da parede: elipses baixas que se fundem num preenchimento só.
+      elipse(corpo, xf, yb - alt * 0.18, larg * 1.1, alt * 0.38 * zona + 2);
+      temCorpo = true;
+      if (yb < yMin) yMin = yb;
+      if (yb > yMax) yMax = yb;
+    }
   }
   ctx.save();
   ctx.lineCap = 'round';
@@ -208,39 +239,152 @@ export function frenteDeFogo(ctx, o) {
     ctx.stroke(brasa);
   }
   ctx.strokeStyle = rgba(o.ch.brasa, 0.55 * o.inten * o.alfa);
-  ctx.lineWidth = Math.max(1.2, o.escala * 0.16);
+  ctx.lineWidth = Math.max(1, o.escala * 0.09);
   ctx.stroke(brasa);
+  ctx.strokeStyle = rgba(o.ch.brasa, 0.4 * o.inten * o.alfa);
+  ctx.lineWidth = Math.max(0.8, o.escala * 0.06);
+  ctx.stroke(cinzaViva);
+  if (temCorpo) {
+    const g = ctx.createLinearGradient(0, yMax + 2, 0, yMin - o.escala * 2.4);
+    g.addColorStop(0, rgba(o.ch.meio, 0.75 * o.alfa));
+    g.addColorStop(0.45, rgba(o.ch.borda, 0.45 * o.alfa));
+    g.addColorStop(1, rgba(o.ch.borda, 0));
+    ctx.fillStyle = g;
+    ctx.fill(corpo);
+  }
   preencherFogo(ctx, pb, pm, pn, o.ch, o.alfa);
   ctx.restore();
 }
 
 /**
- * Fogueira: um monte de toras carbonizadas com fogo alto em cima. Usada na
- * moldura da frente — é o "fogo perto" que faltava nas áreas que queimam.
+ * Toco em brasa — o FOGO PERTO, na moldura da frente. Era uma fogueira (um
+ * monte de toras com labaredas altas) e lia como recorte colado na tela:
+ * fogo grande e chapado, bem na faixa do chão, onde o jogador procura
+ * perigo. Agora é o que sobra DEPOIS do fogo: um toco lascado e uma tora
+ * tombada, pretos, recortados contra o próprio clarão, com as rachas acesas
+ * por dentro e línguas baixas lambendo a borda. A luz conta o incêndio; a
+ * silhueta conta a perda.
+ *
+ * `vida` (0..1) é a força do fogo: a silhueta some junto com ele.
  */
-export function fogueira(ctx, x, yBase, largura, altura, t, semente, ch, alfa, corToras) {
-  const n = 5;
-  ctx.fillStyle = corToras;
-  ctx.beginPath();
-  ctx.moveTo(x - largura * 0.62, yBase + 10);
-  for (let i = 0; i <= n; i++) {
-    const u = i / n;
-    const hh = hash2(i, semente, 7);
-    ctx.lineTo(x + (u - 0.5) * largura * 1.1, yBase - largura * (0.12 + 0.2 * Math.sin(u * Math.PI)) * (0.8 + 0.4 * hh));
+export function tocoEmBrasa(ctx, x, yBase, larg, alt, t, semente, ch, vida, corSilhueta, dir) {
+  const h1 = hash2(semente, 3, 7), h2 = hash2(semente, 5, 7);
+  const a0 = ctx.globalAlpha;
+  const k = clamp01(vida * 5);
+  // 1 · o clarão atrás: é ele que recorta a silhueta.
+  const yc = yBase - alt * 0.4;
+  const R = larg * 1.5;
+  const g = ctx.createRadialGradient(x, yc, 0, x, yc, R);
+  g.addColorStop(0, rgba(ch.meio, 0.55 * vida));
+  g.addColorStop(0.45, rgba(ch.borda, 0.24 * vida));
+  g.addColorStop(1, rgba(ch.borda, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x - R, yc - R, R * 2, R * 2);
+
+  // 2 · a silhueta: toco de topo lascado e uma tora apoiada nele.
+  ctx.globalAlpha = a0 * k;
+  const r = larg * 0.2;
+  const topo = yBase - alt;
+  const toco = new Path2D();
+  toco.moveTo(x - r * 1.55, yBase + 14);
+  toco.quadraticCurveTo(x - r * 1.05, yBase - alt * 0.2, x - r, yBase - alt * 0.55);
+  toco.lineTo(x - r * 0.9, topo + alt * lerp(0.08, 0.2, h1));
+  toco.lineTo(x - r * 0.42, topo + alt * 0.24);
+  toco.lineTo(x - r * 0.12, topo);
+  toco.lineTo(x + r * 0.22, topo + alt * 0.18);
+  toco.lineTo(x + r * 0.6, topo + alt * lerp(0.06, 0.14, h2));
+  toco.lineTo(x + r * 0.95, topo + alt * 0.32);
+  toco.lineTo(x + r, yBase - alt * 0.55);
+  toco.quadraticCurveTo(x + r * 1.05, yBase - alt * 0.2, x + r * 1.65, yBase + 14);
+  toco.closePath();
+  // Tora: do chão, longe do toco, até encostar nele a um terço da altura.
+  const ax = x + dir * larg * lerp(0.95, 1.2, h2), ay = yBase + 8;
+  const bx = x + dir * r * 0.4, by = yBase - alt * lerp(0.3, 0.42, h1);
+  const cx = bx - ax, cy = by - ay, cl = Math.hypot(cx, cy);
+  const tr = r * 0.62;
+  const nx = (-cy / cl) * tr, ny = (cx / cl) * tr;
+  const tora = new Path2D();
+  tora.moveTo(ax + nx, ay + ny);
+  tora.lineTo(bx + nx * 0.8, by + ny * 0.8);
+  tora.lineTo(bx + cx / cl * tr * 0.5, by + cy / cl * tr * 0.5);
+  tora.lineTo(bx - nx * 0.8, by - ny * 0.8);
+  tora.lineTo(ax - nx, ay - ny);
+  tora.closePath();
+  // Contraluz: o contorno traçado ANTES do preenchimento sobra só do lado de
+  // fora — um fio quente em volta da madeira, que a solta do fundo escuro.
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = rgba(ch.meio, 0.45 * vida);
+  ctx.lineWidth = 3;
+  ctx.stroke(tora);
+  ctx.stroke(toco);
+  ctx.restore();
+  ctx.fillStyle = corSilhueta;
+  ctx.fill(tora);
+  ctx.fill(toco);
+
+  // 3 · rachas em brasa: o fogo por DENTRO da madeira, pulsando devagar.
+  /* Rachas SEGUEM O VEIO: duas no toco, na vertical, e duas na tora, ao
+     longo dela. Riscadas em qualquer direção e se cruzando, liam como fio
+     elétrico laranja pendurado na madeira. */
+  const rachas = new Path2D();
+  for (let i = 0; i < 2; i++) {
+    const hi = hash2(semente, i, 11);
+    let rx = x + (i === 0 ? -0.45 : 0.32) * r + (hi - 0.5) * r * 0.2;
+    const y0 = yBase - alt * lerp(0.1, 0.2, hi), y1 = yBase - alt * lerp(0.5, 0.7, hi);
+    rachas.moveTo(rx, y0);
+    for (let j = 1; j <= 5; j++) {
+      rx += (hash2(semente + j, i, 13) - 0.5) * r * 0.22;
+      rachas.lineTo(rx, lerp(y0, y1, j / 5));
+    }
   }
-  ctx.lineTo(x + largura * 0.62, yBase + 10);
-  ctx.closePath();
-  ctx.fill();
+  for (let i = 0; i < 2; i++) {
+    const u0 = 0.14 + i * 0.36 + hash2(semente, i, 19) * 0.08, u1 = u0 + 0.22;
+    const off = i ? -0.22 : 0.25;
+    rachas.moveTo(ax + cx * u0 + nx * off, ay + cy * u0 + ny * off);
+    rachas.lineTo(ax + cx * (u0 + u1) * 0.5 + nx * (off + 0.12), ay + cy * (u0 + u1) * 0.5 + ny * (off + 0.12));
+    rachas.lineTo(ax + cx * u1 + nx * off, ay + cy * u1 + ny * off);
+  }
+  const pulso = 0.65 + 0.35 * ruido1(t * 0.9 + h1 * 30, 83);
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = rgba(ch.borda, 0.5 * vida * pulso);
+  ctx.lineWidth = 4;
+  ctx.stroke(rachas);
+  ctx.strokeStyle = rgba(ch.brasa, 0.95 * vida * pulso);
+  ctx.lineWidth = 1.6;
+  ctx.stroke(rachas);
+  ctx.restore();
+
+  // 4 · línguas BAIXAS lambendo o topo lascado e o dorso da tora.
   const pb = new Path2D(), pm = new Path2D(), pn = new Path2D();
-  for (let i = 0; i < 6; i++) {
-    const hi = hash2(i, semente, 11);
-    const u = (i + 0.5) / 6;
-    const px = x + (u - 0.5) * largura * 0.9;
-    const topoMonte = yBase - largura * (0.12 + 0.2 * Math.sin(u * Math.PI));
-    const a = altura * lerp(0.45, 1, hi) * (0.55 + 0.45 * Math.sin(u * Math.PI));
-    tufo(pb, pm, pn, px, topoMonte + 4, a, largura * lerp(0.22, 0.34, hi), t, hi + semente * 0.01, 0.15);
+  const bocas = [[x - r * 0.42, topo + alt * 0.24], [x + r * 0.22, topo + alt * 0.18],
+    [x - r * 0.9, topo + alt * 0.16]];
+  for (let i = 0; i < bocas.length; i++) {
+    const hi = hash2(semente, i, 23);
+    tufo(pb, pm, pn, bocas[i][0], bocas[i][1] + 3, alt * lerp(0.16, 0.3, hi) * vida,
+      r * lerp(0.7, 1.05, hi), t, hi + i * 0.31, -dir * 0.12);
   }
-  preencherFogo(ctx, pb, pm, pn, ch, alfa);
+  for (let i = 0; i < 2; i++) {
+    const u = 0.35 + i * 0.3;
+    const hi = hash2(semente, i, 29);
+    tufo(pb, pm, pn, ax + cx * u - nx * 0.85, ay + cy * u - ny * 0.85 + 2,
+      alt * lerp(0.1, 0.18, hi) * vida, r * lerp(0.6, 0.9, hi), t, hi + 0.7 + i, -dir * 0.12);
+  }
+  preencherFogo(ctx, pb, pm, pn, ch, clamp01(0.4 + vida));
+
+  // 5 · fagulhas subindo.
+  ctx.fillStyle = rgba(ch.brasa, 0.9 * vida);
+  for (let i = 0; i < 7; i++) {
+    const hi = hash2(semente, i, 31);
+    const u = (t * lerp(0.18, 0.3, hi) + hi) % 1;
+    const fx = x + (hi - 0.5) * r * 1.6 + Math.sin(t * 1.3 + hi * 20) * 8 * u - dir * u * 30;
+    const fy = topo + alt * 0.2 - u * alt * 1.1;
+    ctx.globalAlpha = a0 * (1 - u);
+    ctx.fillRect(fx - 1, fy - 1, 2, 2);
+  }
+  ctx.globalAlpha = a0;
 }
 
 /** Poça de luz do fogo no chão e no ar em volta (passe emissivo ou cena). */
@@ -375,7 +519,7 @@ function incendio(ctx, a, s) {
   frenteDeFogo(ctx, {
     x0: a.x0, x1: a.x1, passo: s.passo ?? 14, yEm, escala: s.escala ?? 26,
     t: a.tempoAnim, semente: s.semente, ch: a.chama, inten: a.fogo,
-    inclina: a.inclinaFogo, alfa: s.alfa ?? 1, lateral: a.lateral,
+    inclina: a.inclinaFogo, alfa: s.alfa ?? 1, lateral: a.lateral, massa: s.massa ?? 1,
   });
 }
 
@@ -499,15 +643,29 @@ function arvoreEmChamas(ctx, a, s) {
     const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe) * a.lateral(tx);
     if (inten > 0.04) {
       algumFogo = true;
+      /* TOCHA. Com o fogo forte (lado do fogo, longe do Guardião) a árvore
+         queima INTEIRA: línguas subindo pelo tronco e a copa engolida. Um
+         tufinho na ponta de cada galho lia como vela de aniversário — era o
+         fogo decorando a árvore, não consumindo. */
+      const tocha = clamp01((inten - 0.4) / 0.35);
       for (let i = 0; i < pontas.length; i++) {
         const [ex, ey] = pontas[i];
         const hi = hash2((x | 0) + i * 13, s.semente, 19);
-        const n = i === 0 ? 3 : 2;
+        const n = (i === 0 ? 3 : 2) + (tocha > 0.5 ? 1 : 0);
         for (let j = 0; j < n; j++) {
           const hj = hash2((x | 0) + i * 13 + j, s.semente, 23);
-          tufo(pb, pm, pn, ex + (hj - 0.5) * r * 2.2, ey + r * 0.6,
-            r * lerp(3, 6, hj) * (i === 0 ? 1.5 : 1) * inten,
-            r * lerp(1.4, 2.2, hi), t, hj + hi, a.inclinaFogo);
+          tufo(pb, pm, pn, ex + (hj - 0.5) * r * (2.2 + 1.6 * tocha), ey + r * 0.6,
+            r * lerp(3, 6, hj) * (i === 0 ? 1.5 : 1) * inten * (1 + 0.7 * tocha),
+            r * lerp(1.4, 2.2, hi) * (1 + 0.5 * tocha), t, hj + hi, a.inclinaFogo);
+        }
+      }
+      if (tocha > 0.05) {
+        for (let k = 0; k < 4; k++) {
+          const hk = hash2((x | 0) + k * 5, s.semente, 37);
+          const kk = lerp(0.18, 0.8, (k + hk * 0.7) / 4);
+          const lado = k % 2 ? 1 : -1;
+          tufo(pb, pm, pn, lerp(px, tx, kk) + lado * r * 0.55, yb - alt * kk,
+            r * lerp(3.2, 5.5, hk) * tocha, r * lerp(1.5, 2.3, hk), t, hk + k * 0.37, a.inclinaFogo);
         }
       }
     }
@@ -559,9 +717,12 @@ function arvoreEmChamasLuz(ctx, a, s) {
     const longe = clamp01((Math.abs(tx - a.jogX) - 90) / 320);
     if (longe < 0.05) continue;
     ctx.globalAlpha = lerp(0.22, 1, longe);
-    const r = lerp(s.largMin ?? 6, s.largMax ?? 16, h2) * 4;
+    // A árvore-tocha acende um halo maior e mais baixo, que pega o tronco.
+    const inten = a.fogo * lerp(0.55, 1, h2) * lerp(0.22, 1, longe) * a.lateral(tx);
+    const tocha = clamp01((inten - 0.4) / 0.35);
+    const r = lerp(s.largMin ?? 6, s.largMax ?? 16, h2) * (4 + 3 * tocha);
     ctx.beginPath();
-    ctx.arc(tx, yb - alt, r, 0, TAU);
+    ctx.arc(tx, yb - alt * (1 - 0.2 * tocha), r, 0, TAU);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -906,6 +1067,7 @@ const ESPECIES = {
     // erguida o veado lia como bicho trotando, não fugindo.
     freq: 2.1, amp: 1.2, salto: 0.13, cabecaFuga: 0.45, cabecaPasto: 2.0, pastoInclina: 0.16,
     cabecaDeitado: 1.35, cabecaLado: 1.3, olho: [0.22, -0.31],
+    comp: 1.3,
   },
   capivara: {
     corpo: [[-0.52, -0.3], [-0.5, -0.43], [-0.38, -0.53], [-0.1, -0.57], [0.18, -0.56],
@@ -919,6 +1081,7 @@ const ESPECIES = {
     perna: [0.13, 0.13], grossura: [0.09, 0.06],
     freq: 2.6, amp: 0.85, salto: 0.06, cabecaFuga: 0.25, cabecaPasto: 0.9, pastoInclina: 0.06,
     cabecaDeitado: 0.7, cabecaLado: 0.95, olho: [0.17, -0.12],
+    comp: 1.2,
   },
   /* Tamanduá-bandeira: lia como raposa. O que identifica o bicho são duas
      coisas e as duas faltavam — o FOCINHO tubular longo apontado pra baixo
@@ -949,6 +1112,7 @@ const ESPECIES = {
     perna: [0.14, 0.15], grossura: [0.09, 0.06],
     freq: 1.3, amp: 0.6, salto: 0.02, cabecaFuga: 0.22, cabecaPasto: 0.8, pastoInclina: 0.04,
     cabecaDeitado: 0.2, cabecaLado: 0.22, olho: [0.16, -0.05],
+    comp: 2.0,
   },
 };
 
@@ -1218,11 +1382,18 @@ export function desenharManada(ctx, o) {
          entre eles é de quase um corpo, e o de trás corre um pouco mais
          abaixo (mais perto), o que separa as silhuetas. */
       const n = 3 + ((hash2(i, o.semente, 93) * 4) | 0);
+      /* O espaço entre um bicho e o próximo é medido em CORPOS da espécie:
+         o tamanduá, com a cauda-bandeira, tem quase o dobro do comprimento
+         do veado, e no mesmo espaçamento a fila deles virava uma lagarta. */
+      let atras = 0, compAnt = 0;
       for (let m = 0; m < n; m++) {
         const hm = hash2(i * 17 + m, o.semente, 97);
         const e = esp[(hm * esp.length) | 0];
         const L = lerp(o.tamMin, o.tamMax, hash2(m, i, o.semente)) * (e === 'capivara' ? 0.8 : 1);
-        const xm = lider - dir * (m * lerp(1.05, 1.45, hm) * L + hm * 0.3 * L);
+        const comp = (ESPECIES[e].comp ?? 1.3) * L;
+        if (m > 0) atras += (compAnt + comp) * 0.5 * lerp(1.12, 1.4, hm);
+        compAnt = comp;
+        const xm = lider - dir * atras;
         const px = xm - dx;
         if (px < o.x0 - 80 || px > o.x1 + 80) continue;
         const py = o.yEm(px) + (m % 2) * 0.1 * L;
@@ -1390,6 +1561,147 @@ function bando(ctx, a, s) {
     passo: s.passo, percurso: s.percurso, periodo: s.periodo, semente: s.semente,
     dens: s.dens, soCalma: s.soCalma, passoCalmo: s.passoCalmo,
   });
+}
+
+/* --- coração: a fonte ---------------------------------------------------- */
+
+/**
+ * Escoadouro — a FONTE. O Coração não queima de mata: queima de resto
+ * industrial. Um cano colossal brota da encosta lá longe e despeja um jorro
+ * de lodo químico aceso, e do pé dele sobe vapor ácido. É a única coisa
+ * feita por gente no Coração — e é o motivo de todo o resto do jogo.
+ *
+ * Mora no HORIZONTE (desenhado em coordenada de tela, entre as duas bandas
+ * de morro): é a única faixa que aparece em toda sala do Coração. Numa camada
+ * de parallax as massas da frente o escondiam em quase toda sala, e deitado
+ * mais perto, atravessando a tela na altura do olho, o cano lia como ponte.
+ * A banda de morro da frente, pintada depois, cobre o pé do jorro — ele cai
+ * ATRÁS do morro, e é isso que diz "longe".
+ *
+ * Restaurado, o jorro seca e o cano FICA: parado, tomado de musgo, com
+ * trepadeira pendurada. A cicatriz fica; a ferida fecha.
+ *
+ * @param {object} o  x, yChao (tela), esc, lado (±1, pra onde a boca olha),
+ *   t, cor (silhueta), ch (rampa da chama), vivo (0..1, o jorro), calma
+ *   (0..1, o musgo), verde, deriva, semente
+ */
+export function escoadouroNoHorizonte(ctx, o) {
+  const { x: px, yChao: yb, esc, lado, t, ch, vivo } = o;
+  const R = 40 * esc, H = 230 * esc, J = H * 0.3;
+  const yc = yb - H;
+  const xPoca = px + lado * (R * 0.2 + J);
+
+  // Vapor ácido subindo do pé do jorro — por TRÁS do cano.
+  if (vivo > 0.03) {
+    pluma(ctx, {
+      x: xPoca, y: yb, alt: H * 2.2, larg: R * 0.9,
+      t, vel: 0.03, semente: o.semente,
+      deriva: o.deriva,
+      // Vapor ácido: o verde que não pertence a este lugar.
+      corBaixa: misturarHex(ch.vapor ?? ch.meio, o.cor, 0.3),
+      corAlta: misturarHex(o.cor, ch.vapor ?? ch.meio, 0.3),
+      alfa: 0.6 * vivo,
+    });
+  }
+
+  /* Cano, no referencial dele: boca na origem, corpo indo pra trás e pra
+     baixo até entrar no chão. Diagonal, brotando da encosta. */
+  const run = 380 * esc;
+  const ang = Math.atan2(H, run);
+  const comp = Math.hypot(H, run) + 80 * esc;
+  const corCano = ajustarBrilho(o.cor, -0.08);
+  ctx.save();
+  ctx.translate(px, yc);
+  ctx.scale(lado, 1);
+  ctx.rotate(-ang);
+  const cano = new Path2D();
+  cano.rect(-comp, -R, comp, R * 2);
+  for (let k = 1; k <= 3; k++) cano.rect(-k * 110 * esc - 6 * esc, -R * 1.14, 12 * esc, R * 2.28);
+  cano.rect(-16 * esc, -R * 1.2, 16 * esc, R * 2.4);
+  ctx.fillStyle = corCano;
+  ctx.fill(cano);
+  // VOLUME: faixa clara em cima, escura embaixo — sem isso, chapa.
+  ctx.fillStyle = rgba(ajustarBrilho(corCano, 0.12), 0.9);
+  ctx.fillRect(-comp, -R * 0.78, comp, R * 0.3);
+  ctx.fillStyle = rgba(ajustarBrilho(corCano, -0.2), 0.9);
+  ctx.fillRect(-comp, R * 0.45, comp, R * 0.55);
+  // Luz de baixo: o lodo aceso ilumina a barriga do cano perto da boca.
+  if (vivo > 0.03) {
+    const gl = ctx.createLinearGradient(0, R, 0, -R * 0.2);
+    gl.addColorStop(0, rgba(ch.meio, 0.55 * vivo));
+    gl.addColorStop(1, rgba(ch.meio, 0));
+    ctx.fillStyle = gl;
+    ctx.fillRect(-260 * esc, -R * 0.2, 260 * esc, R * 1.25);
+  }
+  // Boca: o escuro de dentro.
+  ctx.fillStyle = ajustarBrilho(o.cor, -0.5);
+  ctx.beginPath();
+  elipse(ctx, 0, 0, R * 0.3, R * 0.86);
+  ctx.fill();
+  // Restaurado: musgo no dorso e trepadeira pendurada.
+  if (o.calma > 0.02) {
+    const musgo = new Path2D(), cipo = new Path2D();
+    for (let k = 0; k < 12; k++) {
+      const hk = hash2(k, o.semente, 81);
+      const mx = -(24 + k * 30) * esc;
+      const rr = R * lerp(0.18, 0.34, hk) * o.calma;
+      elipse(musgo, mx, -R + rr * 0.2, rr * 1.6, rr);
+      if (hk > 0.55) {
+        cipo.moveTo(mx, R * 0.6);
+        cipo.lineTo(mx + 2 * esc, R + R * lerp(0.3, 1.1, hk) * o.calma);
+      }
+    }
+    ctx.fillStyle = rgba(o.verde, o.calma);
+    ctx.fill(musgo);
+    ctx.strokeStyle = rgba(o.verde, 0.85 * o.calma);
+    ctx.lineWidth = Math.max(1.2, 2.2 * esc);
+    ctx.lineCap = 'round';
+    ctx.stroke(cipo);
+  }
+  ctx.restore();
+
+  if (vivo < 0.03) return;
+  // Jorro: parábola da boca até o chão, mais largo em cima.
+  const N = 14;
+  const borda = [];
+  for (let i = 0; i <= N; i++) {
+    const u = i / N;
+    const w = R * lerp(1.1, 0.75, u) * (1 + 0.06 * Math.sin(u * 9 - t * 7)) * 0.5;
+    borda.push([px + lado * (R * 0.2 + J * Math.sqrt(u)), lerp(yc + R * 0.15, yb + 6, u), w]);
+  }
+  // Desce pela borda da direita e sobe pela da esquerda: sentido horário.
+  const pj = new Path2D();
+  pj.moveTo(borda[0][0] + borda[0][2], borda[0][1]);
+  for (const [cx, cy, w] of borda) pj.lineTo(cx + w, cy);
+  for (let i = N; i >= 0; i--) pj.lineTo(borda[i][0] - borda[i][2], borda[i][1]);
+  pj.closePath();
+  // Halo do jorro (no lugar do bloom, que o horizonte não tem).
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = rgba(ch.meio, 0.22 * vivo);
+  ctx.lineWidth = R * 0.9;
+  ctx.stroke(pj);
+  ctx.restore();
+  const gj = ctx.createLinearGradient(0, yc, 0, yb);
+  gj.addColorStop(0, rgba(ch.nucleo, 0.95 * vivo));
+  gj.addColorStop(0.35, rgba(ch.meio, 0.92 * vivo));
+  gj.addColorStop(1, rgba(ch.borda, 0.85 * vivo));
+  ctx.fillStyle = gj;
+  ctx.fill(pj);
+  // O lodo ESCORRE: filetes claros descendo pelo jorro. Gotas redondas em
+  // fila liam como botões de casaco.
+  ctx.fillStyle = rgba(ch.nucleo, 0.42 * vivo);
+  for (let i = 0; i < 9; i++) {
+    const hi = hash2(i, o.semente, 77);
+    const u = ((i / 9) + t * lerp(0.45, 0.7, hi)) % 1;
+    const cx = px + lado * (R * 0.2 + J * Math.sqrt(u));
+    const cy = lerp(yc + R * 0.15, yb, u);
+    ctx.beginPath();
+    elipse(ctx, cx + (hi - 0.5) * R * 0.6, cy, R * lerp(0.05, 0.09, hi), R * lerp(0.3, 0.55, hi));
+    ctx.fill();
+  }
+  // Clarão no pé: o lodo acende o morro por trás.
+  focoDeLuz(ctx, xPoca, yb, R * 3.2, ch.meio, 0.5 * vivo);
 }
 
 /* =========================================================================
