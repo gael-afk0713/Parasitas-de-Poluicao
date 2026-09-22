@@ -2192,26 +2192,32 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
   const x0 = Math.floor((esq - passo) / passo) * passo;
   /* Canos: um COLETOR horizontal no alto, de onde eles descem. Soltos, sem
      nada que os segurasse, liam como pistões caindo do céu. */
+  /* Baixo o bastante pra não ser confundido com a borda da tela (colado no
+     topo ele lia como tarja de cinema ou HUD), grosso, com flanges redondas
+     e um terço puxado pra fumaça. */
+  const yColetor = yTopo + 30;
   if (tipo === 'cano') {
+    ctx.save();
     ctx.globalAlpha = 1;
-    ctx.fillRect(esq - 20, yTopo - 30, vw + 40, 46);
+    ctx.fillStyle = misturarHex(tema.primeiroPlano, tema.bruma, 0.3);
+    ctx.fillRect(esq - 20, yColetor, vw + 40, 26);
     const passoF = 150;
     for (let fx = Math.floor(esq / passoF) * passoF; fx <= esq + vw + passoF; fx += passoF) {
-      ctx.fillRect(fx - 5, yTopo - 30, 10, 52);
+      ctx.beginPath();
+      ctx.ellipse(fx, yColetor + 13, 6, 17, 0, 0, TAU);
+      ctx.fill();
     }
-    // A barriga do coletor pega a luz do fogo: é o fio que o faz ler como
-    // CANO, e não como uma tarja preta no alto da tela.
+    // A barriga do coletor pega a luz do fogo.
     const fogoC = forcaFogo(areaAtual, tema.pureza ?? 0);
     if (fogoC > 0.05) {
-      ctx.save();
-      ctx.strokeStyle = rgba(chamaDe(areaAtual).meio, 0.45 * fogoC);
+      ctx.strokeStyle = rgba(chamaDe(areaAtual).meio, 0.5 * fogoC);
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(esq - 20, yTopo + 15.5);
-      ctx.lineTo(esq + vw + 20, yTopo + 15.5);
+      ctx.moveTo(esq - 20, yColetor + 25.5);
+      ctx.lineTo(esq + vw + 20, yColetor + 25.5);
       ctx.stroke();
-      ctx.restore();
     }
+    ctx.restore();
   }
   for (let x = x0; x <= esq + vw + passo; x += passo) {
     const h = hash2(x, 907, 9);
@@ -2260,7 +2266,9 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
            aquilo descesse nele. Agora: colarinhos finos ao longo do corpo, uma
            boca só um pouco mais larga, e o que um cano de fábrica faz de
            verdade: PINGA. Restaurado, a trepadeira toma conta. */
-        ctx.fillRect(px - d * 0.5, yTopo - 30, d, comp + 30);
+        // Desce do coletor, com um colarinho largo na emenda.
+        ctx.fillRect(px - d * 0.5, yTopo + 30, d, comp - 30);
+        ctx.fillRect(px - d * 0.7, yTopo + 50, d * 1.4, Math.max(4, d * 0.25));
         for (let k = 1; k <= 2; k++) {
           ctx.fillRect(px - d * 0.62, yTopo + comp * (k / 3), d * 1.24, Math.max(3, d * 0.2));
         }
@@ -2306,10 +2314,10 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
           for (let fio = 0; fio < 2; fio++) {
             ctx.beginPath();
             let fase = h * 7 + fio * 2.1;
-            for (let yy = yTopo - 30; yy <= yTopo + comp; yy += 6) {
+            for (let yy = yTopo + 40; yy <= yTopo + comp; yy += 6) {
               fase += lerp(0.35, 0.8, hash2(Math.round(yy), x + fio, 943)) * 0.5;
               const xx = px + Math.sin(fase) * d * 0.55;
-              yy === yTopo - 30 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
+              yy === yTopo + 40 ? ctx.moveTo(xx, yy) : ctx.lineTo(xx, yy);
             }
             ctx.stroke();
           }
@@ -2344,7 +2352,7 @@ function desenharMolduraTopo(ctx, tipo, esq, vw, vh, yTopo, refX, tempo, tema) {
           ctx.save();
           ctx.strokeStyle = rgba(chC.meio, 0.4 * fogoAqui);
           ctx.lineWidth = 1.5;
-          ctx.strokeRect(px - d * 0.5, yTopo - 30, d, comp - d * 0.28 + 30);
+          ctx.strokeRect(px - d * 0.5, yTopo + 56, d, comp - d * 0.28 - 56);
           ctx.strokeRect(px - d * 0.6, yTopo + comp - d * 0.28, d * 1.2, d * 0.28);
           ctx.restore();
         }
@@ -2525,8 +2533,10 @@ export function desenharHorizonte(render, sala, mundo) {
        químico bastam.) */
     if (fumaca > 0.05 && sala.area !== 'coracao') {
       const meioS = ((sala.largura ?? w) - w / camera.zoom) * 0.5;
-      const xs = (fuga < 0 ? 0.3 : 0.7) * w - (camera.viewX - meioS) * 0.008;
-      const ys = yH - h * 0.27;
+      // Alto e perto do canto: no meio do céu ele encostava nos canos e
+      // troncos e virava gota de lava pendurada.
+      const xs = (fuga < 0 ? 0.18 : 0.82) * w - (camera.viewX - meioS) * 0.008;
+      const ys = yH - h * 0.34;
       const rs = h * 0.062;
       const al = 0.82 * clamp01((fumaca - 0.05) / 0.4);
       ctx.save();
@@ -2548,7 +2558,7 @@ export function desenharHorizonte(render, sala, mundo) {
         ctx.save();
         ctx.translate(xs + Math.sin(tAnim * 0.05 + dy * 9) * rs * 0.4, ys + rs * dy);
         ctx.rotate(ang);
-        for (const [k, a2] of [[1.8, 0.25], [1, 0.5]]) {
+        for (const [k, a2] of [[1.8, 0.35], [1, 0.6]]) {
           ctx.fillStyle = rgba(corFaixa, a2 * al);
           ctx.beginPath();
           ctx.ellipse(0, 0, rs * 4.5, rs * esp * k, 0, 0, TAU);
@@ -2556,6 +2566,14 @@ export function desenharHorizonte(render, sala, mundo) {
         }
         ctx.restore();
       }
+      /* Por dentro do disco a faixa tem que ficar MAIS fraca que fora (é
+         fumaça na frente de uma luz): um pouco do vermelho volta por cima. */
+      ctx.beginPath();
+      ctx.arc(xs, ys, rs, 0, TAU);
+      ctx.clip();
+      ctx.fillStyle = gsol;
+      ctx.globalAlpha = 0.45;
+      ctx.fillRect(xs - rs, ys - rs, rs * 2, rs * 2);
       ctx.restore();
     }
 
@@ -2698,21 +2716,51 @@ export function desenharHorizonte(render, sala, mundo) {
         corte1 = (fuga > 0 ? 0.44 : 0.9) * w + dC;
         const perfilC = (x) => y0 - perfilHorizonte(x + desl, s, amp, conf.tipo);
         const tocosC = new Path2D(), cortes = new Path2D();
-        for (let x = corte0; x <= corte1; x += 13) {
-          const hx = hash2(Math.round(x - dC), 853, 5);
-          if (hx > 0.8) continue;
-          const tx = x + hx * 8;
+        /* Tocos IRREGULARES: com altura, largura e espaço iguais a fileira
+           lia como paliçada ou ameia de castelo. Alguns tortos, toras
+           deitadas entre eles, e uma faixa de terra nua embaixo. */
+        const terra = new Path2D();
+        terra.moveTo(corte0, perfilC(corte0) + 3);
+        for (let x = corte0; x <= corte1; x += 10) terra.lineTo(x, perfilC(x) - 1);
+        terra.lineTo(corte1, perfilC(corte1) + 6);
+        for (let x = corte1; x >= corte0; x -= 10) terra.lineTo(x, perfilC(x) + 6);
+        terra.closePath();
+        ctx.save();
+        ctx.fillStyle = misturarHex(cor(tema, 'distante', d, -0.14), '#8a6a4a', 0.35);
+        ctx.globalAlpha = corte;
+        ctx.fill(terra);
+        ctx.restore();
+        const toras = new Path2D();
+        let x = corte0;
+        let n = 0;
+        while (x <= corte1) {
+          n++;
+          const hx = hash2(n, 853, 5), hy = hash2(n, 857, 5);
+          const tx = x;
+          x += 13 * lerp(0.6, 1.4, hx);
           const tb = perfilC(tx) + 2;
-          const ta = h * lerp(0.013, 0.026, hx);
-          const tl = h * lerp(0.005, 0.009, hx);
+          if (hy < 0.14) {
+            // Tora deitada no chão.
+            const cl = h * lerp(0.03, 0.05, hx), ct = h * 0.006;
+            toras.moveTo(tx - cl, tb - ct * 2);
+            toras.lineTo(tx + cl, tb - ct * 2.4);
+            toras.lineTo(tx + cl, tb);
+            toras.lineTo(tx - cl, tb);
+            toras.closePath();
+            continue;
+          }
+          const ta = h * lerp(0.008, 0.022, hy);
+          const tl = h * lerp(0.004, 0.009, hx);
+          const inc = (hash2(n, 859, 5) - 0.5) * tl * 1.4;
           tocosC.moveTo(tx - tl * 1.3, tb);
-          tocosC.lineTo(tx - tl, tb - ta);
-          tocosC.lineTo(tx + tl, tb - ta);
+          tocosC.lineTo(tx - tl + inc, tb - ta);
+          tocosC.lineTo(tx + tl + inc, tb - ta + inc * 0.3);
           tocosC.lineTo(tx + tl * 1.3, tb);
           tocosC.closePath();
-          cortes.moveTo(tx + tl, tb - ta);
-          cortes.ellipse(tx, tb - ta, tl, tl * 0.4, 0, 0, TAU);
+          cortes.moveTo(tx + tl + inc, tb - ta);
+          cortes.ellipse(tx + inc, tb - ta, tl, tl * 0.4, inc * 0.05, 0, TAU);
         }
+        tocosC.addPath(toras);
         ctx.save();
         ctx.globalAlpha = corte;
         ctx.fill(tocosC);
@@ -2777,18 +2825,21 @@ export function desenharHorizonte(render, sala, mundo) {
           ctx.ellipse(x, base - alt, r, r * 0.78, 0, 0, TAU);
         }
         if (conf.tipo !== 'brejo' && hy > 0.55) {
-          const gy = base - alt * 0.72;
+          /* Três galhos ASSIMÉTRICOS em alturas diferentes. Dois galhos iguais
+             em V liam como turbina eólica — exatamente o símbolo errado numa
+             cena de desmatamento. */
           const gl = alt * 0.3;
-          // Sentido horário, igual à copa do estado restaurado: no sentido
-          // oposto a regra nonzero abria um corte claro atravessando a copa.
-          ctx.moveTo(x, gy);
-          ctx.lineTo(x - gl * 0.82, gy - gl * 0.55);
-          ctx.lineTo(x - gl, gy - gl * 0.75);
-          ctx.closePath();
-          ctx.moveTo(x, gy + alt * 0.1);
-          ctx.lineTo(x + gl * 0.9, gy - gl * 0.55);
-          ctx.lineTo(x + gl * 0.74, gy - gl * 0.36);
-          ctx.closePath();
+          const lado = hx > 0.5 ? 1 : -1;
+          const galho = (gy, sx, comp, sobe) => {
+            // Sentido horário, igual à copa do estado restaurado.
+            ctx.moveTo(x, gy);
+            ctx.lineTo(x + sx * comp * 0.82, gy - comp * sobe);
+            ctx.lineTo(x + sx * comp, gy - comp * (sobe + 0.2));
+            ctx.closePath();
+          };
+          galho(base - alt * 0.7, -lado, gl * 1.05, 0.55);
+          galho(base - alt * 0.52, lado, gl * 0.55, 0.3);
+          galho(base - alt * 0.86, lado, gl * 0.4, 0.7);
         }
       }
       ctx.fill();

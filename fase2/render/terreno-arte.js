@@ -646,6 +646,10 @@ export class ArteTerreno {
     for (let i = i0; i <= i1; i++) {
       const h = hash2(i, this.semente, 47);
       if (h > 0.55) continue;
+      // Em GRUPOS, com vãos: uma fileira regular na linha d'água lia como
+      // esteira de fábrica. (A vitória-régia ocupa as mesmas vagas: em
+      // touceira ela também fica mais natural.)
+      if (ruido1(i * 0.45, this.semente + 5) < 0.4) continue;
       const h2 = hash2(i, this.semente + 1, 49);
       const px = i * passo + (h2 - 0.5) * passo * 0.6;
       if (px < x0 + 8 || px > x1 - 8) continue;
@@ -668,9 +672,11 @@ export class ArteTerreno {
           peixes.moveTo(...q[0]); for (let k = 1; k < q.length; k++) peixes.lineTo(...q[k]); peixes.closePath();
           const b = [P(-8, -2.4), P(-5, -4.3), P(2, -4.8), P(6, -3.4)];
           barrigas.moveTo(...b[0]); for (let k = 1; k < 4; k++) barrigas.lineTo(...b[k]); barrigas.closePath();
+          // Olho: um ponto pálido e opaco. O "X" de desenho animado virava
+          // piada no meio da cena mais triste da várzea.
           const ox = P(-6.5, -1.6);
-          olhos.moveTo(ox[0] - 1.6, ox[1] - 1.6); olhos.lineTo(ox[0] + 1.6, ox[1] + 1.6);
-          olhos.moveTo(ox[0] + 1.6, ox[1] - 1.6); olhos.lineTo(ox[0] - 1.6, ox[1] + 1.6);
+          olhos.moveTo(ox[0] + 1.3, ox[1]);
+          olhos.arc(ox[0], ox[1], 1.3, 0, TAU);
         } else if (h3 < 0.3) {
           /* Tambor meio afundado, de pé: corpo enferrujado, dois AROS escuros
              e um escorrido preto descendo da borda. A faixa amarela de antes
@@ -694,11 +700,17 @@ export class ArteTerreno {
           const q = [P(-4, 0), P(-4.5, -6), P(4, -7), P(4.5, 0)];
           lixo.moveTo(...q[0]); for (let k = 1; k < 4; k++) lixo.lineTo(...q[k]); lixo.closePath();
         } else {
-          // Sacola: bolha pálida, meio murcha.
+          /* Sacola AMASSADA: contorno irregular de 7 pontas e translúcida. A
+             bolha lisa e opaca de antes lia como ovo ou lua nascendo — e era a
+             coisa mais clara perto do Guardião. */
           const inf = (0.85 + 0.2 * Math.sin(tempo * 2.1 + h * 17)) * E;
           sacolas.moveTo(px - 7 * E, py);
-          sacolas.quadraticCurveTo(px - 8 * inf, py - 7 * inf, px - 1, py - 8 * inf);
-          sacolas.quadraticCurveTo(px + 8 * inf, py - 6 * inf, px + 7 * E, py);
+          for (let k = 1; k < 7; k++) {
+            const a = Math.PI * (1 - k / 7);
+            const rr = lerp(0.6, 1.15, hash2(i, k, 59));
+            sacolas.lineTo(px + Math.cos(a) * 7.5 * inf * rr, py - Math.sin(a) * 6.5 * inf * rr);
+          }
+          sacolas.lineTo(px + 7 * E, py);
           sacolas.closePath();
         }
       }
@@ -724,15 +736,26 @@ export class ArteTerreno {
       ctx.globalAlpha = sujo;
       ctx.fillStyle = misturarHex(tema.terreno, tema.borda, 0.35); ctx.fill(lixo);
       ctx.fillStyle = misturarHex(tema.terreno, '#d8dccf', 0.45); ctx.fill(rotulos);
-      ctx.fillStyle = rgba(misturarHex(tema.bruma, '#f2efe6', 0.55), 0.85); ctx.fill(sacolas);
+      ctx.fillStyle = rgba(misturarHex(tema.bruma, '#f2efe6', 0.4), 0.3); ctx.fill(sacolas);
       ctx.fillStyle = misturarHex(tema.terreno, '#7a3a1a', 0.5); ctx.fill(tambores);
       ctx.fillStyle = misturarHex(tema.primeiroPlano, '#1a1410', 0.5); ctx.fill(faixasRisco);
       ctx.fillStyle = rgba('#0a0806', 0.85); ctx.fill(escorridos);
       ctx.fillStyle = misturarHex(tema.terreno, '#5a6a70', 0.5); ctx.fill(peixes);
       ctx.fillStyle = misturarHex(tema.bruma, '#f4f0e4', 0.7); ctx.fill(barrigas);
-      ctx.strokeStyle = misturarHex(tema.primeiroPlano, '#101010', 0.5);
-      ctx.lineWidth = 1.1;
-      ctx.stroke(olhos);
+      ctx.fillStyle = misturarHex(tema.bruma, '#dcd8c8', 0.6);
+      ctx.fill(olhos);
+      /* O que fica ABAIXO da lâmina afunda: uma faixa da cor da água por cima
+         da metade de baixo de tudo que boia. Sem ela o lixo pousava EM CIMA
+         da água, como adesivo. */
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = rgba(misturarHex(tema.bruma, '#15130f', 0.5), 0.6 * sujo);
+      ctx.beginPath();
+      ctx.moveTo(x0, y + onda(x0) + 2);
+      for (let px = x0; px <= x1; px += 8) ctx.lineTo(px, y + onda(px) + 2);
+      ctx.lineTo(x1, y + 18);
+      ctx.lineTo(x0, y + 18);
+      ctx.closePath();
+      ctx.fill();
     }
     if (calma > 0.03) {
       ctx.globalAlpha = calma;

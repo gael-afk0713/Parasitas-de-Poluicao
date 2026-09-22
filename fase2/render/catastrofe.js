@@ -165,6 +165,8 @@ export function frenteDeFogo(ctx, o) {
   const pb = new Path2D(), pm = new Path2D(), pn = new Path2D();
   const brasa = new Path2D(), cinzaViva = new Path2D(), corpo = new Path2D();
   let emBrasa = false, temCorpo = false;
+  const vapores = [];
+  let proxVapor = -Infinity;
   let yMin = Infinity, yMax = -Infinity;
   /* `dx` separa onde se DESENHA de onde se SORTEIA: no horizonte o desenho é
      em coordenada de tela, mas a mancha de fogo precisa ficar presa ao mundo,
@@ -201,6 +203,7 @@ export function frenteDeFogo(ctx, o) {
        de lava correndo pelo morro. */
     if (foco > 0.05) {
       if (!emBrasa) { brasa.moveTo(x, yb); emBrasa = true; } else brasa.lineTo(x, yb);
+      if (o.ch.vapor && x > proxVapor) { vapores.push([x, yb]); proxVapor = x + o.escala * 2.2; }
     } else {
       emBrasa = false;
       if (n > 0.3 && o.inten > 0.02 && hash2(xm | 0, o.semente, 29) < 0.3) {
@@ -239,14 +242,22 @@ export function frenteDeFogo(ctx, o) {
   ctx.save();
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  if (o.ch.vapor) {
-    // Vapor rasteiro, largo e mole, por baixo das chamas.
-    ctx.strokeStyle = rgba(o.ch.vapor, 0.1 * o.inten * o.alfa);
-    ctx.lineWidth = o.escala * 1.6;
-    ctx.stroke(brasa);
-    ctx.strokeStyle = rgba(o.ch.vapor, 0.2 * o.inten * o.alfa);
-    ctx.lineWidth = o.escala * 0.6;
-    ctx.stroke(brasa);
+  if (o.ch.vapor && vapores.length) {
+    /* Vapor em NUVENS moles (degradê radial, esticado pra cima), uma a cada
+       trecho aceso. O traço grosso de ponta redonda que havia aqui lia como
+       tubo de neon com cantos arredondados. */
+    for (const [vx, vy] of vapores) {
+      const r = o.escala * 1.3;
+      ctx.save();
+      ctx.translate(vx, vy - o.escala * 0.35);
+      ctx.scale(1, 1.6);
+      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      g.addColorStop(0, rgba(o.ch.vapor, 0.2 * o.inten * o.alfa));
+      g.addColorStop(1, rgba(o.ch.vapor, 0));
+      ctx.fillStyle = g;
+      ctx.fillRect(-r, -r, r * 2, r * 2);
+      ctx.restore();
+    }
   }
   ctx.strokeStyle = rgba(o.ch.brasa, 0.55 * o.inten * o.alfa);
   ctx.lineWidth = Math.max(1, o.escala * 0.09);
@@ -1160,6 +1171,9 @@ const ESPECIES = {
     freq: 2.1, amp: 1.2, salto: 0.13, cabecaFuga: 0.45, cabecaPasto: 2.0, pastoInclina: 0.16,
     cabecaDeitado: 1.35, cabecaLado: 1.55, olho: [0.22, -0.31],
     comp: 1.3,
+    /* Deitado, o tórax ESTUFA: o dorso do veado de pé é côncavo (cernelha e
+       garupa mais altas que o meio), e no chão isso lia como canoa. */
+    torso: [-0.02, -0.63, 0.36, 0.17],
   },
   capivara: {
     corpo: [[-0.52, -0.3], [-0.5, -0.43], [-0.38, -0.53], [-0.1, -0.57], [0.18, -0.56],
@@ -1377,6 +1391,11 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
 
   const p = new Path2D();
   contornoSuave(p, E.corpo, 0, 0);
+  if (E.torso && Math.max(deitado, deLado) > 0.02) {
+    const [tx, ty, trx, trY] = E.torso;
+    const k = Math.max(deitado, deLado);
+    elipse(p, tx, ty + (1 - k) * 0.1, trx, trY * (0.4 + 0.6 * k) + 0.04 * deLado);
+  }
   if (E.cauda) {
     // A bandeira do tamanduá balança com o trote.
     contornoSuave(p, E.cauda, 0, 0, Math.sin(fase * 0.5) * 0.05 * galope);
@@ -1779,17 +1798,25 @@ export function escoadouroNoHorizonte(ctx, o) {
       const r = R * lerp(0.5, 1.9, u) * lerp(0.8, 1.2, hi);
       const cx = xPoca + (hi - 0.5) * R * 1.4 + o.deriva * u * H * 0.8;
       const cy = yb - R * 0.4 - u * H * 1.5;
-      ctx.fillStyle = rgba(cv, lerp(0.15, 0.28, hi) * vivo * Math.sin(Math.PI * u));
-      ctx.beginPath();
+      // Degradê radial por bolha, esticada 1,6x pra cima e tombada pelo
+      // vento: discos chapados liam como cacho de balões.
+      const al = lerp(0.18, 0.3, hi) * vivo * Math.sin(Math.PI * u);
       for (let k = 0; k < 5; k++) {
         const hk = hash2(i * 5 + k, o.semente, 87);
         const bx = cx + (hk - 0.5) * r * 1.3;
         const by = cy - (k / 4) * r * 1.2 + (hash2(k, i, 89) - 0.5) * r * 0.4;
         const br = r * lerp(0.45, 0.85, hk);
-        ctx.moveTo(bx + br, by);
-        ctx.arc(bx, by, br, 0, TAU);
+        ctx.save();
+        ctx.translate(bx, by);
+        ctx.rotate(o.deriva * 0.25);
+        ctx.scale(1, 1.6);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, br);
+        g.addColorStop(0, rgba(cv, al));
+        g.addColorStop(1, rgba(cv, 0));
+        ctx.fillStyle = g;
+        ctx.fillRect(-br, -br, br * 2, br * 2);
+        ctx.restore();
       }
-      ctx.fill();
     }
   }
 
