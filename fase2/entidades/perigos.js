@@ -62,6 +62,7 @@ export class Fogo {
     this.x = obj.x - TILE / 2; this.y = obj.y - 30;
     this.largura = TILE;
     this.gravidade = false;          // sem sombra de contato: não é um corpo
+    this.alvoDeGolpe = false;        // a espada passa: não "rouba" o golpe
     this.perigoso = false;
     this.dano = 1;
     this.forca = 1;
@@ -148,8 +149,13 @@ export class TroncoCaindo {
     this.yTopo = Math.min(topo, obj.y - TILE * 5);
     const h = hash2(obj.cx, obj.cy, 29);
     this.periodo = lerp(4.4, 5.6, h);
-    this.t = h * this.periodo;           // vizinhos fora de sincronia
+    /* Nasce SEMPRE dentro da pausa: começando numa fase qualquer do ciclo, o
+       galho de certas células já estaria caindo quando o jogador entrasse na
+       sala — toda vez, porque a fase vem da posição. Vizinhos continuam fora
+       de sincronia (offset na pausa + períodos diferentes). */
+    this.t = h * PAUSA * 0.9;
     this.gravidade = false;
+    this.alvoDeGolpe = false;
     this.perigoso = false;
     this.dano = 1;
     this.fase = 'pausa';
@@ -307,7 +313,8 @@ export class Fumaca {
     this.clareado = Math.max(0, this.clareado - dt / 6);
     const d = this.densidade * (1 - this.clareado);
     if (d > 0.3 && j.vivo && Math.hypot(j.centroX - this.xc, j.centroY - this.yc) < this.raio * 0.85) {
-      j.sufoco = Math.min(1, (j.sufoco ?? 0) + (dt / TEMPO_SUFOCO) * d);
+      // Só INFORMA a taxa; quem enche o medidor é o mundo, uma vez por passo.
+      j.sufocoTaxa = Math.max(j.sufocoTaxa ?? 0, d / TEMPO_SUFOCO);
       j.naFumaca = true;
       if (!this._avisou) {
         this._avisou = true;
@@ -342,8 +349,10 @@ export class Fumaca {
     const cor = misturarHex(misturarHex('#221f14', tema.bruma, 0.2), '#56642a', 0.2);
     for (const [x, y, r] of this._blocos()) {
       const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, rgba(cor, 0.72 * d));
-      g.addColorStop(0.55, rgba(cor, 0.5 * d));
+      // Densa, mas não a ponto de apagar o próprio Guardião: quem joga
+      // precisa continuar se vendo dentro dela.
+      g.addColorStop(0, rgba(cor, 0.6 * d));
+      g.addColorStop(0.55, rgba(cor, 0.42 * d));
       g.addColorStop(1, rgba(cor, 0));
       ctx.fillStyle = g;
       ctx.fillRect(x - r, y - r, r * 2, r * 2);
@@ -378,6 +387,7 @@ export class BichoPreso {
     this.x = obj.x - 40; this.y = obj.y - 36;
     this.largura = 80;
     this.gravidade = false;
+    this.alvoDeGolpe = false;
     this.perigoso = false;
     this.dano = 1;
     this.h = hash2(obj.cx, obj.cy, 53);

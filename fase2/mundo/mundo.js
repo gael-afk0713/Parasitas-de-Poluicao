@@ -306,7 +306,11 @@ export class Mundo {
       const e = this.entidades[i];
       e.atualizar?.(dt, this);
       if (e.morta) { this.entidades.splice(i, 1); continue; }
-      if (caixa && e.caixa && !j.ataqueAcertou && sobrepoe(caixa, e.caixa())) {
+      // `alvoDeGolpe: false` — perigo de cenário (fogo, galho, bicho preso):
+      // tem caixa pra FERIR, mas não pode consumir o golpe da espada. Sem isso
+      // o golpe batia no fogo primeiro, tocava o feedback de acerto e o
+      // parasita ao lado saía ileso.
+      if (caixa && e.caixa && e.alvoDeGolpe !== false && !j.ataqueAcertou && sobrepoe(caixa, e.caixa())) {
         if (j.confirmarAcerto()) {
           e.receberDano?.(1, j.centroX, j.centroY, this);
           this.laco.congelar(0.055);
@@ -324,14 +328,19 @@ export class Mundo {
        por passo, ele desce do lado de fora e cobra a máscara quando enche.
        Sem empurrão: sufocar não é ser golpeado. */
     if (j.naFumaca) {
-      if (j.sufoco >= 1) {
-        j.receberDano(1, j.centroX, j.centroY, { fonte: 'fumaca', recuo: false });
+      // Bolsões sobrepostos NÃO somam: vale o mais denso (cada um só informa
+      // a própria taxa). Somando, dois juntos sufocavam no dobro da pressa.
+      j.sufoco = Math.min(1, (j.sufoco ?? 0) + dt * (j.sufocoTaxa ?? 0));
+      // Só alivia se a máscara foi cobrada de fato — invulnerável (acabou de
+      // levar outro golpe neste passo), o medidor espera cheio.
+      if (j.sufoco >= 1 && j.receberDano(1, j.centroX, j.centroY, { fonte: 'fumaca', recuo: false })) {
         j.sufoco = 0.45;
       }
     } else {
       j.sufoco = Math.max(0, (j.sufoco ?? 0) - dt * 0.45);
     }
     j.naFumaca = false;
+    j.sufocoTaxa = 0;
 
     // --- partículas ---
     for (let i = this.particulas.length - 1; i >= 0; i--) {

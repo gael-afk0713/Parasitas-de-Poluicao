@@ -286,10 +286,19 @@ function quadro(alpha, dtReal) {
   // 12 · composição
   render.finalizar(dtReal);
 
-  // Efeitos colados na tela (vinheta de dano), antes da transição.
-  render.camadaTela((ctx, t, w, h) => efeitos.desenharTela(ctx, t, w, h));
-  // A visão fecha conforme o Guardião respira a fumaça.
-  render.camadaTela((ctx, t, w, h) => desenharSufoco(ctx, w, h, mundo.jogador.sufoco));
+  /* Efeitos colados na tela (vinheta de dano, sufoco), antes da transição.
+     Vão DIRETO na tela final: `render.camadaTela` desenha no buffer da cena,
+     que o `finalizar` acima já copiou pra tela — desenhado ali depois disso,
+     nada chegava a aparecer (a vinheta de dano estava invisível desde sempre). */
+  {
+    const saida = tela.ctx;
+    saida.save();
+    saida.setTransform(tela.dpr, 0, 0, tela.dpr, 0, 0);
+    efeitos.desenharTela(saida, tema, tela.largura, tela.altura);
+    // A visão fecha conforme o Guardião respira a fumaça.
+    desenharSufoco(saida, tela.largura, tela.altura, mundo.jogador.sufoco);
+    saida.restore();
+  }
 
   transicao.desenhar(tela.ctx, tela.largura, tela.altura);
   efeitos.atualizar(dtReal);

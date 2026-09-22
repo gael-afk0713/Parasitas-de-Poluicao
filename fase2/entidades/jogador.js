@@ -142,6 +142,7 @@ export class Jogador {
     /** 0..1 — fumaça tóxica respirada (ver entidades/perigos.js). */
     this.sufoco = 0;
     this.naFumaca = false;
+    this.sufocoTaxa = 0;
 
     this.habilidades = new Set();
 

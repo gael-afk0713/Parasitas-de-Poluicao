@@ -13,6 +13,7 @@
      morta                      true → removida no fim do passo
      perigoso                   false → não machuca ao encostar
      dano                       inteiro, padrão 1
+     alvoDeGolpe                false → a espada passa (perigo de cenário)
 
    Este arquivo é base. O catálogo completo de parasitas e chefes é
    responsabilidade de entidades/parasitas.js e entidades/chefes.js.
