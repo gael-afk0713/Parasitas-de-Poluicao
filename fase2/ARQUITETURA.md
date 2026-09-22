@@ -225,6 +225,14 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
     jogador: na sala suja são poucas, ariscas e não voltam; na limpa são
     muitas, mansas e voltam. Quando a sala é restaurada com o jogador dentro,
     as que faltavam CHEGAM voando.
+  - **O pedaço da catástrofe que o jogador TOCA** vive em
+    `entidades/perigos.js`, com caracteres próprios no mapa: `f` chão em
+    chamas (fere; o Canto e a cura apagam), `t` galho em chamas que despenca
+    num ritmo com aviso, `m` bolsão de fumaça que SUFOCA (medidor no jogador,
+    vinheta na tela; some quando a área fica sem parasitas) e `a` bicho preso
+    (o Canto solta, e ele deixa um fragmento; `mundo.bichosSalvos` vai no
+    save). Regra de leitura: **branco-quente = perigo perto** — o fogo do
+    fundo é abafado, sem núcleo claro, justamente pra não disputar com este.
 
 ### Princípios técnicos
 

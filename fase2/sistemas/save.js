@@ -242,6 +242,7 @@ export class Save {
       'semente',       // restaurou uma sala
       'fragmento',     // coletável permanente
       'areaLimpa',     // destravou a semente da área
+      'bichoSalvo',    // soltou um bicho preso (permanente)
       'chefeMorto',    // marco grande
     ]);
     this.mundo.aoEvento = (ev) => {

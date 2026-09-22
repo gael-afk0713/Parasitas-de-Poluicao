@@ -139,6 +139,9 @@ export class Jogador {
     this.vida = 5;
     this.invulneravel = 0;
     this.atordoado = 0;
+    /** 0..1 — fumaça tóxica respirada (ver entidades/perigos.js). */
+    this.sufoco = 0;
+    this.naFumaca = false;
 
     this.habilidades = new Set();
 
@@ -476,20 +479,23 @@ export class Jogador {
     return true;
   }
 
-  receberDano(quantidade, deX, deY, { fonte = 'inimigo' } = {}) {
+  /** `recuo: false` — dano sem empurrão nem atordoamento (sufocar). */
+  receberDano(quantidade, deX, deY, { fonte = 'inimigo', recuo = true } = {}) {
     if (this.invulneravel > 0 || !this.vivo) return false;
     // Investida NÃO dá invencibilidade: transformar o dash em botão de
     // atravessar tudo apaga o desafio de posicionamento das salas.
     this.vida = Math.max(0, this.vida - quantidade);
     this.invulneravel = DUR_INVULNERAVEL;
-    this.atordoado = DUR_ATORDOADO;
-    this.investidaRestante = 0;
 
     const dir = deX === this.centroX ? -this.direcao : sign(this.centroX - deX);
-    this.vx = RECUO_DANO_X * dir;
-    this.vy = -RECUO_DANO_Y;
-    this.direcao = -dir;   // olha pra fonte do dano
-    this._trocarEstado(ESTADOS.ATORDOADO);
+    if (recuo) {
+      this.atordoado = DUR_ATORDOADO;
+      this.investidaRestante = 0;
+      this.vx = RECUO_DANO_X * dir;
+      this.vy = -RECUO_DANO_Y;
+      this.direcao = -dir;   // olha pra fonte do dano
+      this._trocarEstado(ESTADOS.ATORDOADO);
+    }
     this._emitir('dano', { quantidade, fonte, dir });
 
     if (this.vida <= 0) this._morrer();
@@ -517,6 +523,7 @@ export class Jogador {
     this.investidaRestante = 0;
     this.cantoRestante = 0;
     this.ataqueRestante = 0;
+    this.sufoco = 0;
     this._trocarEstado(ESTADOS.PARADO);
   }
 

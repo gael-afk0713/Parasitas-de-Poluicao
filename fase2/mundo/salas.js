@@ -17,6 +17,9 @@
      $  fragmento (coletável)            S  ponto de salvamento
      >  porta pra direita                <  porta pra esquerda
      ^^ (ver perigo)                     ¨  porta pra cima     _  porta pra baixo
+     f  chão em chamas                   t  galho em chamas que despenca
+     m  bolsão de fumaça tóxica          a  bicho preso (o Canto solta)
+        (os quatro vivem em entidades/perigos.js)
 
    Cada objeto vira { tipo, x, y } em coordenadas de PIXEL já centradas no
    tile — nenhum sistema precisa saber que existiu um grid.
@@ -46,6 +49,7 @@ import { Terreno, TILE, normalizarMapa } from './terreno.js';
 const ANCORADOS_NO_CHAO = new Set([
   'inicio', 'salvamento', 'altar', 'lapide', 'portao', 'chefe',
   'parasita', 'cuspidor', 'explosivo',
+  'fogo', 'tronco', 'bichoPreso',
 ]);
 
 /** Até onde procurar chão abaixo do ponto do mapa, em tiles. */
@@ -122,6 +126,12 @@ export const LEGENDA_OBJETOS = {
   // --- travas de progressão ---
   'g': 'portao',        // exige a habilidade dita em `def.portoes`
   'b': 'barreira',      // matéria corrompida, só quebra com o Canto
+
+  // --- a catástrofe no plano do jogo (entidades/perigos.js) ---
+  'f': 'fogo',          // chão em chamas: fere; o Canto e a cura apagam
+  't': 'tronco',        // galho em chamas que despenca da copa, com aviso
+  'm': 'fumaca',        // bolsão tóxico: sufoca; some com a área limpa
+  'a': 'bichoPreso',    // animal preso: o Canto solta, deixa um fragmento
 
   // --- portas entre salas ---
   '>': 'porta-dir',

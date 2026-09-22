@@ -24,6 +24,7 @@ import {
 import { luzRadial } from '../render/renderizador.js';
 import { criarParasita } from './parasitas.js';
 import { criarChefe } from './chefes.js';
+import { Fogo, TroncoCaindo, Fumaca, BichoPreso } from './perigos.js';
 
 /* ==========================================================================
    Coletáveis / interativos
@@ -1038,12 +1039,31 @@ export function criarEntidade(obj, mundo) {
       const b = new Barreira(obj, mundo.sala?.id);
       return consumido(mundo.barreirasQuebradas, b) ? null : b;
     }
+    case 'bichoPreso': {
+      /* Bicho já solto não volta a ficar preso. O fragmento que ele deixou é
+         um Fragmento comum, com chave própria da célula: se o jogador saiu
+         da sala sem pegá-lo, ele continua lá na volta. */
+      const salaId = mundo.sala?.id;
+      const chave = chaveDeObjeto('bicho', obj, salaId);
+      const criarFragmento = () => {
+        const f = new Fragmento(obj, salaId);
+        return consumido(mundo.fragmentosColetados, f) ? null : f;
+      };
+      if (mundo.bichosSalvos?.has(chave)) return criarFragmento();
+      return new BichoPreso(obj, chave, mundo.sala?.area, criarFragmento);
+    }
 
     // --- sem estado persistido
     case 'salvamento': return new PontoSalvamento(obj);
     case 'fonte': return new Fonte(obj);
     case 'portao': return new Portao(obj, def.portao || 'investida');
     case 'lapide': return new Lapide(obj, (def.lore || [])[obj.cx % Math.max(1, (def.lore || []).length)] || '');
+
+    // --- a catástrofe no plano do jogo: sem estado persistido (o que apaga
+    //     de vez é a CURA da sala, e essa já é persistida pela pureza)
+    case 'fogo': return new Fogo(obj);
+    case 'tronco': return new TroncoCaindo(obj, mundo.sala?.terreno);
+    case 'fumaca': return new Fumaca(obj);
 
     // --- inimigos: o bestiário vive em `entidades/parasitas.js`
     case 'parasita': case 'voador': case 'cuspidor':

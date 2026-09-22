@@ -318,5 +318,9 @@
          o jorro de lodo e o vapor da fonte do Coração, manadas e bandos do
          fundo e do horizonte, e o bicho exausto (respiração e o levantar) —
          continuam na tela (são a informação de que o lugar sofre), mas a 1/3
-         da velocidade (`render.movimentoReduzido`) */
+         da velocidade (`render.movimentoReduzido`)
+       · perigos no plano do jogo (entidades/perigos.js): chamas do chão, do
+         galho que cai e do anel de fogo, giro da fumaça tóxica e o debater do
+         bicho preso — a 1/3. O RITMO de jogo (queda do galho, sufoco) não
+         muda: desacelerá-lo mudaria a dificuldade, não o movimento. */
 }

@@ -19,6 +19,7 @@ import {
 import { desenharParticulas, desenharNevoa } from './render/particulas.js';
 import { nomeArea } from './render/paleta.js';
 import { criarEntidade } from './entidades/catalogo.js';
+import { desenharSufoco } from './entidades/perigos.js';
 import { Hud } from './ui/hud.js';
 import { TelaMapa } from './ui/mapa.js';
 import { Audio } from './audio/audio.js';
@@ -256,6 +257,12 @@ function quadro(alpha, dtReal) {
     }
   });
 
+  // 8a · o que fica POR CIMA de entidades e do Guardião (fumaça tóxica: ela
+  //      esconde o que está dentro dela, esse é o perigo)
+  render.camada(1, (ctx) => {
+    for (const e of mundo.entidades) e.desenharSobre?.(ctx, tema, camera);
+  });
+
   // 8b · efeitos de impacto, na frente das entidades
   render.camada(1, (ctx) => efeitos.desenhar(ctx, tema, camera));
   render.emissivo(1, (ctx) => efeitos.desenharLuz(ctx, tema, camera));
@@ -281,6 +288,8 @@ function quadro(alpha, dtReal) {
 
   // Efeitos colados na tela (vinheta de dano), antes da transição.
   render.camadaTela((ctx, t, w, h) => efeitos.desenharTela(ctx, t, w, h));
+  // A visão fecha conforme o Guardião respira a fumaça.
+  render.camadaTela((ctx, t, w, h) => desenharSufoco(ctx, w, h, mundo.jogador.sufoco));
 
   transicao.desenhar(tela.ctx, tela.largura, tela.altura);
   efeitos.atualizar(dtReal);
@@ -400,6 +409,34 @@ function efeitoDeEvento(ev) {
       // O Coração é o último: derrubá-lo encerra o jogo. Com folga pra a
       // animação de morte dele terminar antes da tela aparecer.
       if (ev.nome === 'O Coração') setTimeout(() => paineis?.mostrarFim(), 3200);
+      break;
+    /* --- a catástrofe no plano do jogo (entidades/perigos.js) --- */
+    case 'bichoPreso':
+      hud.anunciar(null, ev.temCanto
+        ? 'Ele está preso — cante perto dele'
+        : 'Ele está preso. Um canto que acalmasse a mata poderia soltá-lo.',
+      3.4, 'sussurro');
+      break;
+    case 'bichoSalvo':
+      hud.anunciar('Solto', 'ele deixou algo pra trás', 2.8, 'sussurro');
+      render.piscar(tema.crista, 0.3);
+      efeitos.anelChoque(ev.x, ev.y - 20, { raio: 70, cor: 'crista' });
+      break;
+    case 'troncoCaiu': {
+      // Tremor proporcional à distância: longe, só se ouve.
+      const d = Math.hypot(j.centroX - ev.x, j.centroY - ev.y);
+      if (d < 700) camera.sacudir(0.3 * (1 - d / 700));
+      break;
+    }
+    case 'fumacaToxica':
+      // Uma vez por sessão basta: a vinheta fechando já diz o resto.
+      if (!efeitoDeEvento._fumacaAvisada) {
+        efeitoDeEvento._fumacaAvisada = true;
+        hud.anunciar(null, 'A fumaça sufoca — ela se alimenta dos parasitas da área', 3.4, 'sussurro');
+      }
+      break;
+    case 'fogoApagado':
+      efeitos.anelChoque(ev.x, ev.y - 10, { raio: 30, cor: 'crista' });
       break;
     case 'portaoTrancado':
       hud.anunciar('Trancado', 'algo que você ainda não sabe fazer', 2.2, 'sussurro');

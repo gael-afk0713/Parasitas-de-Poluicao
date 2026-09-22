@@ -73,6 +73,8 @@ export class Mundo {
     this._cacheVivos = new Map();   // area -> quantos faltam
     this.fragmentosColetados = new Set();
     this.barreirasQuebradas = new Set();
+    /** Bichos presos que o Canto já soltou (entidades/perigos.js). */
+    this.bichosSalvos = new Set();
 
     /** Último ponto de salvamento tocado. */
     this.checkpoint = { sala: null, x: 0, y: 0 };
@@ -265,6 +267,12 @@ export class Mundo {
     return true;
   }
 
+  salvarBicho(chave) {
+    if (this.bichosSalvos.has(chave)) return false;
+    this.bichosSalvos.add(chave);
+    return true;
+  }
+
   coletarFragmento(chave) {
     if (this.fragmentosColetados.has(chave)) return false;
     this.fragmentosColetados.add(chave);
@@ -310,6 +318,20 @@ export class Mundo {
         j.receberDano(e.dano ?? 1, e.x ?? j.centroX, e.y ?? j.centroY);
       }
     }
+
+    /* --- sufoco (fumaça tóxica, entidades/perigos.js) ---
+       Cada bolsão SOBE o medidor enquanto o Guardião está nele; aqui, uma vez
+       por passo, ele desce do lado de fora e cobra a máscara quando enche.
+       Sem empurrão: sufocar não é ser golpeado. */
+    if (j.naFumaca) {
+      if (j.sufoco >= 1) {
+        j.receberDano(1, j.centroX, j.centroY, { fonte: 'fumaca', recuo: false });
+        j.sufoco = 0.45;
+      }
+    } else {
+      j.sufoco = Math.max(0, (j.sufoco ?? 0) - dt * 0.45);
+    }
+    j.naFumaca = false;
 
     // --- partículas ---
     for (let i = this.particulas.length - 1; i >= 0; i--) {
@@ -432,6 +454,7 @@ export class Mundo {
       parasitas: [...this.parasitasMortos],
       fragmentos: [...this.fragmentosColetados],
       barreiras: [...this.barreirasQuebradas],
+      bichos: [...this.bichosSalvos],
       checkpoint: this.checkpoint,
       dicas: this.dicasVistas ?? [],
     };
@@ -445,6 +468,7 @@ export class Mundo {
     this._cacheVivos.clear();
     this.fragmentosColetados = new Set(dados.fragmentos || []);
     this.barreirasQuebradas = new Set(dados.barreiras || []);
+    this.bichosSalvos = new Set(dados.bichos || []);
     this.checkpoint = dados.checkpoint || this.checkpoint;
     this.dicasVistas = dados.dicas || [];
 
