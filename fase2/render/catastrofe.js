@@ -1489,6 +1489,24 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
     ctx.fill(fp);
     ctx.fillStyle = fill;
   }
+  /* ACABAMENTO DE PERTO (só com `pose`: o bicho do plano de jogo e o da
+     folha de teste — nas manadas do horizonte, a 40 px, isto viraria sujeira).
+     1 · volume: dorso um tom abaixo, barriga um tom acima — sem isso o bicho
+         era um recorte chapado de papel;
+     2 · o detalhe que DIZ a espécie a esta distância. */
+  if (pose && typeof fill === 'string') {
+    let topo = 0, base = -1;
+    for (const c of E.corpo) { if (c[1] < topo) topo = c[1]; if (c[1] > base) base = c[1]; }
+    const gv = ctx.createLinearGradient(0, topo, 0, base);
+    gv.addColorStop(0, rgba('#0c0a09', 0.26));
+    gv.addColorStop(0.45, rgba('#0c0a09', 0));
+    gv.addColorStop(0.8, rgba(misturarHex(fill, '#f0e6d2', 0.5), 0));
+    gv.addColorStop(1, rgba(misturarHex(fill, '#f0e6d2', 0.5), 0.34));
+    ctx.fillStyle = gv;
+    ctx.fill(p);
+    ctx.fillStyle = fill;
+    detalhesDaEspecie(ctx, esp, E, rotCabeca, fill, galope, tempo, h);
+  }
   // Olho: um ponto claro gira junto com a cabeça. Sem ele a capivara caída
   // lia como pedra.
   if (pose?.olho && E.olho) {
@@ -1515,7 +1533,86 @@ function animal(ctx, esp, fase, fuga, tempo, h, borda = null, pose = null) {
 
   pata(fr[0] + 0.04, fr[1], fase + 2.4, true, true);
   pata(tr[0] + 0.04, tr[1], fase, false, true);
+  /* COXA: a perna de trás nascia como um palito saindo da barriga. Uma massa
+     no quadril (da cor do corpo) faz a perna PERTENCER ao bicho. */
+  if (pose && deLado < 0.5) {
+    const [qx, qy] = E.quadris[1];
+    ctx.beginPath();
+    elipse(ctx, qx + 0.06, qy - 0.02, E.grossura[0] * 1.25, E.grossura[0] * 1.7, -0.25);
+    ctx.fill();
+  }
   ctx.restore();
+}
+
+/**
+ * O detalhe que diz a espécie de perto. Coordenadas da cabeça passam pelo
+ * mesmo giro dela (`naCabeca`), senão o focinho ficava no ar quando o bicho
+ * baixava a cabeça pra pastar.
+ */
+function detalhesDaEspecie(ctx, esp, E, rot, fill, galope, tempo, h) {
+  const c = Math.cos(rot), sn = Math.sin(rot);
+  const naCabeca = (u, v) => [E.pivo[0] + u * c - v * sn, E.pivo[1] + u * sn + v * c];
+  const claro = misturarHex(fill, '#f2ead8', 0.62);
+  const escuro = misturarHex(fill, '#0e0b09', 0.7);
+  const ponto = (x, y, r, cor) => { ctx.fillStyle = cor; ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill(); };
+  ctx.save();
+  if (esp === 'veado') {
+    // Cauda-bandeira branca (o sinal de alarme do veado) — erguida na fuga.
+    const erg = galope;
+    ctx.fillStyle = claro;
+    ctx.beginPath();
+    elipse(ctx, -0.53, -0.76 - 0.05 * erg, 0.045, 0.075 + 0.03 * erg, -0.5 - 0.6 * erg);
+    ctx.fill();
+    // Garganta clara e focinho escuro; o interior da orelha, rosado-claro.
+    const [gx, gy] = naCabeca(0.09, -0.1);
+    ctx.fillStyle = rgba(claro, 0.8);
+    ctx.beginPath();
+    elipse(ctx, gx, gy, 0.05, 0.1, rot + 0.3);
+    ctx.fill();
+    const [nx, ny] = naCabeca(0.34, -0.26);
+    ponto(nx, ny, 0.028, escuro);
+    const [ox, oy] = naCabeca(0.02, -0.47);
+    ctx.fillStyle = rgba(misturarHex(claro, '#e8b8a8', 0.35), 0.75);
+    ctx.beginPath();
+    elipse(ctx, ox, oy, 0.02, 0.055, rot - 0.2);
+    ctx.fill();
+  } else if (esp === 'capivara') {
+    // Pelo grosso: meia dúzia de riscos curtos no dorso, e o focinho largo
+    // e escuro que é a cara da capivara.
+    ctx.strokeStyle = rgba(escuro, 0.5);
+    ctx.lineWidth = 0.014;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < 7; i++) {
+      const x = lerp(-0.42, 0.22, i / 6) + (hash2(i, 3, 7) - 0.5) * 0.04;
+      const y = -0.5 - Math.sin((i / 6) * Math.PI) * 0.05;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - 0.04, y + 0.05);
+    }
+    ctx.stroke();
+    const [nx, ny] = naCabeca(0.29, -0.03);
+    ctx.fillStyle = rgba(escuro, 0.85);
+    ctx.beginPath();
+    elipse(ctx, nx, ny, 0.04, 0.05, rot);
+    ctx.fill();
+  } else if (esp === 'tamandua') {
+    // Crina da cauda-bandeira: fios compridos, e o focinho com a ponta preta.
+    ctx.strokeStyle = rgba(escuro, 0.45);
+    ctx.lineWidth = 0.012;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const y0 = lerp(-0.56, -0.3, i / 5);
+      const bal = Math.sin(tempo * 2 + i) * 0.02 * galope;
+      ctx.moveTo(-0.34, y0);
+      ctx.quadraticCurveTo(-0.66, y0 + 0.02 + bal, lerp(-0.92, -0.98, i / 5), lerp(-0.5, -0.32, i / 5) + bal);
+    }
+    ctx.stroke();
+    const [nx, ny] = naCabeca(0.63, 0.04);
+    ponto(nx, ny, 0.024, escuro);
+  }
+  ctx.restore();
+  ctx.fillStyle = fill;
 }
 
 /** Pra folha de teste (e pra quem precisar de um bicho avulso). */
