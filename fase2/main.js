@@ -88,10 +88,15 @@ laco.iniciar();
 // jogo já começa jogável na sala inicial e o save TROCA a sala se houver
 // progresso. É o mesmo padrão da Fase 1 — nunca deixar a tela esperando a rede.
 const save = new Save(mundo);
-paineis = new Paineis(mundo, laco, { aoSalvar: (motivo) => save.salvar(motivo) });
+paineis = new Paineis(mundo, laco, {
+  aoSalvar: (motivo) => save.salvar(motivo),
+  resultadoSave: () => save.ultimoResultado,
+});
 paineis.ligarSom(audio);
 save.iniciar()
+  .catch(() => false)
   .then((restaurou) => {
+    // Sempre: mesmo com uma carga que falhou, o jogo continua salvando.
     save.ligarGatilhos();
     tutor.aplicarSave(mundo.dicasVistas);
     /* O mundo guarda a lista no save; o tutor é quem sabe o conteúdo dela.
@@ -120,6 +125,7 @@ laco.pausado = true;
 document.getElementById('btn-comecar-fase2')?.addEventListener('click', () => {
   abertura.classList.add('escondida');
   laco.pausado = false;
+  audio.liberar?.();
   entrada.limparTudo();   // o clique/tecla que abriu não deve virar uma ação
   canvas.focus?.();
 });
@@ -151,23 +157,32 @@ if (movimentoReduzido) {
 
 function passo(dt) {
   entrada.atualizar(dt);
-
-  // Mapa: Tab alterna. Enquanto aberto o mundo congela — em jogo de
-  // atmosfera, consultar o mapa é uma pausa narrativa, não um risco.
-  if (entrada.acabouDePressionar('mapa')) mapa.alternar();
-  if (entrada.acabouDePressionar('pausa')) {
-    if (mapa.aberta) mapa.fechar();
-    else paineis?.alternarPausa();
-  }
   if (laco.pausado || mapa.aberta || paineis?.bloqueiaJogo) return;
 
   mundo.atualizar(dt, entrada);
   tutor.atualizar(dt);
 }
 
+/* Pausa e mapa são lidos no QUADRO, não no passo: com o jogo pausado o laço
+   nem chama `passo`, então quem abria a pausa ali nunca mais conseguia
+   fechá-la pelo teclado. */
+function interfaceDoQuadro() {
+  const bloqueado = laco.pausado || mapa.aberta || paineis?.bloqueiaJogo;
+  // Parado, ninguém chama `entrada.atualizar` — lê o gamepad (Start) daqui.
+  if (bloqueado) entrada.atualizar(0);
+  // Mapa: Tab alterna. Enquanto aberto o mundo congela — em jogo de
+  // atmosfera, consultar o mapa é uma pausa narrativa, não um risco.
+  if (entrada.consumirUI('mapa') && !paineis?.aberto) mapa.alternar();
+  if (entrada.consumirUI('pausa')) {
+    if (mapa.aberta) mapa.fechar();
+    else paineis?.alternarPausa();
+  }
+}
+
 /* ------------------------------------------------------------------ quadro -- */
 
 function quadro(alpha, dtReal) {
+  interfaceDoQuadro();
   transicao.atualizar(dtReal);
   mundo.atualizarApresentacao(dtReal, laco.pausado || mapa.aberta || !!paineis?.bloqueiaJogo);
   audio.atualizar(dtReal, mundo);
@@ -383,7 +398,7 @@ function efeitoDeEvento(ev) {
     case 'morte':
       paineis?.mostrarMorte();
       efeitos.dissolucao(j.centroX, j.centroY);
-      efeitos.vinhetaDano({ forca: 1.4, dur: 1.6 });
+      efeitos.vinhetaDano({ intensidade: 1.4, dur: 1.6 });
       render.piscar('#ffffff', 0.7);
       laco.congelar(0.16);
       camera.sacudir(1);

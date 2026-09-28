@@ -340,12 +340,21 @@ export class Transicao {
 
   /** Escurece, chama `aoCobrir` com a tela toda preta, depois clareia. */
   cortar(aoCobrir, dur = 0.28) {
+    /* Um corte pedido no MEIO de outro não pode apagar o anterior: porta e
+       renascimento no mesmo instante perdiam um dos dois (e o jogo ficava
+       preso esperando um callback que nunca vinha). Os pedidos se somam e
+       todos rodam com a tela preta. */
+    const anterior = this._cobrir;
+    this._cobrir = anterior ? () => { anterior(); aoCobrir?.(); } : aoCobrir;
+    if (this._aoTerminar && this._alvo === 1) return;   // já escurecendo
     this._dur = dur;
     this._de = this.valor;
     this._alvo = 1;
     this._t = 0;
     this._aoTerminar = () => {
-      aoCobrir?.();
+      const cb = this._cobrir;
+      this._cobrir = null;
+      cb?.();
       this._de = 1;
       this._alvo = 0;
       this._t = 0;

@@ -87,12 +87,21 @@ export class Save {
    * carrega o SDK pela rede — o jogo abre e roda igual, só sem salvar.
    * @returns {Promise<boolean>} true se restaurou algum progresso
    */
+  /** Aplica sem deixar uma exceção derrubar a carga inteira. */
+  _aplicar(dados) {
+    try { return this.mundo.aplicarSave(dados); } catch (e) {
+      console.warn('[fase2/save] save inválido, ignorado:', e?.message || e);
+      try { this.mundo.entrarNaSala('raizes-01'); } catch { /* nada a fazer */ }
+      return false;
+    }
+  }
+
   async iniciar() {
     if (!this.info?.uid || !this.info?.slot) {
       // Sem sessão ainda dá pra continuar de onde parou NESTE navegador.
       const local = lerLocal(this.info);
-      if (local && this.mundo.aplicarSave(local)) {
-        this._ultimoSerializado = JSON.stringify(this.mundo.paraSave());
+      if (local && this._aplicar(local)) {
+        this._ultimoSerializado = JSON.stringify({ ...this.mundo.paraSave(), salvoEm: 0 });
         this._estado('progresso restaurado deste navegador');
         return true;
       }
@@ -132,10 +141,15 @@ export class Save {
         ? snap.data()?.saves?.[this.info.slot]?.progressoFase2
         : null;
 
-      const daNuvem = dados || lerLocal(this.info);
+      /* O MAIS NOVO vence, não "a nuvem sempre". Mortes de parasita e o save
+         de saída da aba vão só pro navegador — com a nuvem vencendo sempre,
+         recarregar os desfazia. */
+      const local = lerLocal(this.info);
+      const novo = (d) => (Number.isFinite(d?.salvoEm) ? d.salvoEm : 0);
+      const daNuvem = dados && local ? (novo(local) > novo(dados) ? local : dados) : (dados || local);
       if (daNuvem) {
-        const ok = this.mundo.aplicarSave(daNuvem);
-        this._ultimoSerializado = JSON.stringify(this.mundo.paraSave());
+        const ok = this._aplicar(daNuvem);
+        this._ultimoSerializado = JSON.stringify({ ...this.mundo.paraSave(), salvoEm: 0 });
         this._estado(ok
           ? (dados ? 'progresso restaurado' : 'progresso restaurado deste navegador')
           : 'save inválido — recomeçando');
@@ -149,8 +163,8 @@ export class Save {
       this.ultimoErro = e;
       console.warn('[fase2/save] indisponível:', e?.message || e);
       const local = lerLocal(this.info);
-      if (local && this.mundo.aplicarSave(local)) {
-        this._ultimoSerializado = JSON.stringify(this.mundo.paraSave());
+      if (local && this._aplicar(local)) {
+        this._ultimoSerializado = JSON.stringify({ ...this.mundo.paraSave(), salvoEm: 0 });
         this._estado('sem conexão — progresso deste navegador');
         return true;
       }
@@ -165,7 +179,8 @@ export class Save {
    */
   async salvar(motivo = 'manual') {
     const progresso = this.mundo.paraSave();
-    const serializado = JSON.stringify(progresso);
+    // Compara SEM o carimbo de tempo — senão todo save pareceria novo.
+    const serializado = JSON.stringify({ ...progresso, salvoEm: 0 });
 
     /* DOIS DESTINOS, DUAS GUARDAS SEPARADAS.
        `_ultimoSerializado` é o que a NUVEM já tem; `_ultimoLocal` é o que
@@ -187,14 +202,15 @@ export class Save {
 
     if (!this.disponivel || !this._ref) {
       if (local) this._estado('salvo neste navegador');
+      this.ultimoResultado = local ? 'local' : 'igual';
       return local;
     }
-    if (serializado === this._ultimoSerializado) return false;
+    if (serializado === this._ultimoSerializado) { this.ultimoResultado = 'igual'; return false; }
 
     // Uma gravação por vez. Se pedirem outra no meio, marca pendente e
     // repete ao terminar — sem isso, dois `updateDoc` simultâneos podem
     // gravar fora de ordem e o estado mais VELHO vencer.
-    if (this._gravando) { this._pendente = true; return false; }
+    if (this._gravando) { this._pendente = true; this.ultimoResultado = 'pendente'; return false; }
     this._gravando = true;
 
     try {
@@ -205,11 +221,13 @@ export class Save {
       });
       this._ultimoSerializado = serializado;
       this._estado('salvo');
+      this.ultimoResultado = 'salvo';
       return true;
     } catch (e) {
       this.ultimoErro = e;
       console.warn(`[fase2/save] falha ao salvar (${motivo}):`, e?.message || e);
       this._estado('falha ao salvar');
+      this.ultimoResultado = 'falha';
       return false;
     } finally {
       this._gravando = false;
@@ -220,7 +238,7 @@ export class Save {
   /** Só a cópia deste navegador. Síncrona, sem rede, sem cota. */
   salvarLocal() {
     const progresso = this.mundo.paraSave();
-    const serializado = JSON.stringify(progresso);
+    const serializado = JSON.stringify({ ...progresso, salvoEm: 0 });
     if (serializado === this._ultimoLocal) return false;
     if (!gravarLocal(this.info, progresso)) return false;
     this._ultimoLocal = serializado;
@@ -243,6 +261,7 @@ export class Save {
       'fragmento',     // coletável permanente
       'areaLimpa',     // destravou a semente da área
       'bichoSalvo',    // soltou um bicho preso (permanente)
+      'barreiraQuebrada', // o Canto abriu um caminho (permanente)
       'chefeMorto',    // marco grande
     ]);
     this.mundo.aoEvento = (ev) => {

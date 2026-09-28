@@ -247,8 +247,12 @@ export class Sombra {
     this.comportamento(dt, mundo);
 
     // Recuo de dano some sozinho, somado por cima do movimento próprio.
+    // Pelo terreno, com colisão: somado direto no `x`, o recuo enfiava o
+    // parasita na parede (e dali ele "subia" pra cima dela).
     if (Math.abs(this.recuoX) > 1) {
-      this.x += this.recuoX * dt;
+      const t = mundo.sala?.terreno;
+      if (t && !this.ignoraTerreno) t.mover(this, this.recuoX * dt, 0);
+      else this.x += this.recuoX * dt;
       this.recuoX = damp(this.recuoX, 0, 0.11, dt);
     }
   }
@@ -315,7 +319,7 @@ export class Sombra {
        sem persistir isso "área limpa" nunca seria verdade: as criaturas
        renascem a cada `_popular`, então o jogador limparia a última sala e a
        primeira já estaria cheia de novo. */
-    mundo.registrarParasitaMorto?.(this.cxInicial, this.cyInicial);
+    if (!this.semRegistro) mundo.registrarParasitaMorto?.(this.cxInicial, this.cyInicial);
     mundo.aoEvento?.({ tipo: 'inimigoMorto', x: this.centroX, y: this.centroY });
     this.aoMorrer?.(mundo);
   }

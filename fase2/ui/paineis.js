@@ -30,10 +30,11 @@ export class Paineis {
    * @param {import('../mundo/mundo.js').Mundo} mundo
    * @param {import('../core/laco.js').Laco} laco
    */
-  constructor(mundo, laco, { aoSalvar } = {}) {
+  constructor(mundo, laco, { aoSalvar, resultadoSave } = {}) {
     this.mundo = mundo;
     this.laco = laco;
     this.aoSalvar = aoSalvar;
+    this.resultadoSave = resultadoSave;
     this.aberto = null;   // null | 'pausa' | 'morte' | 'fim'
 
     this.el = {
@@ -47,15 +48,28 @@ export class Paineis {
   _ligarBotoes() {
     const q = (id) => document.getElementById(id);
 
-    q('btn-pausa-continuar')?.addEventListener('click', () => this.fechar());
+    // `alternarPausa`, não `fechar`: fechar só escondia o painel e deixava
+    // `laco.pausado` ligado — o jogo ficava congelado sem painel nenhum.
+    q('btn-pausa-continuar')?.addEventListener('click', () => {
+      if (this.aberto === 'pausa') this.alternarPausa();
+    });
     q('btn-pausa-salvar')?.addEventListener('click', async () => {
       const status = q('status-pausa');
       if (status) status.textContent = 'salvando...';
       const ok = await this.aoSalvar?.('manual');
-      if (status) status.textContent = ok ? 'salvo' : 'nada novo para salvar';
+      // "nada novo" só quando for verdade: falha de rede e gravação já em
+      // andamento diziam a mesma coisa.
+      const MSG = { salvo: 'salvo', local: 'salvo neste navegador', igual: 'nada novo para salvar',
+        pendente: 'salvando — já havia uma gravação em curso', falha: 'falha ao salvar (sem conexão?)' };
+      if (status) status.textContent = ok ? 'salvo' : (MSG[this.resultadoSave?.()] ?? 'nada novo para salvar');
     });
     q('btn-pausa-menu')?.addEventListener('click', async () => {
-      await this.aoSalvar?.('menu');
+      // Offline, a promessa do Firestore pode nunca resolver: não prende o
+      // jogador na pausa — a cópia local já foi gravada de forma síncrona.
+      await Promise.race([
+        this.aoSalvar?.('menu'),
+        new Promise((r) => setTimeout(r, 1500)),
+      ]);
       window.location.href = 'index.html';
     });
   }

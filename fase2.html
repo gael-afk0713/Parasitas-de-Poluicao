@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=3">
-<link rel="stylesheet" href="fase2.css?v=8">
+<link rel="stylesheet" href="fase2.css?v=9">
 </head>
 <body class="fase2-body">
 
@@ -24,7 +24,12 @@
   <div class="fase2-toque" id="toque-fase2" aria-hidden="true">
     <div class="toque-esquerda">
       <button class="toque-botao toque-direcional" data-acao="esquerda" aria-label="Esquerda">◀</button>
+      <button class="toque-botao toque-direcional toque-baixo" data-acao="baixo" aria-label="Baixo (com pular: descer da plataforma)">▼</button>
       <button class="toque-botao toque-direcional" data-acao="direita" aria-label="Direita">▶</button>
+    </div>
+    <div class="toque-topo">
+      <button class="toque-botao toque-mini" data-acao="mapa" aria-label="Mapa">▦</button>
+      <button class="toque-botao toque-mini" data-acao="pausa" aria-label="Pausa">❚❚</button>
     </div>
     <div class="toque-direita">
       <button class="toque-botao toque-acao" data-acao="atacar" aria-label="Atacar">✦</button>
@@ -126,6 +131,6 @@
     </div>
   </div>
 
-<script type="module" src="fase2/main.js?v=53"></script>
+<script type="module" src="fase2/main.js?v=54"></script>
 </body>
 </html>

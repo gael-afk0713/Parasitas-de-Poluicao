@@ -59,11 +59,24 @@ export class Entrada {
     this.bordaSolta = Object.create(null);
     /** acao → timestamp (s) do último pressionar ainda não consumido; -1 = consumido */
     this.pedido = Object.create(null);
+    /* Bordas PENDENTES. O evento de tecla chega entre dois passos; se ele
+       escrevesse direto em `borda`, o `atualizar()` do passo seguinte zeraria
+       tudo ANTES de alguém ler — era por isso que Esc, Tab e M não faziam nada
+       no teclado (só no gamepad, lido depois de zerar). Aqui o evento marca
+       pendente, e `atualizar()` promove pendente → borda. */
+    this._bordaPend = Object.create(null);
+    this._soltaPend = Object.create(null);
+    /** Pedidos de interface (pausa, mapa): lidos no QUADRO, que roda mesmo com
+     *  o jogo pausado — senão, pausado, nada conseguia despausar. */
+    this._ui = Object.create(null);
     for (const a of ACOES) {
       this.estado[a] = false;
       this.borda[a] = false;
       this.bordaSolta[a] = false;
       this.pedido[a] = -1;
+      this._bordaPend[a] = false;
+      this._soltaPend[a] = false;
+      this._ui[a] = false;
     }
 
     this.tempo = 0;
@@ -83,7 +96,7 @@ export class Entrada {
     this._onKeyUp = this._onKeyUp.bind(this);
     this._onBlur = this._onBlur.bind(this);
     this._onGamepad = this._onGamepad.bind(this);
-    this._botoesGamepadAnteriores = [];
+    this._botoesGamepadAnteriores = {};
   }
 
   ligar() {
@@ -109,7 +122,11 @@ export class Entrada {
   _onKeyDown(e) {
     const acoes = this._porCode[e.code];
     if (!acoes) return;
-    // Espaço rola a página e Tab troca o foco — os dois estragam o jogo.
+    /* Espaço rola a página e Tab troca o foco — os dois estragam o jogo. Mas
+       com o foco num BOTÃO (painel de pausa, abertura) eles são a navegação
+       por teclado: Tab anda entre os botões e Espaço aperta o botão. */
+    const emControle = e.target?.closest?.('button, input, select, textarea, a[href]');
+    if (emControle && (e.code === 'Space' || e.code === 'Tab' || e.code === 'Enter')) return;
     if (e.code === 'Space' || e.code === 'Tab') e.preventDefault();
     this.fonte = 'teclado';
     if (e.repeat) return;   // auto-repeat do SO não é uma nova intenção
@@ -125,23 +142,32 @@ export class Entrada {
   /** Perder o foco (alt-tab) tem que zerar tudo, senão a tecla "gruda". */
   _onBlur() {
     for (const a of ACOES) {
-      if (this.estado[a]) this.bordaSolta[a] = true;
+      if (this.estado[a]) this._soltaPend[a] = true;
       this.estado[a] = false;
       this.pedido[a] = -1;
+      this._bordaPend[a] = false;
     }
   }
 
   _pressionar(acao) {
     if (this.estado[acao]) return;
     this.estado[acao] = true;
-    this.borda[acao] = true;
+    this._bordaPend[acao] = true;
+    this._ui[acao] = true;
     this.pedido[acao] = this.tempo;
   }
 
   _soltar(acao) {
     if (!this.estado[acao]) return;
     this.estado[acao] = false;
-    this.bordaSolta[acao] = true;
+    this._soltaPend[acao] = true;
+  }
+
+  /** Um pedido de interface (pausa/mapa) desde a última consulta. Consome. */
+  consumirUI(acao) {
+    const v = !!this._ui[acao];
+    this._ui[acao] = false;
+    return v;
   }
 
   /**
@@ -151,8 +177,10 @@ export class Entrada {
   atualizar(dt) {
     this.tempo += dt;
     for (const a of ACOES) {
-      this.borda[a] = false;
-      this.bordaSolta[a] = false;
+      this.borda[a] = this._bordaPend[a];
+      this.bordaSolta[a] = this._soltaPend[a];
+      this._bordaPend[a] = false;
+      this._soltaPend[a] = false;
     }
     this._lerGamepad();
 
@@ -170,7 +198,15 @@ export class Entrada {
     const pads = navigator.getGamepads();
     let pad = this.gamepadIndex != null ? pads[this.gamepadIndex] : null;
     if (!pad) { for (const p of pads) if (p) { pad = p; break; } }
-    if (!pad) { this._botoesGamepadAnteriores.length = 0; return; }
+    if (!pad) {
+      // Controle caiu: solta o que ele estava segurando, senão o direcional
+      // apertado na hora da queda deixava o Guardião andando sozinho.
+      for (const acao in this._botoesGamepadAnteriores) {
+        if (this._botoesGamepadAnteriores[acao]) this._soltar(acao);
+      }
+      this._botoesGamepadAnteriores = {};
+      return;
+    }
 
     const ax = pad.axes[0] ?? 0, ay = pad.axes[1] ?? 0;
     if (Math.abs(ax) > ZONA_MORTA) {

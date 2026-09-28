@@ -15,7 +15,7 @@
    ========================================================================= */
 
 import { clamp01, lerp, damp, sobrepoe, caixaDe } from '../core/mat.js';
-import { carregarSala, todasAsSalas, idsDeArea, PORTA_OPOSTA } from './salas.js';
+import { carregarSala, todasAsSalas, idsDeArea, PORTA_OPOSTA, definicaoSala } from './salas.js';
 import { AREAS, resolver } from '../render/paleta.js';
 import { ArteTerreno } from '../render/terreno-arte.js';
 import { Decor } from '../render/decor.js';
@@ -75,6 +75,8 @@ export class Mundo {
     this.barreirasQuebradas = new Set();
     /** Bichos presos que o Canto já soltou (entidades/perigos.js). */
     this.bichosSalvos = new Set();
+    /** Salas cujo chefe já caiu. */
+    this.chefesDerrotados = new Set();
 
     /** Último ponto de salvamento tocado. */
     this.checkpoint = { sala: null, x: 0, y: 0 };
@@ -108,6 +110,9 @@ export class Mundo {
     this.jogador.x = p.x - this.jogador.largura / 2;
     this.jogador.y = p.y - this.jogador.altura;
     this.jogador.vx = 0; this.jogador.vy = 0;
+    // O "último chão seguro" (volta do espinho) é da sala ANTERIOR: zera.
+    this.jogador.chaoSeguro = null;
+    this.jogador._voltaSegura = 0;
     // Depois do jogador posicionado: o bicho caído da sala é colocado perto
     // de onde ELE entrou, pra ser visto logo.
     this.fauna = new Fauna(sala.terreno, sala.area, sala.def.semente ?? 7,
@@ -135,8 +140,15 @@ export class Mundo {
   _tentarPorta() {
     if (this.trocandoDeSala || !this.sala) return;
     const j = this.jogador;
+    // Morto não atravessa porta: o corpo caindo numa porta perto da hora de
+    // renascer disparava duas transições e uma delas se perdia (preso morto,
+    // ou nenhuma porta funcionando mais).
+    if (!j.vivo || this._revivendo) return;
     const porta = this.sala.portaEm(j.centroX, j.centroY);
-    if (!porta) return;
+    // A porta por onde ele ACABOU de chegar só volta a valer depois que ele
+    // sair do gatilho dela — rede de segurança contra pingue-pongue.
+    if (porta !== this._portaDeChegada) this._portaDeChegada = null;
+    if (!porta || porta === this._portaDeChegada) return;
     const destino = this.sala.ligacoes[porta.tipo];
     if (!destino) return;
 
@@ -147,6 +159,9 @@ export class Mundo {
       const salaDest = carregarSala(idDestino);
       const ponto = salaDest.pontoDeEntrada(portaChegada);
       this.entrarNaSala(idDestino, ponto);
+      this._portaDeChegada = salaDest.objetos.find((o) => o.tipo === portaChegada) ?? null;
+      // Subindo por um buraco, sai com impulso — senão cai de volta nele.
+      if (portaChegada === 'porta-baixo') this.jogador.vy = -380;
       this.trocandoDeSala = false;
     });
   }
@@ -167,10 +182,15 @@ export class Mundo {
 
   registrarParasitaMorto(cx, cy, salaId = this.sala?.id) {
     if (!salaId) return;
-    this.parasitasMortos.add(Mundo.chaveParasita(salaId, cx, cy));
-    this._cacheVivos.clear();
     const area = this.sala?.area;
-    if (area && this.parasitasVivosNaArea(area) === 0) {
+    // Anuncia só na PASSAGEM de "ainda tem" para "limpa" — não a cada morte
+    // numa área que já estava limpa.
+    const antes = area ? this.parasitasVivosNaArea(area) : 0;
+    const chave = Mundo.chaveParasita(salaId, cx, cy);
+    if (this.parasitasMortos.has(chave)) return;
+    this.parasitasMortos.add(chave);
+    this._cacheVivos.clear();
+    if (area && antes > 0 && this.parasitasVivosNaArea(area) === 0) {
       this.aoEvento?.({ tipo: 'areaLimpa', area });
     }
   }
@@ -263,7 +283,24 @@ export class Mundo {
     const atual = this.purezaDaSala(salaId);
     if (atual >= TETO_CANTO) return false;
     const alvo = Math.min(TETO_CANTO, atual + GANHO_CANTO);
+    // Não atropela uma restauração MAIOR em andamento (a da semente): cantar
+    // no meio dela a interrompia em 0,28 pra sempre, com a semente já gasta.
+    const r = this._restaurando;
+    if (r && r.sala === salaId && r.para >= alvo) return false;
     this._restaurando = { sala: salaId, de: atual, para: alvo, t: 0, dur: 1.4 };
+    return true;
+  }
+
+  /** O golpe tem 46 px de alcance — mais que um tile. Sem esta checagem a
+   *  espada acertava o que estava do OUTRO lado de uma parede fina. */
+  _semParedeEntre(x0, y0, c) {
+    const t = this.sala?.terreno;
+    if (!t) return true;
+    const x1 = c.x + c.largura / 2, y1 = c.y + c.altura / 2;
+    for (let i = 1; i < 6; i++) {
+      const k = i / 6;
+      if (t.solido(Math.floor(lerp(x0, x1, k) / t.tile), Math.floor(lerp(y0, y1, k) / t.tile))) return false;
+    }
     return true;
   }
 
@@ -298,7 +335,7 @@ export class Mundo {
     const j = this.jogador;
     j.atualizar(dt, entrada, this.sala.terreno);
 
-    for (const ev of j.eventos) this.aoEvento?.(ev);
+    // (Os eventos do jogador são despachados no FIM do passo — ver lá.)
 
     // --- entidades ---
     const caixa = j.caixaAtaque();
@@ -310,7 +347,12 @@ export class Mundo {
       // tem caixa pra FERIR, mas não pode consumir o golpe da espada. Sem isso
       // o golpe batia no fogo primeiro, tocava o feedback de acerto e o
       // parasita ao lado saía ileso.
-      if (caixa && e.caixa && e.alvoDeGolpe !== false && !j.ataqueAcertou && sobrepoe(caixa, e.caixa())) {
+      // Só é ALVO quem pode levar golpe (`receberDano`) e ainda não está
+      // morrendo: ponto de salvamento, semente, altar, fonte ou um parasita
+      // já se desfazendo ficavam com o golpe e o inimigo ao lado saía ileso.
+      if (caixa && e.caixa && typeof e.receberDano === 'function' && e.alvoDeGolpe !== false
+        && !(e.morrendo > 0) && !j.ataqueAcertou && sobrepoe(caixa, e.caixa())
+        && this._semParedeEntre(j.centroX, j.centroY, e.caixa())) {
         if (j.confirmarAcerto()) {
           e.receberDano?.(1, j.centroX, j.centroY, this);
           this.laco.congelar(0.055);
@@ -318,8 +360,14 @@ export class Mundo {
           this.render.sacudirCor(0.35);
         }
       }
-      if (e.caixa && e.perigoso !== false && sobrepoe(caixaDe(j), e.caixa())) {
-        j.receberDano(e.dano ?? 1, e.x ?? j.centroX, e.y ?? j.centroY);
+      if (e.caixa && e.perigoso !== false) {
+        const ce = e.caixa();
+        if (sobrepoe(caixaDe(j), ce)) {
+          // Recuo a partir do CENTRO de quem fere. Com o canto superior
+          // esquerdo (`e.x`), quem encostava pela esquerda de um chefe era
+          // empurrado PRA DENTRO dele.
+          j.receberDano(e.dano ?? 1, ce.x + ce.largura / 2, ce.y + ce.altura / 2);
+        }
       }
     }
 
@@ -373,6 +421,18 @@ export class Mundo {
 
     this._tentarPorta();
     this.camera.seguir(dt, { x: j.centroX, y: j.centroY, vx: j.vx });
+
+    /* EVENTOS DO JOGADOR, no fim do passo. Eram despachados logo depois de
+       `jogador.atualizar` — e tudo o que acontece DEPOIS disso no mesmo passo
+       (dano por contato, projétil, fogo, sufoco, acerto da espada, morte) era
+       apagado pelo próximo `atualizar` antes de alguém ver: dano sem flash,
+       sem som, sem tela de morte. */
+    for (const ev of j.eventos) {
+      // O Canto restaura um pouco a sala — `cantar()` existia e ninguém chamava.
+      if (ev.tipo === 'canto') this.cantar();
+      this.aoEvento?.(ev);
+    }
+    j.eventos.length = 0;
   }
 
   /** Chamado fora do passo fixo — animação puramente visual. */
@@ -406,8 +466,20 @@ export class Mundo {
         this.jogador.reviver(cp.x - this.jogador.largura / 2, cp.y - this.jogador.altura);
         this._revivendo = false;
       });
+    } else if (!cp.sala) {
+      /* Sem checkpoint ainda (antes do primeiro ponto de salvamento): volta ao
+         começo do jogo. O `inicio` de uma sala sem '@' é o CENTRO dela — o
+         Guardião renascia no ar, às vezes em cima de um poço. */
+      this._transicao(() => {
+        const inicial = 'raizes-01';
+        if (this.sala?.id !== inicial) this.entrarNaSala(inicial);
+        const p = this.sala.inicio;
+        this.jogador.reviver(p.x - this.jogador.largura / 2, p.y - this.jogador.altura);
+        this.camera.encaixar(this.jogador.centroX, this.jogador.centroY);
+        this._revivendo = false;
+      });
     } else {
-      const p = cp.sala ? cp : this.sala.inicio;
+      const p = cp;
       this._transicao(() => {
         this.jogador.reviver(p.x - this.jogador.largura / 2, p.y - this.jogador.altura);
         this.camera.encaixar(this.jogador.centroX, this.jogador.centroY);
@@ -454,44 +526,64 @@ export class Mundo {
    * certa, mas os fragmentos já coletados renasciam.
    */
   paraSave() {
+    /* A restauração em curso vai pro save JÁ no valor final: a semente grava
+       no instante em que é ativada, antes dos 2,6 s de animação, e um save
+       com a pureza do meio do caminho deixava a sala suja pra sempre (a
+       semente já consta como gasta). */
+    const r = this._restaurando;
+    const pureza = Object.fromEntries([...this.pureza].map(([k, v]) =>
+      [k, r && r.sala === k ? Math.max(v, r.para) : v]));
     return {
       versao: 1,
+      salvoEm: Date.now(),
       sala: this.sala?.id ?? null,
       jogador: this.jogador.paraSave(),
-      pureza: Object.fromEntries(this.pureza),
+      pureza,
       sementes: [...this.sementesAtivadas],
       parasitas: [...this.parasitasMortos],
       fragmentos: [...this.fragmentosColetados],
       barreiras: [...this.barreirasQuebradas],
       bichos: [...this.bichosSalvos],
+      chefes: [...this.chefesDerrotados],
       checkpoint: this.checkpoint,
       dicas: this.dicasVistas ?? [],
     };
   }
 
   aplicarSave(dados) {
-    if (!dados) return false;
-    this.pureza = new Map(Object.entries(dados.pureza || {}));
-    this.sementesAtivadas = new Set(dados.sementes || []);
-    this.parasitasMortos = new Set(dados.parasitas || []);
+    if (!dados || typeof dados !== 'object') return false;
+    /* SAVE DESCONFIADO. Um save antigo ou corrompido (sala que deixou de
+       existir, campo com o tipo errado) lançava no meio da carga: o mundo
+       ficava meio aplicado e nada mais era salvo na sessão. Aqui cada campo
+       é conferido e o que não presta é descartado. */
+    const lista = (v) => (Array.isArray(v) ? v.filter((k) => typeof k === 'string') : []);
+    const pares = (v) => (v && typeof v === 'object' && !Array.isArray(v)
+      ? Object.entries(v).filter(([k, x]) => definicaoSala(k) && Number.isFinite(x)).map(([k, x]) => [k, clamp01(x)])
+      : []);
+    this.pureza = new Map(pares(dados.pureza));
+    this.sementesAtivadas = new Set(lista(dados.sementes));
+    this.parasitasMortos = new Set(lista(dados.parasitas));
     this._cacheVivos.clear();
-    this.fragmentosColetados = new Set(dados.fragmentos || []);
-    this.barreirasQuebradas = new Set(dados.barreiras || []);
-    this.bichosSalvos = new Set(dados.bichos || []);
-    this.checkpoint = dados.checkpoint || this.checkpoint;
-    this.dicasVistas = dados.dicas || [];
+    this.fragmentosColetados = new Set(lista(dados.fragmentos));
+    this.barreirasQuebradas = new Set(lista(dados.barreiras));
+    this.bichosSalvos = new Set(lista(dados.bichos));
+    this.chefesDerrotados = new Set(lista(dados.chefes));
+    const cp = dados.checkpoint;
+    const cpValido = !!(cp && definicaoSala(cp.sala) && Number.isFinite(cp.x) && Number.isFinite(cp.y));
+    this.checkpoint = cpValido ? { sala: cp.sala, x: cp.x, y: cp.y } : { sala: null, x: 0, y: 0 };
+    this.dicasVistas = lista(dados.dicas);
 
-    // Renasce no último ponto de salvamento, não onde parou: é o contrato do
-    // gênero, e evita restaurar o jogador no meio de uma queda ou dentro de
-    // um chefe.
-    const destino = dados.checkpoint?.sala || dados.sala;
-    if (!destino) return false;
+    /* Renasce no último ponto de salvamento, não onde parou: é o contrato do
+       gênero, e evita restaurar o jogador no meio de uma queda ou dentro de
+       um chefe. Sem ponto de salvamento, do começo do jogo — nunca na posição
+       gravada, que é de OUTRA sala (o save acontece em qualquer lugar: o
+       Guardião aparecia fora do mapa, preso). */
+    const destino = cpValido ? cp.sala : 'raizes-01';
 
     // A vida máxima depende dos fragmentos, então tem que ser reaplicada
     // ANTES de entrar na sala (a UI lê `vidaMax` no primeiro quadro).
     this.jogador.aplicarSave(dados.jogador);
-    this.entrarNaSala(destino, dados.checkpoint?.sala ? dados.checkpoint : null);
-    this.jogador.aplicarSave(dados.jogador);   // `entrarNaSala` mexe em x/y
+    this.entrarNaSala(destino, cpValido ? this.checkpoint : null);
     return true;
   }
 }

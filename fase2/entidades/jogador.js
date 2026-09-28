@@ -195,7 +195,8 @@ export class Jogador {
    * @param {import('../mundo/terreno.js').Terreno} terreno
    */
   atualizar(dt, entrada, terreno) {
-    this.eventos.length = 0;
+    // A lista de eventos é esvaziada pelo MUNDO, no fim do passo, depois de
+    // despachar (ver mundo.atualizar).
     this.tempoNoEstado += dt;
     this.velAnteriorY = this.vy;
 
@@ -231,17 +232,23 @@ export class Jogador {
     if (this.investidaRestante > 0) {
       this._passoInvestida(dt);
     } else {
-      this._passoHorizontal(dt, eixo);
+      /* Atordoado, o corpo segue o RECUO: com eixo 0 o freio de chão zerava a
+         velocidade do empurrão no mesmo instante (o recuo andava 8 px). */
+      if (this.atordoado > 0) this.vx = moveTowards(this.vx, 0, FREIO_AR * dt);
+      else this._passoHorizontal(dt, eixo);
       this._passoVertical(dt, entrada, controlavel);
     }
+    if (this._descer > 0) this._descer -= dt;
 
     // --------------------------------------------------------- colisão ---
     const antesY = this.y;
     terreno.mover(this, this.vx * dt, 0, { atravessaPlataforma: false });
     const res = terreno.mover(this, 0, this.vy * dt, {
-      // Segurar baixo numa plataforma faz descer por ela.
-      atravessaPlataforma: controlavel && entrada.ativo('baixo') && entrada.ativo('pular'),
+      // Baixo + pular numa plataforma faz descer por ela (ver `_passoVertical`).
+      atravessaPlataforma: this._descer > 0
+        || (controlavel && entrada.ativo('baixo') && entrada.ativo('pular')),
     });
+    this.sobrePlataforma = res.plataforma;
 
     this.eraNoChao = this.noChao;
     this.noChao = res.chao || terreno.noChao(this, 2);
@@ -274,8 +281,25 @@ export class Jogador {
     }
 
     // ------------------------------------------------------------ dano ---
+    /* ESPINHO devolve ao último chão seguro (depois do golpe). Sem isso, um
+       poço de espinhos mais fundo que o pulo tirava uma máscara a cada 0,95 s
+       até matar — e parado em cima, o recuo quase nulo não tirava ninguém. */
+    if (this.noChao && !this.naAgua
+      && !terreno.caixaToca(this.x - 10, this.y, this.largura + 20, this.altura + 6, PERIGO)) {
+      this.chaoSeguro = { x: this.x, y: this.y };
+    }
     if (terreno.caixaToca(this.x + 3, this.y + 3, this.largura - 6, this.altura - 6, PERIGO)) {
-      this.receberDano(1, this.centroX, this.centroY, { fonte: 'terreno' });
+      if (this.receberDano(1, this.centroX, this.centroY, { fonte: 'terreno' }) && this.vivo && this.chaoSeguro) {
+        this._voltaSegura = 0.32;
+      }
+    }
+    if (this._voltaSegura > 0) {
+      this._voltaSegura -= dt;
+      if (this._voltaSegura <= 0 && this.vivo && this.chaoSeguro) {
+        this.x = this.chaoSeguro.x; this.y = this.chaoSeguro.y;
+        this.vx = 0; this.vy = 0;
+        this._emitir('voltaSegura');
+      }
     }
 
     this._resolverEstado();
@@ -359,6 +383,17 @@ export class Jogador {
       if (querPular) { this._pularDaParede(); return; }
     }
 
+    /* --- descer da plataforma ---
+       Baixo + pular em cima de plataforma é DESCER, não pular: o pulo guardado
+       era consumido antes do `atravessaPlataforma` valer, e o Guardião subia
+       84 px antes de atravessar. */
+    if (querPular && this.noChao && this.sobrePlataforma && controlavel && entrada.ativo('baixo')) {
+      this._descer = 0.22;
+      this.vy = Math.max(this.vy, 60);
+      this.noChao = false;
+      return;
+    }
+
     // --- pulos ---
     if (querPular) {
       if (this.noChao || this.coyote > 0) this._pular();
@@ -368,8 +403,11 @@ export class Jogador {
 
     // --- corte do pulo variável ---
     // Só corta subindo e só se o botão foi solto: é o que dá controle fino de
-    // altura sem exigir precisão de frame do jogador.
-    if (this.vy < 0 && !this.segurandoPulo) {
+    // altura sem exigir precisão de frame do jogador. E só a subida que veio
+    // do BOTÃO: sem o `_subidaDoPulo`, ele cortava também o salto do recuo de
+    // dano (atordoado, ninguém segura pular) — o empurrão não subia.
+    if (this.vy >= 0 || this.noChao) this._subidaDoPulo = false;
+    if (this.vy < 0 && !this.segurandoPulo && this._subidaDoPulo) {
       this.vy = Math.max(this.vy, this.vy * CORTE_PULO + 0);
       if (this.vy > -60) this.vy = Math.max(this.vy, -60);
     }
@@ -396,6 +434,7 @@ export class Jogador {
   }
 
   _pular() {
+    this._subidaDoPulo = true;
     this.vy = -VEL_PULO;
     this.coyote = 0;
     this.noChao = false;
@@ -405,6 +444,7 @@ export class Jogador {
   }
 
   _pularNoAr() {
+    this._subidaDoPulo = true;
     this.saltosRestantes--;
     this.vy = -VEL_PULO * 0.92;
     this.esticar = 1.34; this.achatar = 0.72;
@@ -414,6 +454,7 @@ export class Jogador {
   }
 
   _pularDaParede() {
+    this._subidaDoPulo = true;
     const fora = -this.naParede;
     this.vx = PULO_PAREDE_X * fora;
     this.vy = -PULO_PAREDE_Y;
@@ -492,6 +533,9 @@ export class Jogador {
     if (recuo) {
       this.atordoado = DUR_ATORDOADO;
       this.investidaRestante = 0;
+      // Apanhar interrompe o Canto — senão, passado o atordoamento, ele
+      // voltava ao estado de CANTO no meio do ar.
+      this.cantoRestante = 0;
       this.vx = RECUO_DANO_X * dir;
       this.vy = -RECUO_DANO_Y;
       this.direcao = -dir;   // olha pra fonte do dano
@@ -525,6 +569,8 @@ export class Jogador {
     this.cantoRestante = 0;
     this.ataqueRestante = 0;
     this.sufoco = 0;
+    this._voltaSegura = 0;
+    this.chaoSeguro = null;
     this._trocarEstado(ESTADOS.PARADO);
   }
 
@@ -577,10 +623,11 @@ export class Jogador {
   }
 
   aplicarSave(dados) {
-    if (!dados) return;
-    this.x = dados.x ?? this.x;
-    this.y = dados.y ?? this.y;
-    this.vidaMax = dados.vidaMax ?? this.vidaMax;
+    if (!dados || typeof dados !== 'object') return;
+    // A POSIÇÃO não vem do save: quem posiciona é a entrada na sala (pelo
+    // checkpoint). O x/y gravado é de onde o save aconteceu — outra sala.
+    const vm = dados.vidaMax;
+    if (Number.isFinite(vm)) this.vidaMax = clamp(Math.round(vm), 1, 40);
     /* CARREGAR NUNCA COMEÇA MORTO.
        O save podia ser gravado com `vida` 0 — o `beforeunload` dispara em
        qualquer momento, inclusive no quadro em que o jogador morre, e cada
@@ -589,7 +636,8 @@ export class Jogador {
        Além disso `aplicarSave` sempre reentra pelo CHECKPOINT, e ponto de
        descanso curar é o contrato do gênero: carregar devolve a vida cheia. */
     this.vida = this.vidaMax;
-    this.habilidades = new Set(dados.habilidades ?? []);
+    this.habilidades = new Set((Array.isArray(dados.habilidades) ? dados.habilidades : [])
+      .filter((h) => HABILIDADES.includes(h)));
   }
 }
 

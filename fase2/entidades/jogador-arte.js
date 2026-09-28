@@ -85,6 +85,9 @@ export class ArteJogador {
   /* ===================================================================== */
 
   atualizar(dt, j) {
+    // As molas (cauda, orelhas) divergem com passo grande — um engasgo de
+    // poucos FPS virava NaN no desenho. Integra em passos de no máximo 1/30.
+    dt = Math.min(dt, 1 / 30);
     this.respiro += dt;
     this.floracao = damp(this.floracao, this._floracaoAlvo, 0.9, dt);
 

@@ -136,6 +136,16 @@ class Chefe {
     this.invulneravel = 1.4;
     this._trocarEstado('transicao');
     this.filaPadroes = [];
+    /* A troca de fase INTERROMPE o padrão em andamento — então tudo o que ele
+       deixou marcado volta ao zero. Sem isso o próximo padrão do mesmo tipo
+       avisava e não disparava (a trava "já cuspi" ficava ligada), e a Mãe
+       voltava do mergulho sem ferir ao encostar. */
+    for (const k of ['_cuspiu', '_pariu', '_emergiu', '_pulou', '_soltou', '_disparou', '_lancou']) {
+      if (k in this) this[k] = false;
+    }
+    this.telegrafo = 0;
+    this._anelPendente = null;
+    this.perigoso = true;
     mundo.camera.sacudir(0.7);
     mundo.render?.piscar?.(mundo.tema.acento, 0.45);
     mundo.laco.congelar(0.12);
@@ -176,6 +186,9 @@ class Chefe {
     this.vida = 0;
     this.morrendo = 0.001;
     this.perigoso = false;
+    // Chefe vencido fica vencido: sem isto ele voltava de vida cheia a cada
+    // visita à sala (e o Coração reabria a tela de fim).
+    if (mundo.sala?.id) mundo.chefesDerrotados?.add(mundo.sala.id);
     mundo.laco.congelar(0.22);
     mundo.camera.sacudir(1);
     mundo.render?.piscar?.('#ffffff', 0.7);
@@ -321,6 +334,9 @@ class MaeAfogada extends Chefe {
               cx: this.origemX / 32 + i, cy: this.origemY / 32,
             });
             cria.perseguindo = true;
+            // Cria de chefe não é parasita DA ÁREA: não conta pra semente nem
+            // grava chave (fracionária) no save.
+            cria.semRegistro = true;
             mundo.entidades.push(cria);
           }
           mundo.camera.sacudir(0.25);
@@ -471,6 +487,9 @@ class Maquina extends Chefe {
         break;
       case 'transicao':
         this.vx = damp(this.vx, 0, 0.2, dt);
+        // Cai durante a transição: a fase podia virar no meio do salto e a
+        // Máquina ficava 1,4 s parada no ar.
+        this._gravidade(dt, terreno);
         this.pressao = clamp01(this.tempoEstado / 1.4);
         if (this.tempoEstado > 1.4) { this.pressao = 0; this._trocarEstado('espera'); }
         break;
@@ -549,7 +568,10 @@ class Maquina extends Chefe {
         } else {
           // No ar, corrige a horizontal em direção ao ponto de queda — mas
           // devagar, pra que sair de baixo continue funcionando.
-          this.x = damp(this.x, this.alvoX - this.largura / 2, 0.55, dt);
+          // Com colisão (a Máquina ia parar DENTRO/EM CIMA da parede quando o
+          // jogador pulava colado nela).
+          const xAlvo = damp(this.x, this.alvoX - this.largura / 2, 0.55, dt);
+          terreno.mover(this, xAlvo - this.x, 0);
           const res = this._gravidade(dt, terreno);
           if (res.chao && this.vy === 0 && this.tempoEstado > AVISO + 0.25) {
             this._pulou = false;
@@ -717,7 +739,10 @@ class Maquina extends Chefe {
 
 class CoracaoChefe extends Chefe {
   constructor(obj) {
-    super(obj, {
+    /* O Coração FLUTUA: o encoste automático de chefes o derrubava 6 tiles até
+       o chão, e a metade de baixo de cada anel morria no piso. Volta pra
+       altura escrita no mapa. */
+    super({ ...obj, y: obj.y - (obj.encoste ?? 0) }, {
       nome: 'O Coração', vida: 52, largura: 110, altura: 110, dano: 2,
       limiaresFase: [0.66, 0.33],
     });
@@ -773,19 +798,24 @@ class CoracaoChefe extends Chefe {
             // jogador parado no vão da fase 1 morre aqui — de propósito.
             curvatura: gira ? 0.55 : 0,
           });
-          if (this.estado === 'anelDuplo') {
-            setTimeout(() => {
-              if (!this.morta) {
-                atirarAnel(mundo, this.centroX, this.centroY, n, this.anguloVao + Math.PI, 1.0, {
-                  vel: 150, raio: 6, cor: 'acento', curvatura: -0.55,
-                });
-              }
-            }, 520);
-          }
+          /* O segundo anel era um `setTimeout(520)`: disparava com o jogo
+             pausado, ignorava a câmera lenta e saía com o chefe já morrendo.
+             Agora é um tempo de JOGO, contado no próprio estado. */
+          if (this.estado === 'anelDuplo') this._anelPendente = { n, t: 0.52 };
           mundo.camera.sacudir(0.4);
         }
+        if (this._anelPendente) {
+          this._anelPendente.t -= dt;
+          if (this._anelPendente.t <= 0) {
+            if (!(this.morrendo > 0)) {
+              atirarAnel(mundo, this.centroX, this.centroY, this._anelPendente.n,
+                this.anguloVao + Math.PI, 1.0, { vel: 150, raio: 6, cor: 'acento', curvatura: -0.55 });
+            }
+            this._anelPendente = null;
+          }
+        }
         if (this.tempoEstado > AVISO + (this.estado === 'anelDuplo' ? 1.5 : 0.9)) {
-          this._disparou = false; this._trocarEstado('espera');
+          this._disparou = false; this._anelPendente = null; this._trocarEstado('espera');
         }
         break;
       }

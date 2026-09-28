@@ -370,8 +370,11 @@ function gradeBarreiras(mundo) {
   if (_gradeBarreira.sala !== mundo.sala) {
     _gradeBarreira.sala = mundo.sala;
     _gradeBarreira.celulas = new Set();
+    // Por CÉLULA (`barreira:cx,cy`), que é como as vizinhas se procuram. Com
+    // a chave completa (que tem a sala no meio) ninguém se achava, e cada
+    // célula era desenhada como bolha solta em vez de massa fundida.
     for (const e of mundo.entidades) {
-      if (e instanceof Barreira) _gradeBarreira.celulas.add(e.chave);
+      if (e instanceof Barreira) _gradeBarreira.celulas.add(`barreira:${e.cx},${e.cy}`);
     }
   }
   return _gradeBarreira.celulas;
@@ -460,7 +463,10 @@ class Barreira {
         this.dissolvendo = 0.001;
         // Sai da grade agora: as vizinhas abrem o contorno no mesmo quadro
         // em que o buraco aparece.
-        gradeBarreiras(mundo).delete(this.chave);
+        gradeBarreiras(mundo).delete(`barreira:${this.cx},${this.cy}`);
+        // E fica quebrada de vez: o conjunto era salvo e lido, mas ninguém o
+        // preenchia — a barreira voltava inteira a cada visita.
+        mundo.barreirasQuebradas?.add(this.chave);
         mundo.emitir(this.x + 16, this.y + 16, 24, {
           velMin: 50, velMax: 220, g: -30, vidaMin: 0.6, vidaMax: 1.4,
           cor: mundo.tema.crista, brilha: true, arrasto: 0.5,
@@ -1074,7 +1080,10 @@ export function criarEntidade(obj, mundo) {
       if (mundo.parasitaEstaMorto?.(mundo.sala?.id, obj.cx, obj.cy)) return null;
       return criarParasita(obj.tipo, obj) ?? new ParasitaBase(obj);
 
-    case 'chefe': return criarChefe(def.chefe, obj, mundo);
+    // Chefe vencido não volta (ver `Chefe._morrer`).
+    case 'chefe':
+      if (mundo.chefesDerrotados?.has(mundo.sala?.id)) return null;
+      return criarChefe(def.chefe, obj, mundo);
     default: return null;
   }
 }

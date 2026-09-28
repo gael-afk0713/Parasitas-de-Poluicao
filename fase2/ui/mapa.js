@@ -325,10 +325,12 @@ export class TelaMapa {
       ctx.arc(px, py, 3.4, 0, TAU);
       ctx.fill();
       // Halo pulsando: acha o ponto branco num mapa cheio de retângulos.
-      ctx.strokeStyle = rgba('#ffffff', 0.5 + 0.3 * Math.sin(performance.now() / 260));
+      // Com movimento reduzido, o halo fica parado.
+      const pul = this.mundo.render?.movimentoReduzido ? 0 : Math.sin(performance.now() / 260);
+      ctx.strokeStyle = rgba('#ffffff', 0.5 + 0.3 * pul);
       ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(px, py, 7 + Math.sin(performance.now() / 260) * 1.6, 0, TAU);
+      ctx.arc(px, py, 7 + pul * 1.6, 0, TAU);
       ctx.stroke();
     }
 

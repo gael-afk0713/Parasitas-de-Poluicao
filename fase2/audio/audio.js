@@ -26,21 +26,40 @@ export class Audio {
     this.pronto = false;
     this.volumeMestre = 0.55;
     this.volumeAmbiente = 0.42;
+    // Guardado ANTES do contexto existir: o painel aplica o volume salvo logo
+    // na carga, e sem guardar o valor ele era descartado (a música tocava a
+    // 0,5 com o deslizador mostrando 0).
+    this.volumeMusica = 0.5;
 
     this._drone = null;
     this._purezaAlvo = 0;
     this._pureza = 0;
     this._proximaNota = 0;
 
-    // Um gesto qualquer libera o áudio.
+    /* Um gesto libera o áudio — mas nem todo evento conta como gesto: no
+       celular um `pointerdown` de toque NÃO libera (só `touchend`/`click`), e
+       tirar os ouvintes no primeiro evento deixava o som mudo pra sempre.
+       Ficam até o contexto estar de fato rodando. */
+    const gestos = ['pointerup', 'touchend', 'click', 'keydown'];
     const iniciar = () => {
       this._garantirContexto();
-      window.removeEventListener('pointerdown', iniciar);
-      window.removeEventListener('keydown', iniciar);
+      if (this.ctx?.state === 'running') {
+        for (const g of gestos) window.removeEventListener(g, iniciar);
+      }
     };
-    window.addEventListener('pointerdown', iniciar);
-    window.addEventListener('keydown', iniciar);
+    for (const g of gestos) window.addEventListener(g, iniciar);
+    this._liberar = iniciar;
+
+    // Aba escondida: silêncio (e nada de notas se acumulando no agendador).
+    document.addEventListener('visibilitychange', () => {
+      if (!this.ctx) return;
+      if (document.hidden) this.ctx.suspend?.();
+      else if (this.pronto) this.ctx.resume?.();
+    });
   }
+
+  /** Chamado no clique de "Descer": garante o áudio no primeiro gesto real. */
+  liberar() { this._liberar?.(); }
 
   _garantirContexto() {
     if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
@@ -68,7 +87,7 @@ export class Audio {
     // abaixar a trilha sem abafar o retorno de acerto/dano, que é informação
     // de jogo e não pode sumir.
     this.barrMusica = this.ctx.createGain();
-    this.barrMusica.gain.value = 0.5;
+    this.barrMusica.gain.value = this.volumeMusica;
     this.barrMusica.connect(this.mestre);
     this.musica = new Musica(this.ctx, this.barrMusica);
     this.musica.iniciar();
@@ -166,8 +185,9 @@ export class Audio {
   }
 
   definirVolumeMusica(v) {
+    this.volumeMusica = clamp01(v);
     if (this.barrMusica) {
-      this.barrMusica.gain.setTargetAtTime(clamp01(v), this.ctx.currentTime, 0.2);
+      this.barrMusica.gain.setTargetAtTime(this.volumeMusica, this.ctx.currentTime, 0.2);
     }
   }
 

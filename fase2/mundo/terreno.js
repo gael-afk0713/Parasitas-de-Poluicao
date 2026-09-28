@@ -186,7 +186,13 @@ export class Terreno {
           // Plataforma só apoia se os pés estavam ACIMA do topo dela antes do
           // passo — senão o jogador subindo por baixo é teleportado pra cima.
           const podeApoiarPlat = ehPlat && !atravessaPlataforma && pesEmCimaAntes <= cy * this.tile + 1;
-          if (ehBloqueante(t) || podeApoiarPlat) {
+          /* O MESMO critério vale pro sólido: só vira chão se os pés estavam
+             acima dele antes do passo. Sem isso, um corpo empurrado de lado
+             pra dentro de uma parede (recuo de dano, salto de chefe) era
+             "apoiado" no topo da célula em que já estava enfiado — subia um
+             tile por passo e ia parar em cima da parede, fora do alcance. */
+          const podeApoiarSolido = ehBloqueante(t) && pesEmCimaAntes <= cy * this.tile + 1;
+          if (podeApoiarSolido || podeApoiarPlat) {
             corpo.y = cy * this.tile - corpo.altura;
             corpo.vy = 0;
             res.chao = true;

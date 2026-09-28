@@ -261,7 +261,18 @@ export class Sala {
    */
   portaEm(x, y) {
     for (const p of this.portas) {
-      if (Math.abs(x - p.x) < TILE * 1.1 && Math.abs(y - p.y + TILE / 2) < TILE * 1.6) return p;
+      /* Portas VERTICAIS só disparam com o corpo DENTRO da passagem. Com a
+         caixa generosa das laterais, quem andava pelo chão ao lado de um
+         buraco de porta-baixo caía nele (logo no começo, em raizes-01), e
+         quem chegava por uma porta vertical já nascia dentro do gatilho dela
+         — pingue-pongue infinito entre as duas salas. */
+      if (p.tipo === 'porta-baixo') {
+        if (Math.abs(x - p.x) < TILE * 0.7 && y > p.y - TILE * 0.9 && y < p.y + TILE * 2) return p;
+      } else if (p.tipo === 'porta-cima') {
+        if (Math.abs(x - p.x) < TILE * 0.9 && y < p.y + TILE * 0.2 && y > p.y - TILE * 2) return p;
+      } else if (Math.abs(x - p.x) < TILE * 1.1 && Math.abs(y - p.y + TILE / 2) < TILE * 1.6) {
+        return p;
+      }
     }
     return null;
   }
@@ -278,7 +289,36 @@ export class Sala {
     const deslocY = nomePorta === 'porta-cima' ? TILE * 1.3
       : nomePorta === 'porta-baixo' ? -TILE * 1.3
       : 0;
-    return { x: p.x + desloc, y: p.y + deslocY };
+    /* O Guardião tem 44 px (quase 1,4 tile). Uma porta no fim de um túnel de
+       1 tile punha a chegada DENTRO do teto — o jogador nascia preso. Se o
+       ponto padrão não comporta o corpo, procura o espaço livre mais perto:
+       mais pra dentro da sala e/ou mais pra cima. */
+    const L = 22, A = 44;
+    const cabe = (x, y) => !this.terreno.caixaSolida(x - L / 2 + 1, y - A + 1, L - 2, A - 2);
+    /* Chegando por baixo (pela passagem de uma porta-baixo), nasce AO LADO
+       dela, em pé no primeiro chão que houver — centrado na passagem, caía de
+       volta e as duas salas ficavam trocando o jogador sem fim. */
+    if (nomePorta === 'porta-baixo') {
+      for (const d of [1, -1, 2, -2, 3, -3, 4, -4]) {
+        const x = p.x + d * TILE;
+        const topo = p.y - TILE * 2;
+        const queda = this.terreno.alturaAteChao(x, topo, 4);
+        if (!Number.isFinite(queda) || queda < 0) continue;
+        const pes = topo + queda;
+        if (pes > p.y + 1) continue;
+        if (cabe(x, pes)) return { x, y: pes };
+      }
+    }
+    const dirX = Math.sign(desloc) || 0;
+    const x0 = p.x + desloc, y0 = p.y + deslocY;
+    if (cabe(x0, y0)) return { x: x0, y: y0 };
+    for (const dx of [0, 1, 2, 3]) {
+      for (const dy of [0, -1, -2, 1]) {
+        const x = x0 + dirX * dx * TILE, y = y0 + dy * TILE;
+        if (cabe(x, y)) return { x, y };
+      }
+    }
+    return { x: x0, y: y0 };
   }
 }
 

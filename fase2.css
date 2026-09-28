@@ -51,6 +51,14 @@
 .fase2-body.cursor-oculto{ cursor:none; }
 
 /* ============ CONTROLES DE TOQUE ============ */
+/* Painéis que não cabem (celular deitado, 390 px de altura): rolam, e o
+   conteúdo não é cortado em cima nem embaixo. */
+.fase2-body .painel{ overflow-y:auto; align-items:safe center; }
+.fase2-body .painel-conteudo{ margin:auto; }
+@media (max-height:520px){
+  .fase2-body .painel{ padding:3vh 5vw; }
+}
+
 /* `pointer:coarse` = dedo. Num notebook com tela sensível ao toque o
    ponteiro fino continua sendo o mouse, então os botões ficam escondidos —
    que é o certo: quem tem teclado não quer botões cobrindo o jogo. */
@@ -74,6 +82,18 @@
     pointer-events:auto;
   }
   .toque-direita{ flex-wrap:wrap; justify-content:flex-end; max-width:44vw; }
+  /* Pausa e mapa: sem eles, no celular não havia como pausar, salvar, mexer
+     no volume nem abrir o mapa. Pequenos e no alto, longe do polegar. */
+  .toque-topo{
+    position:fixed;
+    top:max(12px, env(safe-area-inset-top));
+    right:max(14px, env(safe-area-inset-right));
+    display:flex;
+    gap:10px;
+    pointer-events:auto;
+  }
+  .toque-mini{ width:44px; height:44px; font-size:15px; opacity:0.8; }
+  .toque-baixo{ width:50px; height:50px; font-size:16px; align-self:flex-end; }
 
   .toque-botao{
     width:62px; height:62px;
