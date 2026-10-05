@@ -6,66 +6,51 @@
 <title>Parasitas de Poluição</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=3">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Big+Shoulders+Stencil+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 
-  <div class="power-on" aria-hidden="true"></div>
-
   <div class="bg" aria-hidden="true"></div>
-  <div class="raios" aria-hidden="true"></div>
   <div class="vinheta" aria-hidden="true"></div>
-  <div class="grao" aria-hidden="true"></div>
-  <div class="fuligem" id="fuligem"></div>
-
-  <div class="hud-frame" aria-hidden="true">
-    <span class="hud-corner hud-corner--tl"></span>
-    <span class="hud-corner hud-corner--tr"></span>
-    <span class="hud-corner hud-corner--bl"></span>
-    <span class="hud-corner hud-corner--br"></span>
-  </div>
-
-  <div class="hud-status" aria-hidden="true">
-    <span class="hud-dot"></span>
-    Sistema Corporativo Online
-  </div>
+  <div class="fuligem" id="fuligem" aria-hidden="true"></div>
 
   <main>
-    <p class="titulo-overline">Simulação de Colapso Corporativo</p>
     <h1 class="titulo">
       <span class="linha">Parasitas</span>
       <span class="linha">de Poluição</span>
     </h1>
+    <p class="titulo-sub">
+      Faça a empresa crescer à custa da floresta.<br>
+      Quando ela cair, volte para consertar o que destruiu.
+    </p>
 
-    <nav class="menu">
-      <button class="item item-principal" id="btn-novo-jogo">Novo Jogo</button>
-      <button class="item" id="btn-continuar">Continuar</button>
+    <nav class="menu" aria-label="Menu principal">
+      <button class="item item-principal" id="btn-novo-jogo">Novo jogo</button>
+      <!-- a linha de baixo diz QUAL save o Continuar vai abrir (o mais
+           recente da conta) — antes ele escolhia sem avisar -->
+      <button class="item" id="btn-continuar">Continuar<span class="item-sub" id="resumo-continuar" hidden></span></button>
       <!-- Atalho direto pra Fase 2. Existe porque a Fase 2 só é alcançada
            terminando a Fase 1, o que leva bastante tempo — e sem esse atalho
            ela ficaria inacessível pra quem quer só voltar de onde parou.
            A Fase 2 lê o mesmo save ativo, então continuar por aqui restaura o
            progresso normalmente. -->
-      <button class="item" id="btn-fase2">Fase 2 · O Guardião</button>
-      <button class="item" id="btn-como-jogar">Como Jogar</button>
+      <button class="item item-guardiao" id="btn-fase2">Fase 2: o Guardião</button>
+      <button class="item" id="btn-como-jogar">Como jogar</button>
       <button class="item" id="btn-creditos">Créditos</button>
     </nav>
   </main>
 
   <footer>
-    <span class="relogio" id="relogio">00:00:00</span><span class="footer-sep">·</span>protótipo · v0.1
-    <span class="footer-sep footer-conta-sep" id="footer-conta-sep" hidden>·</span>
     <span class="footer-conta" id="footer-conta" hidden></span>
   </footer>
 
   <section class="painel painel--login aberto" id="painel-login" aria-hidden="false">
     <div class="painel-conteudo">
-      <p class="painel-rotulo">Acesso</p>
       <h2 class="painel-titulo">Entrar</h2>
       <p class="painel-explicacao">
-        Conta de verdade (Firebase Authentication) — seu progresso fica
-        salvo na nuvem e acompanha você em qualquer navegador ou
-        dispositivo, não só neste computador.
+        Seu progresso fica salvo na sua conta e continua de onde parou em
+        qualquer navegador ou aparelho.
       </p>
 
       <div class="campo">
@@ -80,7 +65,7 @@
       <p class="painel-status" id="status-login"></p>
 
       <div class="painel-acoes painel-acoes--fim">
-        <button class="painel-voltar" id="btn-criar-conta">Criar Conta</button>
+        <button class="painel-voltar" id="btn-criar-conta">Criar conta</button>
         <button class="painel-confirmar" id="btn-entrar">Entrar</button>
       </div>
 
@@ -90,8 +75,7 @@
 
   <section class="painel" id="painel-como-jogar" aria-hidden="true">
     <div class="painel-conteudo">
-      <p class="painel-rotulo">Manual</p>
-      <h2 class="painel-titulo">Como Jogar</h2>
+      <h2 class="painel-titulo">Como jogar</h2>
       <ul class="painel-lista">
         <li>Você assume o comando de uma empresa em ascensão.</li>
         <li>Cada decisão — desmatar, poluir rios, abrir novas fábricas — acelera o lucro, mas tem um custo ambiental.</li>
@@ -99,27 +83,25 @@
         <li>Quando a exploração atinge o limite, a empresa colapsa — e você se torna o Guardião da Natureza.</li>
         <li>A partir daí, o objetivo se inverte: restaurar tudo o que foi destruído.</li>
       </ul>
-      <button class="painel-voltar" data-fechar="painel-como-jogar">← Voltar</button>
+      <button class="painel-voltar" data-fechar="painel-como-jogar">Voltar</button>
     </div>
   </section>
 
   <section class="painel" id="painel-creditos" aria-hidden="true">
     <div class="painel-conteudo">
-      <p class="painel-rotulo">Ficha Técnica</p>
       <h2 class="painel-titulo">Créditos</h2>
       <ul class="painel-lista painel-lista--creditos">
-        <li><span>Roteiro &amp; Design</span>você</li>
+        <li><span>Roteiro e design</span>você</li>
         <li><span>Desenvolvimento</span>Claude</li>
         <li><span>Arte de fundo</span>gerada com IA</li>
       </ul>
-      <button class="painel-voltar" data-fechar="painel-creditos">← Voltar</button>
+      <button class="painel-voltar" data-fechar="painel-creditos">Voltar</button>
     </div>
   </section>
 
   <section class="painel" id="painel-novo-jogo" aria-hidden="true">
     <div class="painel-conteudo painel-conteudo--largo">
-      <p class="painel-rotulo">Novo Jogo</p>
-      <h2 class="painel-titulo">Criar Save</h2>
+      <h2 class="painel-titulo">Novo jogo</h2>
 
       <div class="slots">
         <div class="slot-wrapper">
@@ -152,24 +134,24 @@
       </div>
 
       <div class="campo">
-        <label for="campo-nome-save">Nome do Save</label>
+        <label for="campo-nome-save">Nome do save</label>
         <input type="text" id="campo-nome-save" maxlength="24" placeholder="ex: 1ª tentativa">
       </div>
 
       <div class="campo-linha">
         <div class="campo">
-          <label for="campo-nome-jogador">Nome do Jogador</label>
+          <label for="campo-nome-jogador">Seu nome</label>
           <input type="text" id="campo-nome-jogador" maxlength="20" placeholder="seu nome">
         </div>
         <div class="campo">
-          <label for="campo-nome-empresa">Nome da Empresa</label>
+          <label for="campo-nome-empresa">Nome da empresa</label>
           <input type="text" id="campo-nome-empresa" maxlength="24" placeholder="ex: Nortec Ind.">
         </div>
       </div>
 
       <div class="campo">
-        <label>Dificuldade</label>
-        <div class="dificuldades">
+        <label id="rotulo-dificuldade">Dificuldade</label>
+        <div class="dificuldades" role="group" aria-labelledby="rotulo-dificuldade">
           <button class="dificuldade dificuldade-ativa" data-dificuldade="Iniciante">Iniciante</button>
           <button class="dificuldade" data-dificuldade="Médio">Médio</button>
           <button class="dificuldade" data-dificuldade="Expert">Expert</button>
@@ -179,12 +161,12 @@
       <p class="painel-status" id="status-novo-jogo"></p>
 
       <div class="painel-acoes">
-        <button class="painel-voltar" data-fechar="painel-novo-jogo">← Voltar</button>
+        <button class="painel-voltar" data-fechar="painel-novo-jogo">Voltar</button>
         <button class="painel-confirmar" id="btn-comecar">Começar</button>
       </div>
     </div>
   </section>
 
-<script type="module" src="script.js?v=9"></script>
+<script type="module" src="script.js?v=10"></script>
 </body>
 </html>

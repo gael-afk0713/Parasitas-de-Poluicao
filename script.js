@@ -18,7 +18,6 @@ const campoLoginEmail = document.getElementById('campo-login-email');
 const campoLoginSenha = document.getElementById('campo-login-senha');
 const statusLogin = document.getElementById('status-login');
 const footerConta = document.getElementById('footer-conta');
-const footerContaSep = document.getElementById('footer-conta-sep');
 
 let usuarioAtual = null; // objeto User do Firebase Auth, ou null se deslogado
 
@@ -46,11 +45,9 @@ function fecharGateLogin() {
 function atualizarIndicadorConta() {
   if (!usuarioAtual) {
     footerConta.hidden = true;
-    footerContaSep.hidden = true;
     return;
   }
   footerConta.hidden = false;
-  footerContaSep.hidden = false;
   footerConta.textContent = '';
   const nomeEl = document.createElement('span');
   nomeEl.className = 'footer-conta-usuario';
@@ -59,7 +56,7 @@ function atualizarIndicadorConta() {
   botaoSair.className = 'footer-conta-sair';
   botaoSair.textContent = 'Sair';
   botaoSair.addEventListener('click', () => signOut(auth));
-  footerConta.append(nomeEl, ' · ', botaoSair);
+  footerConta.append(nomeEl, botaoSair);
 }
 
 // tradução das mensagens de erro mais comuns do Firebase Auth — lista
@@ -155,6 +152,7 @@ campoLoginSenha.addEventListener('keydown', (e) => {
 onAuthStateChanged(auth, (user) => {
   usuarioAtual = user;
   atualizarIndicadorConta();
+  atualizarResumoContinuar();
   if (user) {
     campoLoginSenha.value = '';
     statusLogin.classList.remove('visivel');
@@ -163,6 +161,28 @@ onAuthStateChanged(auth, (user) => {
     abrirGateLogin();
   }
 });
+
+// Linha de baixo do "Continuar": qual save ele vai abrir (o mais recente da
+// conta). Só leitura do próprio documento — o mesmo que o Continuar já lê.
+async function atualizarResumoContinuar() {
+  const resumo = document.getElementById('resumo-continuar');
+  if (!resumo) return;
+  resumo.hidden = true;
+  if (!usuarioAtual) return;
+  const saves = await carregarSavesConta();
+  const recente = maisRecenteDe(saves);
+  if (!recente || !usuarioAtual) return;
+  const partes = [`Save ${recente.slot}`];
+  if (recente.empresa) partes.push(recente.empresa);
+  if (recente.progresso) partes.push(formatarDinheiroSimples(recente.progresso.dinheiro));
+  resumo.textContent = partes.join(', ');
+  resumo.hidden = false;
+}
+function maisRecenteDe(saves) {
+  const existentes = [1, 2, 3].map((n) => saves[n]).filter(Boolean);
+  if (existentes.length === 0) return null;
+  return existentes.sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0))[0];
+}
 
 // gera partículas de fuligem caindo, densidade contida
 const campo = document.getElementById('fuligem');
@@ -184,17 +204,6 @@ for (let i = 0; i < total; i++) {
 }
 
 const reduzMovimento = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-// relógio do rodapé, tipo HUD
-function atualizarRelogio() {
-  const relogio = document.getElementById('relogio');
-  if (!relogio) return;
-  const agora = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  relogio.textContent = `${pad(agora.getHours())}:${pad(agora.getMinutes())}:${pad(agora.getSeconds())}`;
-}
-atualizarRelogio();
-setInterval(atualizarRelogio, 1000);
 
 // parallax sutil do fundo seguindo o mouse
 const bgEl = document.querySelector('.bg');
@@ -323,7 +332,7 @@ function atualizarRotulosSlots() {
     if (!sub) return;
     if (carregandoSaves) { sub.textContent = 'carregando...'; return; }
     if (!salvo) sub.textContent = 'vazio';
-    else if (salvo.progresso) sub.textContent = `${salvo.empresa} · ${formatarDinheiroSimples(salvo.progresso.dinheiro)}`;
+    else if (salvo.progresso) sub.textContent = `${salvo.empresa}, ${formatarDinheiroSimples(salvo.progresso.dinheiro)}`;
     else sub.textContent = salvo.empresa || 'rascunho';
   });
 }
@@ -507,14 +516,13 @@ document.querySelectorAll('.slot-apagar').forEach((botao) => {
 document.getElementById('btn-continuar').addEventListener('click', async () => {
   if (!usuarioAtual) { abrirGateLogin(); return; }
   const saves = await carregarSavesConta();
-  const existentes = [1, 2, 3].map((n) => saves[n]).filter(Boolean);
-  if (existentes.length === 0) {
+  const maisRecente = maisRecenteDe(saves);
+  if (!maisRecente) {
     // sem nenhum save ainda: manda pro Novo Jogo em vez de não fazer nada
     document.getElementById('btn-novo-jogo').click();
-    setTimeout(() => mostrarStatus('Nenhum save ainda — crie um pra começar.', false), 260);
+    setTimeout(() => mostrarStatus('Nenhum save ainda. Crie um para começar.', false), 260);
     return;
   }
-  const maisRecente = existentes.sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0))[0];
   localStorage.setItem('parasitas-save-ativo', JSON.stringify({
     uid: usuarioAtual.uid, slot: maisRecente.slot, nomeSave: maisRecente.nomeSave,
     jogador: maisRecente.jogador, empresa: maisRecente.empresa, dificuldade: maisRecente.dificuldade,
@@ -531,13 +539,12 @@ document.getElementById('btn-continuar').addEventListener('click', async () => {
 document.getElementById('btn-fase2')?.addEventListener('click', async () => {
   if (!usuarioAtual) { abrirGateLogin(); return; }
   const saves = await carregarSavesConta();
-  const existentes = [1, 2, 3].map((n) => saves[n]).filter(Boolean);
-  if (existentes.length === 0) {
+  const maisRecente = maisRecenteDe(saves);
+  if (!maisRecente) {
     document.getElementById('btn-novo-jogo').click();
     setTimeout(() => mostrarStatus('Crie um save antes de descer.', false), 260);
     return;
   }
-  const maisRecente = existentes.sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0))[0];
   localStorage.setItem('parasitas-save-ativo', JSON.stringify({
     uid: usuarioAtual.uid, slot: maisRecente.slot, nomeSave: maisRecente.nomeSave,
     jogador: maisRecente.jogador, empresa: maisRecente.empresa, dificuldade: maisRecente.dificuldade,

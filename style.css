@@ -8,6 +8,13 @@
   --moss-bright:#8fbf72;
   --agua:#5f97a6;        /* acento das construções de "usina" (água), contraste com o âmbar do carvão */
   --agua-dim:#3f7383;
+  --patina:#6fae93;      /* verde-pátina: o lado da floresta (Fase 2). O âmbar é o lucro. */
+
+  /* Duas vozes. O ESTÊNCIL é a empresa falando — título, o nome dela e o
+     dinheiro dela; some na Fase 2, quando a empresa cai. O resto é Archivo,
+     em caixa normal, usando a largura (font-stretch) pra variar o tom. */
+  --fonte-marca:'Big Shoulders Stencil Display', 'Archivo', sans-serif;
+  --fonte-texto:'Archivo', system-ui, sans-serif;
 }
 
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -15,30 +22,12 @@
 html,body{
   height:100%;
   background:var(--soot);
-  font-family:'Space Grotesk',sans-serif;
+  font-family:var(--fonte-texto);
   color:var(--paper);
   overflow:hidden;
 }
 
 body{position:relative;}
-
-/* ============ FLASH DE ABERTURA ============ */
-.power-on{
-  position:fixed;
-  inset:0;
-  z-index:60; /* sempre por cima de tudo durante o flash de abertura, inclusive do .painel (50) */
-  pointer-events:none;
-  background:var(--paper);
-  animation:ligar 0.8s steps(1,end) forwards;
-}
-@keyframes ligar{
-  0%{opacity:1;}
-  8%{opacity:0.2;}
-  14%{opacity:0.9;}
-  22%{opacity:0.05;}
-  30%{opacity:0.6;}
-  100%{opacity:0;}
-}
 
 /* ============ FUNDO — imagem cheia com respiração lenta ============ */
 .bg{
@@ -49,59 +38,25 @@ body{position:relative;}
   background-size:cover;
   background-position:center 38%;
   background-repeat:no-repeat;
-  filter:saturate(0.9) contrast(1.05) brightness(0.95);
-  animation:respirar 34s ease-in-out infinite alternate, tremulacao 6.5s ease-in-out infinite;
+  filter:saturate(0.85) contrast(1.05) brightness(0.9);
+  animation:respirar 34s ease-in-out infinite alternate;
   transform-origin:center 60%;
 }
 @keyframes respirar{
   from{transform:scale(1.06);}
   to{transform:scale(1);}
 }
-@keyframes tremulacao{
-  0%,46%,54%,100%{filter:saturate(0.9) contrast(1.05) brightness(0.95);}
-  50%{filter:saturate(0.9) contrast(1.08) brightness(1.03);}
-  76%,80%,84%{filter:saturate(0.9) contrast(1.05) brightness(0.95);}
-  78%{filter:saturate(0.88) contrast(1.1) brightness(0.88);}
-}
-
-/* raios de luz girando lentamente por trás da fumaça */
-.raios{
-  position:fixed;
-  inset:-20%;
-  z-index:1;
-  pointer-events:none;
-  opacity:0.16;
-  background:conic-gradient(from 200deg at 30% 20%,
-    transparent 0deg, rgba(217,154,53,0.5) 8deg, transparent 26deg,
-    transparent 200deg, rgba(217,154,53,0.35) 214deg, transparent 240deg);
-  mix-blend-mode:screen;
-  animation:girar 100s linear infinite;
-}
-@keyframes girar{
-  to{transform:rotate(360deg);}
-}
-
-/* textura de grão sutil, tipo HUD de jogo */
-.grao{
-  position:fixed;
-  inset:0;
-  z-index:2;
-  pointer-events:none;
-  opacity:0.05;
-  background-image:repeating-linear-gradient(0deg, #000 0px, transparent 1px, transparent 2px);
-  mix-blend-mode:overlay;
-}
-
-/* vinheta — escurece pra dar legibilidade ao texto, sem tapar a imagem */
+/* vinheta — escurece pra dar legibilidade ao texto, sem tapar a imagem.
+   O título fica no alto à esquerda: é ali que ela é mais funda. */
 .vinheta{
   position:fixed;
   inset:0;
   z-index:1;
   pointer-events:none;
   background:
-    linear-gradient(90deg, rgba(11,9,6,0.88) 0%, rgba(11,9,6,0.55) 30%, transparent 62%),
-    linear-gradient(0deg, rgba(11,9,6,0.85) 0%, rgba(11,9,6,0.25) 30%, transparent 55%),
-    linear-gradient(180deg, rgba(11,9,6,0.55) 0%, transparent 22%);
+    linear-gradient(90deg, rgba(11,9,6,0.9) 0%, rgba(11,9,6,0.6) 34%, transparent 66%),
+    linear-gradient(0deg, rgba(11,9,6,0.7) 0%, transparent 34%),
+    linear-gradient(180deg, rgba(11,9,6,0.6) 0%, transparent 30%);
 }
 
 /* ============ PARTÍCULAS DE FULIGEM ============ */
@@ -126,209 +81,129 @@ body{position:relative;}
   to{transform:translateY(110vh) translateX(20px);}
 }
 
-/* ============ HUD DE MOLDURA ============ */
-.hud-frame{
-  position:fixed;
-  inset:0;
-  z-index:4;
-  pointer-events:none;
-  opacity:0;
-  animation:hud-surgir 1s ease-out 0.4s forwards;
-}
-.hud-corner{
-  position:absolute;
-  width:26px;
-  height:26px;
-  border:1px solid rgba(217,154,53,0.4);
-}
-.hud-corner--tl{top:1.6rem;left:1.6rem;border-right:none;border-bottom:none;}
-.hud-corner--tr{top:1.6rem;right:1.6rem;border-left:none;border-bottom:none;}
-.hud-corner--bl{bottom:1.6rem;left:1.6rem;border-right:none;border-top:none;}
-.hud-corner--br{bottom:1.6rem;right:1.6rem;border-left:none;border-top:none;}
-
-@keyframes hud-surgir{
-  to{opacity:1;}
-}
-
-.hud-status{
-  position:fixed;
-  top:2.2rem;
-  left:2.6rem;
-  z-index:5;
-  display:flex;
-  align-items:center;
-  gap:0.5rem;
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.64rem;
-  letter-spacing:0.12em;
-  text-transform:uppercase;
-  color:var(--paper-dim);
-  opacity:0;
-  animation:hud-surgir 0.8s ease-out 0.9s forwards;
-}
-.hud-dot{
-  width:6px;
-  height:6px;
-  border-radius:50%;
-  background:var(--moss-bright);
-  box-shadow:0 0 6px rgba(143,191,114,0.8);
-  animation:piscar 2.6s ease-in-out infinite;
-}
-@keyframes piscar{
-  0%,100%{opacity:1;}
-  50%{opacity:0.35;}
-}
-
 /* ============ CONTEÚDO PRINCIPAL ============ */
 main{
   position:fixed;
-  left:6vw;
-  bottom:13vh;
+  left:7vw;
+  top:clamp(1.5rem, 8vh, 5.5rem);
   z-index:5;
-  max-width:600px;
+  max-width:min(62vw, 780px);
 }
 
-.titulo-overline{
-  display:flex;
-  align-items:center;
-  gap:0.6rem;
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.72rem;
-  letter-spacing:0.3em;
-  text-transform:uppercase;
-  color:var(--amber-dim);
-  margin-bottom:0.9rem;
-  padding-left:0.2rem;
-  opacity:0;
-  transform:translateY(10px);
-  animation:surgir 0.8s cubic-bezier(.2,.7,.2,1) forwards;
-}
-.titulo-overline::before{
-  content:"";
-  width:1.6rem;
-  height:1px;
-  background:var(--amber-dim);
-}
-
+/* O título é a única coisa que grita na tela: o nome pintado com estêncil,
+   como em caixa de carga e muro de fábrica. A tinta vaza um pouco na borda
+   (o text-shadow fino) — é spray, não impressão. */
 .titulo{
+  font-family:var(--fonte-marca);
   font-weight:900;
-  font-size:clamp(2.4rem,6.4vw,4.4rem);
-  line-height:0.98;
-  letter-spacing:-0.01em;
+  font-size:clamp(3.4rem, min(10.5vw, 17vh), 9.25rem);
+  line-height:0.84;
+  letter-spacing:0.01em;
   text-transform:uppercase;
   color:var(--paper);
-  text-shadow:0 2px 18px rgba(0,0,0,0.6);
+  text-shadow:0 0 1px rgba(239,232,214,0.6), 0 0 18px rgba(239,232,214,0.08);
 }
+/* Cada linha entra como uma passada de spray sobre o estêncil: uma máscara
+   de borda macia corre da esquerda pra direita. É o único movimento de
+   abertura da página. */
 .titulo .linha{
   display:block;
-  opacity:0;
-  transform:translateY(18px);
-  animation:surgir 0.9s cubic-bezier(.2,.7,.2,1) forwards;
+  -webkit-mask-image:linear-gradient(90deg, #000 44%, transparent 56%);
+  mask-image:linear-gradient(90deg, #000 44%, transparent 56%);
+  -webkit-mask-size:240% 100%;
+  mask-size:240% 100%;
+  -webkit-mask-repeat:no-repeat;
+  mask-repeat:no-repeat;
+  -webkit-mask-position:100% 0;
+  mask-position:100% 0;
+  animation:borrifar 0.7s cubic-bezier(.35,.55,.3,1) 0.15s forwards;
 }
+/* "de Poluição" na cor do lucro: na empresa, uma coisa é a outra. */
 .titulo .linha:nth-child(2){
   color:var(--amber);
-  animation-delay:0.18s;
+  text-shadow:0 0 1px rgba(217,154,53,0.65), 0 0 20px rgba(217,154,53,0.12);
+  animation-delay:0.5s;
 }
-.titulo .linha:nth-child(1){animation-delay:0s;}
+@keyframes borrifar{
+  to{-webkit-mask-position:0 0;mask-position:0 0;}
+}
 
-@keyframes surgir{
-  to{opacity:1;transform:translateY(0);}
+.titulo-sub{
+  font-size:1.0625rem;
+  font-stretch:90%;
+  line-height:1.45;
+  color:var(--paper-dim);
+  max-width:56ch;
+  text-wrap:pretty;
+  margin:1.4rem 0 0;
+  animation:aparecer 0.6s ease 1.05s both;
+}
+@keyframes aparecer{
+  from{opacity:0;}
+  to{opacity:1;}
 }
 
 /* ============ MENU ============ */
 nav.menu{
   display:flex;
   flex-direction:column;
-  margin-top:2.6rem;
-  gap:0.15rem;
+  align-items:flex-start;
+  margin-top:clamp(1.4rem, 5vh, 2.6rem);
+  animation:aparecer 0.6s ease 1.15s both;
 }
 
 .item{
-  font-family:'JetBrains Mono',monospace;
-  font-weight:600;
-  font-size:0.92rem;
-  letter-spacing:0.16em;
-  text-transform:uppercase;
-  text-decoration:none;
-  cursor:pointer;
-  border:none;
-  background:transparent;
-  color:var(--paper-dim);
-  text-align:left;
-  padding:0.65rem 0 0.65rem 1.4rem;
   position:relative;
-  opacity:0;
-  transform:translateX(-10px);
-  animation:entrar 0.6s ease-out forwards;
-  transition:color 0.2s ease, transform 0.15s cubic-bezier(.3,.7,.4,1);
-  -webkit-tap-highlight-color:transparent;
+  font-family:var(--fonte-texto);
+  font-stretch:92%;
+  font-weight:600;
+  font-size:1.375rem;
+  line-height:1.15;
+  text-align:left;
+  color:var(--paper);
+  background:transparent;
+  border:none;
+  padding:0.42rem 0;
+  cursor:pointer;
+  transition:color 0.15s ease, padding-left 0.18s cubic-bezier(.3,.7,.4,1);
 }
+/* marcador: uma faixa de tinta que só aparece no item em foco/hover */
 .item::before{
   content:"";
   position:absolute;
-  left:0;top:50%;
-  width:0.7rem;height:2px;
-  background:var(--paper-dim);
+  left:0;
+  top:calc(0.42rem + 0.58em);
+  width:0;
+  height:3px;
+  background:currentColor;
   transform:translateY(-50%);
-  transition:width 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+  transition:width 0.18s cubic-bezier(.3,.7,.4,1);
 }
-.item:nth-of-type(1){animation-delay:0.55s;}
-.item:nth-of-type(2){animation-delay:0.68s;}
-.item:nth-of-type(3){animation-delay:0.81s;}
-.item:nth-of-type(4){animation-delay:0.94s;}
+.item:hover, .item:focus-visible{padding-left:1.3rem;outline:none;}
+.item:hover::before, .item:focus-visible::before{width:0.85rem;}
 
-@keyframes entrar{
-  to{opacity:1;transform:translateX(0);}
+.item-sub{
+  display:block;
+  margin-top:0.2rem;
+  font-size:0.8125rem;
+  font-stretch:100%;
+  font-weight:450;
+  line-height:1.3;
+  color:var(--paper-dim);
 }
-
-.item:hover, .item:focus-visible{color:var(--paper);transform:translateX(4px);}
-.item:hover::before, .item:focus-visible::before{width:1.3rem;background:var(--amber);}
-.item:focus-visible{outline:none;}
+.item-sub[hidden]{display:none;}
 
 /* ---- feedback de clique ---- */
-.item.clicado{
-  color:var(--amber);
-  transform:translateX(3px) scale(0.97);
-  transition:color 0.08s ease, transform 0.08s ease;
-}
-.item.clicado::before{
-  width:100%;
-  background:var(--amber);
-  box-shadow:0 0 10px rgba(217,154,53,0.6);
-  transition:width 0.16s cubic-bezier(.2,.8,.3,1), background 0.1s ease;
-}
+.item.clicado{color:var(--amber);transition:color 0.08s ease;}
+.item.clicado::before{width:0.85rem;}
 
 .item-principal{
-  color:var(--paper);
+  color:var(--amber);
+  font-size:1.625rem;
   font-weight:700;
-  font-size:1rem;
-  overflow:hidden;
-  animation:entrar 0.6s ease-out 0.55s forwards, pulso-selecao 2.6s ease-in-out 1.7s infinite;
 }
-.item-principal::before{width:1.3rem;background:var(--amber);box-shadow:0 0 6px rgba(217,154,53,0.5);}
-.item-principal:hover, .item-principal:focus-visible{color:var(--amber);}
-.item-principal:hover::before, .item-principal:focus-visible::before{width:1.9rem;background:var(--amber);}
-
-@keyframes pulso-selecao{
-  0%,100%{text-shadow:0 2px 18px rgba(0,0,0,0.6);}
-  50%{text-shadow:0 2px 18px rgba(0,0,0,0.6), 0 0 14px rgba(217,154,53,0.35);}
-}
-.item-principal::after{
-  content:"";
-  position:absolute;
-  top:0;left:-70%;
-  width:50%;height:100%;
-  background:linear-gradient(90deg, transparent, rgba(217,154,53,0.4), transparent);
-  transform:skewX(-18deg);
-  pointer-events:none;
-}
-.item-principal.clicado::after{
-  animation:varredura 0.55s ease-out;
-}
-@keyframes varredura{
-  from{left:-70%;}
-  to{left:130%;}
-}
+.item-principal.clicado{color:var(--paper);}
+.item-guardiao{color:var(--patina);}
 
 /* ============ RODAPÉ ============ */
 footer{
@@ -338,15 +213,10 @@ footer{
   z-index:5;
   display:flex;
   align-items:center;
-  gap:0.6rem;
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.66rem;
-  letter-spacing:0.1em;
+  gap:0.9rem;
+  font-size:0.8125rem;
   color:var(--paper-dim);
-  opacity:0.6;
 }
-.relogio{color:var(--paper);font-variant-numeric:tabular-nums;}
-.footer-sep{opacity:0.5;}
 
 /* ============ PAINÉIS (Como Jogar / Créditos) ============ */
 .painel{
@@ -386,34 +256,6 @@ footer{
   transform:translateY(0);
   opacity:1;
 }
-.painel-conteudo::before, .painel-conteudo::after{
-  content:"";
-  position:absolute;
-  width:20px;
-  height:20px;
-  border-color:rgba(217,154,53,0.45);
-  pointer-events:none;
-}
-.painel-conteudo::before{top:-14px;left:-14px;border-top:1px solid;border-left:1px solid;}
-.painel-conteudo::after{bottom:-14px;right:-14px;border-bottom:1px solid;border-right:1px solid;}
-
-/* revelação em cascata do conteúdo ao abrir o painel */
-.painel.aberto .painel-conteudo > *{
-  animation:conteudo-surgir 0.5s cubic-bezier(.2,.7,.2,1) both;
-}
-.painel-conteudo > *:nth-child(1){animation-delay:0.05s;}
-.painel-conteudo > *:nth-child(2){animation-delay:0.11s;}
-.painel-conteudo > *:nth-child(3){animation-delay:0.17s;}
-.painel-conteudo > *:nth-child(4){animation-delay:0.23s;}
-.painel-conteudo > *:nth-child(5){animation-delay:0.29s;}
-.painel-conteudo > *:nth-child(6){animation-delay:0.35s;}
-.painel-conteudo > *:nth-child(7){animation-delay:0.41s;}
-.painel-conteudo > *:nth-child(8){animation-delay:0.47s;}
-
-@keyframes conteudo-surgir{
-  from{opacity:0;transform:translateY(10px);}
-  to{opacity:1;transform:translateY(0);}
-}
 
 /* tremor de validação (Novo Jogo) */
 .tremer{animation:tremer 0.4s ease-in-out;}
@@ -424,24 +266,24 @@ footer{
   40%,60%{transform:translateX(6px);}
 }
 
+/* linha de contexto acima do título — só onde diz algo que o título não diz
+   (a categoria de uma construção, "Fase 1 completa") */
 .painel-rotulo{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.7rem;
-  letter-spacing:0.24em;
-  text-transform:uppercase;
-  color:var(--amber);
-  margin-bottom:0.6rem;
+  font-size:0.9375rem;
+  font-weight:500;
+  color:var(--paper-dim);
+  margin-bottom:0.35rem;
 }
 
+/* títulos de painel: Archivo larga e pesada — papel timbrado, não estêncil */
 .painel-titulo{
-  font-weight:900;
-  font-size:clamp(1.8rem,4.4vw,2.6rem);
-  text-transform:uppercase;
+  font-weight:800;
+  font-stretch:112%;
+  font-size:clamp(1.75rem,4.2vw,2.4rem);
+  line-height:1.05;
   letter-spacing:-0.01em;
   color:var(--paper);
-  margin-bottom:1.8rem;
-  padding-bottom:1rem;
-  border-bottom:1px solid rgba(239,232,214,0.15);
+  margin-bottom:1.5rem;
 }
 
 .painel-lista{
@@ -454,7 +296,7 @@ footer{
 .painel-lista li{
   position:relative;
   padding-left:1.3rem;
-  font-size:0.95rem;
+  font-size:1rem;
   line-height:1.55;
   color:var(--paper-dim);
 }
@@ -473,15 +315,12 @@ footer{
   padding-left:0;
   padding-bottom:0.8rem;
   border-bottom:1px solid rgba(239,232,214,0.08);
-  font-family:'JetBrains Mono',monospace;
   color:var(--paper);
 }
 .painel-lista--creditos li::before{display:none;}
 .painel-lista--creditos li span{
   color:var(--paper-dim);
-  letter-spacing:0.08em;
-  text-transform:uppercase;
-  font-size:0.72rem;
+  font-size:0.875rem;
 }
 
 .painel-lista--stats{
@@ -496,36 +335,34 @@ footer{
   padding:0.7rem 0;
   padding-left:0;
   border-bottom:1px solid rgba(239,232,214,0.08);
-  font-family:'JetBrains Mono',monospace;
 }
 .painel-lista--stats li::before{display:none;}
 .painel-lista--stats li span{
   color:var(--paper-dim);
-  letter-spacing:0.06em;
-  text-transform:uppercase;
-  font-size:0.72rem;
+  font-size:0.875rem;
 }
-.painel-lista--stats li strong{color:var(--amber);font-size:0.95rem;}
+.painel-lista--stats li strong{
+  color:var(--amber);
+  font-size:1rem;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+}
 
 .painel-voltar{
-  font-family:'JetBrains Mono',monospace;
+  font-family:var(--fonte-texto);
   font-weight:600;
-  font-size:0.85rem;
-  letter-spacing:0.1em;
-  text-transform:uppercase;
+  font-size:0.9375rem;
+  text-decoration:none;
   background:transparent;
-  border:1px solid rgba(239,232,214,0.25);
-  color:var(--paper-dim);
-  padding:0.7rem 1.3rem;
+  border:1px solid rgba(239,232,214,0.28);
+  color:var(--paper);
+  padding:0.7rem 1.25rem;
   cursor:pointer;
   transition:color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
-.painel-voltar:hover, .painel-voltar:focus-visible{
-  color:var(--soot);
-  background:var(--amber);
-  border-color:var(--amber);
-  outline:none;
-}
+/* secundário continua secundário no hover: clareia, não vira âmbar */
+.painel-voltar:hover{border-color:rgba(239,232,214,0.6);background:rgba(239,232,214,0.06);}
+.painel-voltar:focus-visible{outline:2px solid var(--paper);outline-offset:2px;}
 
 /* ============ PAINEL NOVO JOGO ============ */
 .painel-conteudo--largo{
@@ -546,33 +383,37 @@ footer{
   flex:1;
   display:flex;
   flex-direction:column;
-  gap:0.3rem;
-  font-family:'JetBrains Mono',monospace;
-  font-weight:600;
-  font-size:0.78rem;
-  letter-spacing:0.08em;
-  text-transform:uppercase;
+  align-items:flex-start;
+  gap:0.2rem;
+  min-width:0;
+  font-family:var(--fonte-texto);
+  font-weight:700;
+  font-size:1rem;
+  text-align:left;
   background:rgba(239,232,214,0.04);
   border:1px solid rgba(239,232,214,0.15);
-  color:var(--paper-dim);
-  padding:0.75rem 0.5rem;
+  color:var(--paper);
+  padding:0.7rem 0.85rem;
   cursor:pointer;
   transition:color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
 .slot-sub{
-  font-weight:400;
-  font-size:0.62rem;
-  letter-spacing:0.04em;
-  opacity:0.75;
-  text-transform:none;
+  max-width:100%;
+  font-weight:450;
+  font-size:0.8125rem;
+  color:var(--paper-dim);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
-.slot:hover, .slot:focus-visible{color:var(--paper);border-color:rgba(217,154,53,0.5);outline:none;}
+.slot:hover{border-color:rgba(217,154,53,0.5);}
+.slot:focus-visible{outline:2px solid var(--paper);outline-offset:2px;}
 .slot-ativo, .slot-ativo:hover{
   color:var(--soot);
   background:var(--amber);
   border-color:var(--amber);
-  box-shadow:0 0 0 1px rgba(217,154,53,0.25), 0 0 16px rgba(217,154,53,0.35);
 }
+.slot-ativo .slot-sub{color:rgba(11,9,6,0.72);}
 
 /* ---- apagar save: botão pequeno ao lado do slot, exige clicar 2x
    (primeiro clique arma/fica vermelho, segundo confirma) ---- */
@@ -596,7 +437,8 @@ footer{
   stroke-linejoin:round;
   stroke-linecap:round;
 }
-.slot-apagar:hover, .slot-apagar:focus-visible{color:var(--paper);border-color:rgba(239,232,214,0.35);outline:none;}
+.slot-apagar:hover{color:var(--paper);border-color:rgba(239,232,214,0.35);}
+.slot-apagar:focus-visible{color:var(--paper);outline:2px solid var(--paper);outline-offset:2px;}
 .slot-apagar--confirmando, .slot-apagar--confirmando:hover{
   color:var(--paper);
   background:var(--rust);
@@ -610,24 +452,31 @@ footer{
   margin-bottom:1.4rem;
 }
 .campo label{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.68rem;
-  letter-spacing:0.16em;
-  text-transform:uppercase;
+  font-size:0.875rem;
+  font-weight:500;
   color:var(--paper-dim);
 }
-.campo input[type="text"]{
-  font-family:'Space Grotesk',sans-serif;
-  font-size:0.95rem;
+/* vale pra texto, e-mail e senha: antes só [type="text"] tinha estilo, e os
+   campos do login apareciam como barras brancas padrão do navegador */
+.campo input{
+  font-family:var(--fonte-texto);
+  font-size:1rem;
   color:var(--paper);
   background:rgba(239,232,214,0.05);
   border:1px solid rgba(239,232,214,0.18);
+  border-radius:0;
   padding:0.7rem 0.85rem;
   outline:none;
   transition:border-color 0.2s ease, background 0.2s ease;
 }
-.campo input[type="text"]::placeholder{color:var(--paper-dim);opacity:0.5;}
-.campo input[type="text"]:focus{border-color:var(--amber);background:rgba(217,154,53,0.06);}
+.campo input::placeholder{color:var(--paper-dim);opacity:0.6;}
+.campo input:focus{border-color:var(--amber);background:rgba(217,154,53,0.06);}
+/* o preenchimento automático do navegador pinta o campo de branco/azul */
+.campo input:-webkit-autofill{
+  -webkit-text-fill-color:var(--paper);
+  box-shadow:0 0 0 100px #1c1710 inset;
+  caret-color:var(--paper);
+}
 
 .campo-linha{
   display:grid;
@@ -642,11 +491,9 @@ footer{
   flex-wrap:wrap;
 }
 .dificuldade{
-  font-family:'JetBrains Mono',monospace;
+  font-family:var(--fonte-texto);
   font-weight:600;
-  font-size:0.78rem;
-  letter-spacing:0.1em;
-  text-transform:uppercase;
+  font-size:0.9375rem;
   background:transparent;
   border:1px solid rgba(239,232,214,0.2);
   color:var(--paper-dim);
@@ -654,21 +501,20 @@ footer{
   cursor:pointer;
   transition:color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
-.dificuldade:hover, .dificuldade:focus-visible{color:var(--paper);border-color:rgba(217,154,53,0.5);outline:none;}
+.dificuldade:hover{color:var(--paper);border-color:rgba(217,154,53,0.5);}
+.dificuldade:focus-visible{color:var(--paper);outline:2px solid var(--paper);outline-offset:2px;}
 .dificuldade-ativa, .dificuldade-ativa:hover{
   color:var(--soot);
   background:var(--amber);
   border-color:var(--amber);
-  box-shadow:0 0 16px rgba(217,154,53,0.35);
 }
 
 .painel-status{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.78rem;
-  letter-spacing:0.04em;
+  font-size:0.9375rem;
+  font-weight:500;
   min-height:1.2em;
   margin:0.4rem 0 0.8rem;
-  color:var(--rust);
+  color:#d0805e; /* ferrugem clareada: --rust puro não lê sobre o fundo escuro */
   opacity:0;
   transition:opacity 0.2s ease;
 }
@@ -686,18 +532,17 @@ footer{
 .painel-acoes--fim{justify-content:flex-end;}
 
 .painel-explicacao{
-  font-size:0.9rem;
+  font-size:1rem;
   line-height:1.55;
+  max-width:60ch;
   color:var(--paper-dim);
   margin-bottom:1.6rem;
 }
 .painel-nota{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.66rem;
-  line-height:1.6;
-  letter-spacing:0.02em;
+  font-size:0.9375rem;
+  font-style:italic;
+  line-height:1.5;
   color:var(--paper-dim);
-  opacity:0.7;
   margin-top:1.2rem;
   padding-top:1rem;
   border-top:1px solid rgba(239,232,214,0.1);
@@ -708,28 +553,27 @@ footer{
   margin:0.9rem auto 0;
   background:none;
   border:none;
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.72rem;
-  letter-spacing:0.04em;
+  font-family:var(--fonte-texto);
+  font-size:0.875rem;
   color:var(--paper-dim);
   text-decoration:underline;
-  text-underline-offset:2px;
+  text-underline-offset:3px;
   cursor:pointer;
 }
-.link-discreto:hover, .link-discreto:focus-visible{color:var(--amber);outline:none;}
+.link-discreto:hover{color:var(--paper);}
+.link-discreto:focus-visible{color:var(--paper);outline:2px solid var(--paper);outline-offset:2px;}
 
 /* ---- indicador de conta logada no rodapé ---- */
 .footer-conta{
   display:inline-flex;
   align-items:center;
-  gap:0.5rem;
+  gap:0.9rem;
 }
+.footer-conta[hidden]{display:none;}
 .footer-conta-usuario{color:var(--paper);}
 .footer-conta-sair{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.66rem;
-  letter-spacing:0.08em;
-  text-transform:uppercase;
+  font-family:var(--fonte-texto);
+  font-size:0.8125rem;
   background:none;
   border:none;
   color:var(--paper-dim);
@@ -738,14 +582,13 @@ footer{
   text-underline-offset:2px;
   padding:0;
 }
-.footer-conta-sair:hover, .footer-conta-sair:focus-visible{color:var(--amber);outline:none;}
+.footer-conta-sair:hover{color:var(--paper);}
+.footer-conta-sair:focus-visible{color:var(--paper);outline:2px solid var(--paper);outline-offset:2px;}
 
 .painel-confirmar{
-  font-family:'JetBrains Mono',monospace;
+  font-family:var(--fonte-texto);
   font-weight:700;
-  font-size:0.85rem;
-  letter-spacing:0.1em;
-  text-transform:uppercase;
+  font-size:0.9375rem;
   text-decoration:none;
   background:var(--amber);
   border:1px solid var(--amber);
@@ -754,20 +597,20 @@ footer{
   cursor:pointer;
   transition:filter 0.2s ease, transform 0.15s ease;
 }
-.painel-confirmar:hover, .painel-confirmar:focus-visible{filter:brightness(1.1);outline:none;}
+.painel-confirmar:hover{filter:brightness(1.1);}
+.painel-confirmar:focus-visible{filter:brightness(1.1);outline:2px solid var(--paper);outline-offset:2px;}
 .painel-confirmar:active{transform:scale(0.97);}
 
 @media (max-width:640px){
-  main{left:6vw;right:6vw;bottom:11vh;max-width:none;}
+  main{left:6vw;right:6vw;max-width:none;}
   .bg{background-position:center 30%;}
+  .vinheta{background:linear-gradient(180deg, rgba(11,9,6,0.85) 0%, rgba(11,9,6,0.55) 55%, rgba(11,9,6,0.8) 100%);}
+  .titulo{font-size:clamp(3.4rem, min(18vw, 13vh), 6rem);}
+  .item{font-size:1.25rem;}
+  .item-principal{font-size:1.5rem;}
+  footer{left:6vw;right:6vw;bottom:1.2rem;justify-content:flex-end;}
   .campo-linha{grid-template-columns:1fr;}
   .slots{flex-direction:column;}
-  .hud-status{display:none;}
-  .hud-corner{width:16px;height:16px;}
-  .hud-corner--tl, .hud-corner--tr{top:1rem;}
-  .hud-corner--bl, .hud-corner--br{bottom:1rem;}
-  .hud-corner--tl, .hud-corner--bl{left:1rem;}
-  .hud-corner--tr, .hud-corner--br{right:1rem;}
 }
 
 /* ============ FASE 1 — GRID ISOMÉTRICO ============ */
@@ -1324,15 +1167,13 @@ footer{
 }
 
 @media (prefers-reduced-motion:reduce){
-  .particula,.bg,.titulo .linha,.item,.item-principal,
-  .power-on,.raios,.hud-frame,.hud-status,.hud-dot,
-  .titulo-overline,.painel-conteudo > *,.tremer{
+  .particula,.bg,.titulo .linha,.titulo-sub,nav.menu,.tremer{
     animation:none !important;opacity:1;transform:none;
   }
-  .item.clicado{transform:none;}
-  .item-principal.clicado::after{animation:none !important;}
+  /* sem a passada de spray: o título já nasce pintado */
+  .titulo .linha{-webkit-mask-image:none;mask-image:none;}
+  .item, .item::before{transition:none !important;}
   .painel, .painel-conteudo{transition:opacity 0.15s ease !important;transform:none !important;}
-  .power-on{display:none;}
   .painel-fabricas, .painel-fabricas-conteudo{transition:opacity 0.15s ease !important;transform:none !important;}
   .fabrica-acoes-flutuantes{animation:none !important;opacity:1;transform:translate(-50%, 0) !important;}
   .fabrica-tinta--sucesso, .fabrica-tinta--erro{animation:none !important;opacity:0.6 !important;}
