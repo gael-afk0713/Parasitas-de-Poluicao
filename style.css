@@ -699,70 +699,102 @@ footer{
      por cima do cenário, não importa quão "funda" uma construção esteja */
   z-index:40;
   display:flex;
-  align-items:center;
-  gap:2.4rem;
-  padding:1.1rem 2.2rem;
-  background:linear-gradient(180deg, rgba(11,9,6,0.85) 0%, rgba(11,9,6,0.5) 75%, transparent 100%);
-  backdrop-filter:blur(2px);
+  align-items:flex-start;
+  gap:2.2rem;
+  /* à direita: espaço do botão de pausa (2.6rem + 1.6rem de "right") */
+  padding:1rem 5.4rem 1.7rem 2.2rem;
+  background:linear-gradient(180deg, rgba(11,9,6,0.9) 0%, rgba(11,9,6,0.6) 62%, transparent 100%);
+}
+
+/* O nome da empresa pintado em estêncil, como na fachada da fábrica. */
+.hud-empresa{
+  align-self:stretch;
+  font-family:var(--fonte-marca);
+  font-weight:900;
+  font-size:2.1rem;
+  line-height:0.9;
+  letter-spacing:0.01em;
+  text-transform:uppercase;
+  color:var(--paper);
+  text-shadow:0 0 1px rgba(239,232,214,0.5);
+  max-width:26vw;
+  padding:0.2rem 2.2rem 0 0;
+  border-right:1px solid rgba(239,232,214,0.15);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
 
 .hud-stat{
   display:flex;
-  align-items:center;
-  gap:0.7rem;
-}
-
-.hud-stat-texto{
-  display:flex;
   flex-direction:column;
+  align-items:flex-start;
+  gap:0.12rem;
+  min-width:0;
 }
-
 .hud-stat-rotulo{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.62rem;
-  letter-spacing:0.18em;
-  text-transform:uppercase;
+  font-size:0.8125rem;
+  font-weight:500;
   color:var(--paper-dim);
 }
-
+/* os números da empresa também são estêncil — o dinheiro é dela */
 .hud-stat-valor{
-  font-family:'Space Grotesk',sans-serif;
-  font-weight:700;
-  font-size:1.3rem;
+  font-family:var(--fonte-marca);
+  font-weight:800;
+  font-size:1.85rem;
+  line-height:1;
   color:var(--amber);
-  line-height:1.15;
+  font-variant-numeric:tabular-nums;
+}
+.hud-stat--fabrica .hud-stat-valor{color:var(--paper);}
+.hud-stat-meta{
+  font-size:0.75rem;
+  color:var(--paper-dim);
 }
 
-.hud-stat--fabrica .hud-stat-valor{color:var(--paper);}
-
-.hud-stat-meta{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.6rem;
-  letter-spacing:0.06em;
-  color:var(--paper-dim);
-  opacity:0.75;
+/* barras de progresso: a cor vem de `color` (currentColor), assim a barra e
+   o número da poluição mudam de gravidade juntos */
+.hud-barra{
+  position:relative;
+  display:block;
+  width:10.5rem;
+  height:4px;
+  margin:0.35rem 0 0.15rem;
+  background:rgba(239,232,214,0.14);
+}
+.hud-barra-cheia{
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:0;
+  background:currentColor;
+  transition:width 0.6s cubic-bezier(.3,.7,.3,1);
+}
+.hud-stat--caixa .hud-barra{color:var(--amber);}
+/* poluição: o trilho vai até o colapso; depois da meta (75%) o fundo fica
+   ferrugem, e um risco claro marca a meta */
+.hud-barra--poluicao{
+  background:linear-gradient(90deg, rgba(239,232,214,0.14) 0 75%, rgba(208,128,94,0.34) 75% 100%);
+}
+.hud-barra--poluicao::after{
+  content:"";
+  position:absolute;
+  left:75%;
+  top:-3px;
+  bottom:-3px;
+  width:2px;
+  margin-left:-1px;
+  background:var(--paper);
 }
 
 /* ---- poluição: cor sobe de gravidade conforme o total acumulado ---- */
-.icone-poluicao{
-  display:block;
-  flex-shrink:0;
-  width:24px;height:24px;
-  fill:none;
-  stroke:var(--paper-dim);
-  stroke-width:1.6;
-  stroke-linejoin:round;
-  stroke-linecap:round;
-  transition:stroke 0.4s ease;
-}
-.icone-poluicao circle{fill:rgba(157,148,127,0.25);stroke:none;}
-.hud-stat--poluicao .hud-stat-valor{color:var(--paper-dim);transition:color 0.4s ease;}
-.hud-stat--poluicao[data-nivel="atencao"] .icone-poluicao,
-.hud-stat--poluicao[data-nivel="atencao"] .hud-stat-valor{color:var(--amber);stroke:var(--amber);}
-.hud-stat--poluicao[data-nivel="atencao"] .icone-poluicao circle{fill:rgba(217,154,53,0.25);}
-.hud-stat--poluicao[data-nivel="critico"] .icone-poluicao,
-.hud-stat--poluicao[data-nivel="critico"] .hud-stat-valor{color:var(--rust);stroke:var(--rust);}
-.hud-stat--poluicao[data-nivel="critico"] .icone-poluicao circle{fill:rgba(138,74,47,0.35);}
+.hud-stat--poluicao .hud-stat-valor,
+.hud-stat--poluicao .hud-barra{color:var(--paper);transition:color 0.4s ease;}
+.hud-stat--poluicao[data-nivel="atencao"] .hud-stat-valor,
+.hud-stat--poluicao[data-nivel="atencao"] .hud-barra{color:var(--amber);}
+.hud-stat--poluicao[data-nivel="critico"] .hud-stat-valor,
+.hud-stat--poluicao[data-nivel="critico"] .hud-barra{color:#d0805e;}
 
 /* ---- pulso na Caixa a cada tick que rende dinheiro ---- */
 .hud-stat-valor.pulso-ganho{animation:pulso-ganho 0.6s ease-out;}
@@ -774,37 +806,22 @@ footer{
 /* ---- pulso na Caixa quando leva multa de fiscalização ---- */
 .hud-stat-valor.pulso-multa{animation:pulso-multa 0.7s ease-out;}
 @keyframes pulso-multa{
-  0%{color:var(--rust);text-shadow:0 0 10px rgba(138,74,47,0.7);}
+  0%{color:#d0805e;text-shadow:0 0 10px rgba(138,74,47,0.7);}
   100%{color:var(--amber);text-shadow:none;}
-}
-
-.hud-stat--empresa{
-  padding-right:2.2rem;
-  margin-right:0.2rem;
-  border-right:1px solid rgba(239,232,214,0.15);
-}
-.hud-stat--empresa .hud-stat-valor{
-  color:var(--paper);
-  max-width:34vw;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
 }
 
 /* ---- toast de boas-vindas ---- */
 .boas-vindas{
   position:fixed;
-  top:6.4rem;
+  top:7.6rem;
   left:50%;
   z-index:41; /* acima de qualquer construção, ver nota em .hud-fase1 */
   max-width:min(90vw, 520px);
   text-align:center;
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.78rem;
-  letter-spacing:0.02em;
-  line-height:1.5;
-  color:var(--paper-dim);
-  background:rgba(11,9,6,0.82);
+  font-size:0.9375rem;
+  line-height:1.45;
+  color:var(--paper);
+  background:rgba(11,9,6,0.88);
   border:1px solid rgba(217,154,53,0.35);
   padding:0.75rem 1.3rem;
   opacity:0;
@@ -818,7 +835,7 @@ footer{
 }
 .boas-vindas strong{color:var(--amber);}
 
-/* ícone de fábrica — SVG reaproveitado no HUD, no botão e nos cartões */
+/* ícone de fábrica — SVG reaproveitado no botão Construir e no catálogo */
 .icone-fabrica{
   display:block;
   flex-shrink:0;
@@ -828,9 +845,8 @@ footer{
   stroke-linejoin:round;
   stroke-linecap:round;
 }
-.hud-fabrica-icone{width:30px;height:30px;}
 
-/* ---- botão "Fábricas" (fixo embaixo) ---- */
+/* ---- botão "Construir" (fixo embaixo) ---- */
 .botao-fabricas{
   position:fixed;
   left:50%;
@@ -840,13 +856,11 @@ footer{
   display:flex;
   align-items:center;
   gap:0.65rem;
-  font-family:'JetBrains Mono',monospace;
-  font-weight:600;
-  font-size:0.85rem;
-  letter-spacing:0.12em;
-  text-transform:uppercase;
+  font-family:var(--fonte-texto);
+  font-weight:700;
+  font-size:1rem;
   color:var(--paper);
-  background:rgba(11,9,6,0.78);
+  background:rgba(11,9,6,0.82);
   border:1px solid rgba(217,154,53,0.5);
   padding:0.75rem 1.5rem;
   cursor:pointer;
@@ -854,11 +868,8 @@ footer{
   transition:background 0.2s ease, border-color 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 .botao-fabricas .icone-fabrica{width:20px;height:20px;}
-.botao-fabricas:hover, .botao-fabricas:focus-visible{
-  border-color:var(--amber);
-  box-shadow:0 0 16px rgba(217,154,53,0.35);
-  outline:none;
-}
+.botao-fabricas:hover{border-color:var(--amber);}
+.botao-fabricas:focus-visible{border-color:var(--amber);outline:2px solid var(--paper);outline-offset:2px;}
 .botao-fabricas[aria-expanded="true"]{
   background:var(--amber);
   color:var(--soot);
@@ -870,8 +881,9 @@ footer{
 }
 .botao-fabricas:active{transform:translateX(-50%) scale(0.97);}
 
-/* ---- botão de engrenagem (config), fixo no canto — atalho de toque
-   equivalente à tecla Esc, que não existe em celular/tablet ---- */
+/* ---- botão de pausa, fixo no canto — atalho de toque equivalente à
+   tecla Esc, que não existe em celular/tablet (era uma engrenagem, mas
+   o painel é de pausa: não tem configuração nenhuma) ---- */
 .botao-config{
   position:fixed;
   top:1.4rem;
@@ -888,19 +900,11 @@ footer{
   backdrop-filter:blur(3px);
   transition:border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
-.botao-config:hover, .botao-config:focus-visible{
-  border-color:var(--amber);
-  box-shadow:0 0 16px rgba(217,154,53,0.35);
-  outline:none;
-  transform:rotate(35deg);
-}
+.botao-config:hover{border-color:var(--amber);}
+.botao-config:focus-visible{border-color:var(--amber);outline:2px solid var(--paper);outline-offset:2px;}
 .icone-config{
-  width:20px;height:20px;
-  fill:rgba(217,154,53,0.18);
-  stroke:var(--amber);
-  stroke-width:1.4;
-  stroke-linejoin:round;
-  stroke-linecap:round;
+  width:18px;height:18px;
+  fill:var(--amber);
 }
 
 /* ---- painel de Configurações ---- */
@@ -962,10 +966,15 @@ footer{
   padding-bottom:1rem;
   border-bottom:1px solid rgba(239,232,214,0.15);
 }
-.painel-fabricas-cabecalho .painel-rotulo{margin-bottom:0;}
+.painel-fabricas-titulo{
+  font-weight:800;
+  font-stretch:112%;
+  font-size:1.5rem;
+  color:var(--paper);
+}
 
 .painel-fabricas-fechar{
-  font-family:'JetBrains Mono',monospace;
+  font-family:var(--fonte-texto);
   font-size:0.9rem;
   background:transparent;
   border:1px solid rgba(239,232,214,0.25);
@@ -975,85 +984,78 @@ footer{
   cursor:pointer;
   transition:color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
-.painel-fabricas-fechar:hover, .painel-fabricas-fechar:focus-visible{
-  color:var(--soot);
-  background:var(--amber);
-  border-color:var(--amber);
-  outline:none;
-}
+.painel-fabricas-fechar:hover{color:var(--paper);border-color:rgba(239,232,214,0.6);}
+.painel-fabricas-fechar:focus-visible{color:var(--paper);outline:2px solid var(--paper);outline-offset:2px;}
 
 .lista-fabricas{
   display:flex;
   flex-direction:column;
-  gap:0.7rem;
   /* com várias construções a lista fica mais alta que a tela — rola só
      ela, mantendo cabeçalho e botão de fechar sempre visíveis */
-  max-height:min(48vh, 420px);
+  max-height:min(52vh, 460px);
   overflow-y:auto;
   padding-right:0.3rem;
 }
+
+/* catálogo, não cartões: a categoria vira o título do grupo (uma vez só)
+   e cada construção é uma linha — nome, o que ela faz, quanto custa */
+.lista-fabricas-grupo{
+  font-size:0.875rem;
+  font-weight:600;
+  color:var(--paper-dim);
+  padding:1rem 0 0.45rem;
+}
+.lista-fabricas-grupo:first-child{padding-top:0;}
 
 .carta-fabrica{
   display:flex;
   align-items:center;
   gap:1rem;
   text-align:left;
-  background:rgba(239,232,214,0.04);
-  border:1px solid rgba(239,232,214,0.15);
-  padding:0.9rem 1.1rem;
+  font-family:var(--fonte-texto);
+  color:inherit;
+  background:transparent;
+  border:none;
+  border-top:1px solid rgba(239,232,214,0.1);
+  padding:0.8rem 0.6rem;
   cursor:pointer;
-  transition:border-color 0.2s ease, background 0.2s ease;
+  transition:background 0.15s ease;
 }
-.carta-fabrica:hover, .carta-fabrica:focus-visible{
-  border-color:rgba(217,154,53,0.5);
-  outline:none;
-}
-.carta-fabrica--selecionada{
-  border-color:var(--amber);
-  background:rgba(217,154,53,0.08);
-  box-shadow:0 0 16px rgba(217,154,53,0.25);
-}
-.carta-fabrica .icone-fabrica{width:30px;height:30px;}
+.carta-fabrica:hover{background:rgba(239,232,214,0.05);}
+.carta-fabrica:focus-visible{outline:2px solid var(--paper);outline-offset:-2px;}
+.carta-fabrica .icone-fabrica{width:28px;height:28px;}
 
 .carta-fabrica-texto{
   display:flex;
   flex-direction:column;
-  gap:0.2rem;
+  gap:0.15rem;
   flex:1;
-}
-.carta-fabrica-categoria{
-  font-family:'JetBrains Mono',monospace;
-  font-weight:600;
-  font-size:0.6rem;
-  letter-spacing:0.16em;
-  text-transform:uppercase;
-  color:var(--amber-dim);
+  min-width:0;
 }
 .carta-fabrica-nome{
-  font-family:'Space Grotesk',sans-serif;
   font-weight:700;
-  font-size:0.98rem;
+  font-size:1rem;
   color:var(--paper);
 }
 .carta-fabrica-desc{
-  font-family:'JetBrains Mono',monospace;
-  font-size:0.7rem;
+  font-size:0.875rem;
+  line-height:1.4;
   color:var(--paper-dim);
-  letter-spacing:0.02em;
 }
 .carta-fabrica-custo{
-  font-family:'JetBrains Mono',monospace;
-  font-weight:600;
-  font-size:0.85rem;
+  font-family:var(--fonte-marca);
+  font-weight:800;
+  font-size:1.3rem;
   color:var(--amber);
   white-space:nowrap;
 }
 
+/* sem dinheiro pra comprar: a linha apaga, mas o preço continua legível */
 .carta-fabrica:disabled{
-  opacity:0.4;
+  opacity:0.45;
   cursor:not-allowed;
 }
-.carta-fabrica:disabled:hover{border-color:rgba(239,232,214,0.15);}
+.carta-fabrica:disabled:hover{background:transparent;}
 
 .botao-fabricas:disabled{
   opacity:0.4;
@@ -1140,9 +1142,11 @@ footer{
 .fabrica-acoes-flutuantes .painel-voltar,
 .fabrica-acoes-flutuantes .painel-confirmar{
   padding:0.5rem 0.9rem;
-  font-size:0.78rem;
+  font-size:0.875rem;
   white-space:nowrap;
 }
+/* por cima do cenário, o botão secundário precisa de fundo próprio */
+.fabrica-acoes-flutuantes .painel-voltar{background:rgba(11,9,6,0.88);}
 
 /* ---- número flutuante de ganho, sobe e some sobre a construção ---- */
 .numero-flutuante{
@@ -1150,9 +1154,10 @@ footer{
   top:0;
   left:0;
   z-index:46; /* acima de qualquer construção (mesmo uma funda), ver nota em .hud-fase1 */
-  font-family:'JetBrains Mono',monospace;
+  font-family:var(--fonte-texto);
   font-weight:700;
-  font-size:0.8rem;
+  font-size:0.875rem;
+  font-variant-numeric:tabular-nums;
   color:var(--moss-bright);
   text-shadow:0 1px 5px rgba(11,9,6,0.85);
   pointer-events:none;
@@ -1179,36 +1184,32 @@ footer{
   .fabrica-tinta--sucesso, .fabrica-tinta--erro{animation:none !important;opacity:0.6 !important;}
   .numero-flutuante{animation:none !important;opacity:0.9;transform:translate(-50%, -14px) !important;}
   .hud-stat-valor.pulso-ganho, .hud-stat-valor.pulso-multa{animation:none !important;}
+  .hud-barra-cheia{transition:none !important;}
   .neblina-filtro{transition:none !important;}
   .particula-fumaca{animation:none !important;opacity:0.3;transform:none;}
 }
 
-/* ---- HUD da fase 1 em telas estreitas: empilha em vez de estourar a
-   largura da tela, e reserva espaço à direita pro botão de engrenagem
-   (2.6rem de largura + 1.6rem de "right") não sobrepor o valor da Caixa.
+/* ---- HUD da fase 1 em telas estreitas: o nome da empresa ganha a
+   primeira linha inteira e os três números dividem a segunda; reserva
+   espaço à direita pro botão de pausa (2.6rem + 1.6rem de "right").
    Fica no final do arquivo de propósito: precisa vir depois das regras
    base de .hud-fase1/.hud-stat pra vencer o empate de especificidade. ---- */
 @media (max-width:640px){
   .hud-fase1{
-    flex-wrap:wrap;
-    gap:0.5rem 1.1rem;
-    padding:0.75rem 4.8rem 0.75rem 1rem;
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+    gap:0.55rem 1rem;
+    padding:0.8rem 4.6rem 1.1rem 1rem;
   }
-  .hud-stat{gap:0.5rem;}
-  .hud-stat-rotulo{font-size:0.56rem;}
-  .hud-stat-valor{font-size:1.05rem;}
-  .hud-stat-meta{display:none;}
-  .hud-stat--empresa{
-    flex-basis:100%;
+  .hud-empresa{
+    grid-column:1 / -1;
     max-width:100%;
-    min-width:0;
-    padding-right:4.4rem;
-    margin-right:0;
+    font-size:1.55rem;
+    padding:0.15rem 0 0;
     border-right:none;
-    padding-bottom:0.4rem;
-    border-bottom:1px solid rgba(239,232,214,0.15);
   }
-  .hud-stat--empresa .hud-stat-texto{min-width:0;}
-  .hud-stat--empresa .hud-stat-valor{max-width:100%;}
-  .icone-poluicao{width:20px;height:20px;}
+  .hud-stat-valor{font-size:1.35rem;}
+  .hud-barra{width:100%;}
+  .hud-stat-meta{display:none;}
+  .boas-vindas{top:8.2rem;}
 }

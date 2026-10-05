@@ -411,17 +411,25 @@ function valorVenda(instancia) {
   return Math.round(investido * FATOR_VENDA);
 }
 
+const GRUPOS_CONSTRUCAO = { 'Fábrica': 'Fábricas', 'Usina': 'Usinas' };
 function renderizarCartasFabricas() {
   const lista = document.getElementById('lista-fabricas');
+  let grupoAtual = null;
   for (const tipo in FABRICAS) {
     const config = FABRICAS[tipo];
+    if (config.categoria !== grupoAtual) {
+      grupoAtual = config.categoria;
+      const titulo = document.createElement('h3');
+      titulo.className = 'lista-fabricas-grupo';
+      titulo.textContent = GRUPOS_CONSTRUCAO[grupoAtual] || grupoAtual;
+      lista.appendChild(titulo);
+    }
     const carta = document.createElement('button');
     carta.className = 'carta-fabrica';
     carta.dataset.fabrica = tipo;
     carta.innerHTML = `
       <svg class="icone-fabrica" viewBox="0 0 24 24" aria-hidden="true">${ICONES_CONSTRUCAO[config.icone] || ICONES_CONSTRUCAO.fabrica}</svg>
       <span class="carta-fabrica-texto">
-        <span class="carta-fabrica-categoria">${config.categoria}</span>
         <span class="carta-fabrica-nome">${config.nome}</span>
         <span class="carta-fabrica-desc">${config.descricao}</span>
       </span>
@@ -445,6 +453,11 @@ function precoAtual(tipo) {
   return Math.round(config.custo * Math.pow(MULTIPLICADOR_CUSTO_REPETIDO, quantidade));
 }
 
+// metas da fase (comentário completo em "META DE VITÓRIA / COLAPSO")
+const META_DINHEIRO = 1500000;
+const META_POLUICAO = 15000;
+const LIMIAR_COLAPSO = 20000;
+
 let dinheiro = 5000;
 let poluicaoTotal = 0;
 let totalFabricas = 0;
@@ -456,12 +469,16 @@ const hudDinheiroEl = document.getElementById('hud-dinheiro');
 const hudFabricasEl = document.getElementById('hud-fabricas');
 const hudPoluicaoEl = document.getElementById('hud-poluicao');
 const hudStatPoluicaoEl = document.querySelector('.hud-stat--poluicao');
+const hudBarraCaixaEl = document.getElementById('hud-barra-caixa');
+const hudBarraPoluicaoEl = document.getElementById('hud-barra-poluicao');
+const porcento = (v, max) => (Math.min(1, Math.max(0, v / max)) * 100).toFixed(2) + '%';
 
 function formatarDinheiro(valor) {
   return 'R$ ' + valor.toLocaleString('pt-BR');
 }
 function atualizarHudDinheiro() {
   hudDinheiroEl.textContent = formatarDinheiro(dinheiro);
+  if (hudBarraCaixaEl) hudBarraCaixaEl.style.width = porcento(dinheiro, META_DINHEIRO);
 }
 function atualizarHudFabricas() {
   hudFabricasEl.textContent = String(totalFabricas);
@@ -487,6 +504,8 @@ let avisoPoluicaoMostrado = false;
 
 function atualizarHudPoluicao() {
   hudPoluicaoEl.textContent = poluicaoTotal.toLocaleString('pt-BR');
+  // o trilho vai até o COLAPSO, não até a meta: a marca da meta fica a 75%
+  if (hudBarraPoluicaoEl) hudBarraPoluicaoEl.style.width = porcento(poluicaoTotal, LIMIAR_COLAPSO);
   const nivel = poluicaoTotal >= LIMIAR_POLUICAO_CRITICO ? 'critico'
     : poluicaoTotal >= LIMIAR_POLUICAO_ATENCAO ? 'atencao' : 'normal';
   hudStatPoluicaoEl.dataset.nivel = nivel;
@@ -651,8 +670,12 @@ function mostrarNumeroFlutuante(instancia, texto, classeExtra) {
   setTimeout(() => numero.remove(), 1150);
 }
 
+function jogoPausado() {
+  return painelConfig.classList.contains('aberto');
+}
+
 function tickEconomia() {
-  if (jogoEncerrado || instanciasConstruidas.length === 0) return;
+  if (jogoEncerrado || jogoPausado() || instanciasConstruidas.length === 0) return;
   let ganhoDoTick = 0;
   let reducaoGlobalDoTick = 0;
   instanciasConstruidas.forEach((instancia) => {
@@ -799,7 +822,7 @@ function pulsarMultaNoHud() {
 }
 
 function aplicarFiscalizacao() {
-  if (jogoEncerrado || poluicaoTotal <= 0) return;
+  if (jogoEncerrado || jogoPausado() || poluicaoTotal <= 0) return;
   const multa = Math.round(poluicaoTotal * FATOR_MULTA * configDificuldade().multMulta);
   if (multa <= 0) return;
   dinheiro = Math.max(0, dinheiro - multa);
@@ -823,9 +846,8 @@ setInterval(aplicarFiscalizacao, FISCALIZACAO_INTERVALO_MS);
 // poluição 15.000 é nova) — preço/ganho/poluição de cada construção
 // continuam nos valores originais (ver comentário em FABRICAS), então
 // bater META_DINHEIRO numa sessão só demora bem mais que antes.
-const META_DINHEIRO = 1500000;
-const META_POLUICAO = 15000;
-const LIMIAR_COLAPSO = 20000;
+// (META_DINHEIRO/META_POLUICAO/LIMIAR_COLAPSO são declaradas lá em cima,
+// antes de `let dinheiro`: as barras do HUD usam as três já na carga.)
 let jogoEncerrado = null; // null | 'colapso' | 'vitoria'
 
 function segundosJogados() {

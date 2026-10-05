@@ -6,8 +6,8 @@
 <title>Fase 1 · Parasitas de Poluição</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Big+Shoulders+Stencil+Display:wght@800;900&family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=4">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Big+Shoulders+Stencil+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=5">
 </head>
 <body class="fase1-body">
 
@@ -18,45 +18,36 @@
 
   <div class="boas-vindas" id="boas-vindas" aria-hidden="true"></div>
 
+  <!-- O HUD é o livro-caixa da empresa: o nome dela pintado em estêncil e
+       duas barras que contam a história da fase — o dinheiro indo pra meta
+       e a poluição indo pra meta... e, logo depois dela, pro colapso. -->
   <header class="hud-fase1">
-    <div class="hud-stat hud-stat--empresa">
-      <span class="hud-stat-rotulo">Empresa</span>
-      <span class="hud-stat-valor" id="hud-empresa">—</span>
+    <span class="hud-empresa" id="hud-empresa">—</span>
+    <div class="hud-stat hud-stat--caixa">
+      <span class="hud-stat-rotulo">Caixa</span>
+      <span class="hud-stat-valor" id="hud-dinheiro">R$ 5.000</span>
+      <span class="hud-barra" aria-hidden="true"><span class="hud-barra-cheia" id="hud-barra-caixa"></span></span>
+      <span class="hud-stat-meta" id="hud-meta"></span>
     </div>
-    <div class="hud-stat">
-      <span class="hud-stat-texto">
-        <span class="hud-stat-rotulo">Caixa</span>
-        <span class="hud-stat-valor" id="hud-dinheiro">R$ 5.000</span>
-        <span class="hud-stat-meta" id="hud-meta"></span>
-      </span>
+    <div class="hud-stat hud-stat--poluicao" data-nivel="normal">
+      <span class="hud-stat-rotulo">Poluição</span>
+      <span class="hud-stat-valor" id="hud-poluicao">0</span>
+      <!-- trilho de 0 ao colapso: o risco na marca é a meta, o trecho
+           avermelhado depois dela é onde a empresa quebra -->
+      <span class="hud-barra hud-barra--poluicao" aria-hidden="true"><span class="hud-barra-cheia" id="hud-barra-poluicao"></span></span>
+      <span class="hud-stat-meta">meta 15 mil, colapso em 20 mil</span>
     </div>
     <div class="hud-stat hud-stat--fabrica">
-      <svg class="icone-fabrica hud-fabrica-icone" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M3 21V13l4 3v-3l4 3v-3l4 3v5H3Z"/>
-        <rect x="17" y="7" width="3" height="14"/>
-        <path d="M2 21h20"/>
-      </svg>
-      <div class="hud-stat-texto">
-        <span class="hud-stat-rotulo">Fábricas</span>
-        <span class="hud-stat-valor" id="hud-fabricas">1</span>
-      </div>
-    </div>
-    <div class="hud-stat hud-stat--poluicao">
-      <svg class="icone-poluicao" viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 18c1.5-4 3-6 5-6s2.5 2 4 2 2.5-3 5-3 4 3 2 7"/>
-        <circle cx="17" cy="6" r="2.4"/>
-      </svg>
-      <div class="hud-stat-texto">
-        <span class="hud-stat-rotulo">Poluição</span>
-        <span class="hud-stat-valor" id="hud-poluicao">0</span>
-      </div>
+      <span class="hud-stat-rotulo">Construções</span>
+      <span class="hud-stat-valor" id="hud-fabricas">1</span>
     </div>
   </header>
 
-  <button class="botao-config" id="btn-config" aria-label="Configurações">
+  <!-- Esc no teclado; este botão é o mesmo atalho para quem joga no toque. -->
+  <button class="botao-config" id="btn-config" aria-label="Pausar">
     <svg class="icone-config" viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="3.2"/>
-      <path d="M12 3v2.6M12 18.4V21M21 12h-2.6M5.6 12H3M18.4 5.6l-1.85 1.85M7.45 16.55l-1.85 1.85M18.4 18.4l-1.85-1.85M7.45 7.45 5.6 5.6"/>
+      <rect x="6.5" y="5" width="3.6" height="14"/>
+      <rect x="13.9" y="5" width="3.6" height="14"/>
     </svg>
   </button>
 
@@ -66,13 +57,13 @@
       <rect x="17" y="7" width="3" height="14"/>
       <path d="M2 21h20"/>
     </svg>
-    Fábricas
+    Construir
   </button>
 
   <section class="painel-fabricas" id="painel-fabricas" aria-hidden="true">
     <div class="painel-fabricas-conteudo">
       <div class="painel-fabricas-cabecalho">
-        <p class="painel-rotulo">Construção</p>
+        <h2 class="painel-fabricas-titulo">Construir</h2>
         <button class="painel-fabricas-fechar" id="fechar-fabricas" aria-label="Fechar">✕</button>
       </div>
 
@@ -82,20 +73,20 @@
 
   <section class="painel" id="painel-config" aria-hidden="true">
     <div class="painel-conteudo">
-      <p class="painel-rotulo">Pausado</p>
-      <h2 class="painel-titulo">Configurações</h2>
+      <h2 class="painel-titulo">Pausado</h2>
       <p class="painel-explicacao">
-        O progresso já fica salvo sozinho a cada poucos segundos — mas dá
-        pra forçar um salvamento agora, antes de sair.
+        A empresa para enquanto este painel estiver aberto. O progresso
+        já se salva sozinho a cada poucos segundos, mas dá para salvar agora
+        antes de sair.
       </p>
       <p class="painel-status" id="status-config"></p>
       <div class="config-acoes">
         <button class="painel-voltar" id="btn-config-salvar">Salvar agora</button>
-        <button class="painel-voltar" id="btn-config-menu">Voltar ao Menu</button>
-        <button class="painel-voltar config-acao-sair" id="btn-config-sair">Sair da Sessão</button>
+        <button class="painel-voltar" id="btn-config-menu">Voltar ao menu</button>
+        <button class="painel-voltar config-acao-sair" id="btn-config-sair">Sair da conta</button>
       </div>
       <div class="painel-acoes painel-acoes--fim">
-        <button class="painel-confirmar" id="btn-config-continuar">Continuar Jogando</button>
+        <button class="painel-confirmar" id="btn-config-continuar">Continuar jogando</button>
       </div>
     </div>
   </section>
@@ -122,8 +113,8 @@
 
   <section class="painel painel--fim" id="tela-vitoria" aria-hidden="true">
     <div class="painel-conteudo">
-      <p class="painel-rotulo">Fase 1 Completa</p>
-      <h2 class="painel-titulo">Expansão Garantida</h2>
+      <p class="painel-rotulo">Fase 1 completa</p>
+      <h2 class="painel-titulo">Expansão garantida</h2>
       <p class="painel-explicacao">
         Sua empresa atingiu a meta de caixa — e a de poluição junto. Não
         foi um efeito colateral: não existia caminho pra esse tanto de
@@ -141,16 +132,16 @@
         Foi tudo conforme o plano. É esse o problema.
       </p>
       <div class="painel-acoes painel-acoes--fim">
-        <a class="painel-voltar" href="index.html">Voltar ao Menu</a>
-        <a class="painel-confirmar" href="fase2.html">Continuar &rarr; Fase 2</a>
+        <a class="painel-voltar" href="index.html">Voltar ao menu</a>
+        <a class="painel-confirmar" href="fase2.html">Ir para a Fase 2</a>
       </div>
     </div>
   </section>
 
   <section class="painel painel--fim" id="tela-colapso" aria-hidden="true">
     <div class="painel-conteudo">
-      <p class="painel-rotulo">Fim de Jogo</p>
-      <h2 class="painel-titulo">A Empresa Colapsou</h2>
+      <p class="painel-rotulo">Fase 1 encerrada</p>
+      <h2 class="painel-titulo">A empresa colapsou</h2>
       <p class="painel-explicacao">
         A poluição acumulada passou do que a região — e a fiscalização —
         conseguiam absorver. Entre multas, protestos e o colapso ambiental,
@@ -167,12 +158,12 @@
         por cima disso.
       </p>
       <div class="painel-acoes painel-acoes--fim">
-        <a class="painel-voltar" href="index.html">Voltar ao Menu</a>
-        <a class="painel-confirmar" href="fase2.html">Continuar &rarr; Fase 2</a>
+        <a class="painel-voltar" href="index.html">Voltar ao menu</a>
+        <a class="painel-confirmar" href="fase2.html">Ir para a Fase 2</a>
       </div>
     </div>
   </section>
 
-<script type="module" src="fase1.js?v=8"></script>
+<script type="module" src="fase1.js?v=9"></script>
 </body>
 </html>
