@@ -78,23 +78,60 @@ carregam o **mesmo** `style.css`.
                              de propósito com o âmbar/rust do carvão — só usado no sprite/
                              ícone da Usina de Água, a UI/chrome continua toda em âmbar */
 --agua-dim:#3f7383;
+--patina:#6fae93;        /* verde-pátina: o lado da floresta (botão da Fase 2) */
+--fonte-marca:'Big Shoulders Stencil Display', 'Archivo', sans-serif;
+--fonte-texto:'Archivo', system-ui, sans-serif;
 ```
 
-Fontes (Google Fonts, já linkadas no `<head>` dos dois HTMLs):
-- **Space Grotesk** (500/700/900) — títulos, valores de HUD, texto normal
-- **JetBrains Mono** (400/600) — rótulos, botões, tudo que é "UI/HUD"
+**Identidade "estêncil industrial"** (escolhida pelo autor, aplicada com a
+skill Frontend-Design — substitui a dupla Space Grotesk/JetBrains Mono, que
+saiu do projeto inteiro):
 
-Estilo geral: uppercase + letter-spacing largo nos rótulos mono, bordas finas
-em vez de sombras pesadas, glow sutil em âmbar pra estados ativos/hover.
+- **Duas vozes.** O ESTÊNCIL (`--fonte-marca`, Big Shoulders Stencil Display
+  800/900) é a empresa falando: o título do menu, o nome da empresa e os
+  números grandes do HUD da Fase 1, os preços do catálogo. Ele **some na
+  Fase 2** — a empresa caiu. Todo o resto é **Archivo** (`--fonte-texto`,
+  eixo de largura 62–125 e peso 400–800; a Fase 2 carrega 300–800), em caixa
+  normal, variando o tom pela largura (`font-stretch`): títulos de painel em
+  800 a 112% ("papel timbrado"), itens de menu a 92%, a abertura da Fase 2
+  em 300 a 125% (leve e largo, o avesso do estêncil).
+- **Cor com significado**: âmbar = lucro (CTA principal, dinheiro); pátina
+  = floresta. Nada de cor decorativa.
+- **Sem chrome genérico**: nada de rótulo em CAIXA ALTA com espaçamento largo
+  (eyebrow), fonte mono pra rótulo pequeno, ponto médio (`·`) juntando
+  metadados, seta (`→`/`←`) em botão, cantos de "HUD" em moldura. O rótulo
+  acima de título (`.painel-rotulo`) só existe quando diz algo que o título
+  não diz (a categoria de uma construção, "Fase 1 completa").
+- Foco de teclado sempre visível (`outline` de 2px em `--paper`), e o
+  secundário (`.painel-voltar`) continua secundário no hover — clareia, não
+  vira âmbar.
+- Google Fonts linkado no `<head>` dos três HTMLs (menu e Fase 1 com o
+  estêncil, Fase 2 só com Archivo).
 
 ## O que já está pronto
 
 ### `index.html` / `script.js` / `style.css` — Menu principal
 
-- Tela de menu com título animado, fundo com respiração/parallax sutil pelo
-  mouse, flicker de luz industrial, camada de "raios" girando, partículas de
-  fuligem caindo, moldura HUD com cantos e status "Sistema Corporativo
-  Online", relógio ao vivo no rodapé, flash de "power-on" na abertura.
+- Tela de menu: título "Parasitas / de Poluição" em estêncil enorme no alto
+  à esquerda ("de Poluição" na cor do lucro — na empresa, uma coisa é a
+  outra), linha de apoio ("Faça a empresa crescer à custa da floresta.
+  Quando ela cair, volte para consertar o que destruiu."), menu em Archivo
+  caixa normal (**Novo jogo** em âmbar, **Fase 2: o Guardião** em pátina),
+  fundo com respiração/parallax sutil pelo mouse e fuligem caindo. O único
+  movimento de abertura é cada linha do título entrando como uma passada de
+  spray (máscara de borda macia, `@keyframes borrifar`). Flash de power-on,
+  raios girando, grão, flicker, moldura de cantos, status "Sistema
+  Corporativo Online" e relógio do rodapé **saíram** (eram enfeite genérico
+  de "HUD", não diziam nada sobre o jogo).
+- **Continuar mostra qual save vai abrir** (linha de baixo, `#resumo-continuar`:
+  "Save 2, Nortec Ind., R$ 48.250") — antes ele pegava o mais recente sem
+  avisar. `atualizarResumoContinuar()` em `script.js` lê o próprio documento
+  da conta no `onAuthStateChanged` (a mesma leitura que o Continuar já fazia)
+  e usa `maisRecenteDe()`, o mesmo critério do Continuar e do botão da Fase 2.
+- **Bug corrigido, não reintroduzir**: só `.campo input[type="text"]` tinha
+  estilo, então os campos de e-mail e senha do login apareciam como barras
+  brancas padrão do navegador. A regra agora é `.campo input` (cobre
+  text/email/password), com `:-webkit-autofill` tratado.
 - Navegação do menu por teclado (setas + Enter/Espaço nativo dos botões).
 - Painel **Como Jogar** — lista estática de regras.
 - Painel **Créditos**.
@@ -398,11 +435,35 @@ gravidade via `data-nivel` no `.hud-stat--poluicao`: `normal` até 500,
 `atencao` até 1500, `critico` depois disso; cruzar o `critico` dispara um
 toast único de aviso narrativo, ver abaixo).
 
+**Atualização — HUD como livro-caixa da empresa (identidade estêncil):** o
+nome da empresa vem pintado em estêncil, sem rótulo (`.hud-empresa`); Caixa,
+Poluição e Construções são números grandes em estêncil com rótulo em
+Archivo. Embaixo da Caixa, uma barra até `META_DINHEIRO`
+(`#hud-barra-caixa`); embaixo da Poluição, um **trilho de 0 até o
+COLAPSO** (`#hud-barra-poluicao`, até `LIMIAR_COLAPSO`) com um risco na
+meta (75%, `META_POLUICAO`) e o trecho depois dela em ferrugem — é a
+história da fase numa linha só: você precisa chegar no risco, e logo depois
+dele a empresa quebra. A meta de poluição voltou a aparecer como texto
+("meta 15 mil, colapso em 20 mil"). Ícones de fábrica/poluição do HUD
+saíram (repetiam o rótulo). **`META_DINHEIRO`/`META_POLUICAO`/
+`LIMIAR_COLAPSO` subiram pra antes de `let dinheiro`**: as barras são
+desenhadas já na carga (`atualizarHudDinheiro()` roda na avaliação do
+módulo) e `const` lido antes da declaração é `ReferenceError` (TDZ) — não
+mova de volta pra seção "META DE VITÓRIA".
+
 **Toast (`#boas-vindas`, reaproveitado):** a função genérica `mostrarToast(...conteudo)`
 troca o conteúdo do elemento e reinicia a transição — é usada tanto pra
 "Bem-vindo(a), {jogador}..." ao carregar a fase (se existe save ativo) quanto
 pro aviso de poluição crítica. Não crie um segundo elemento de toast pra
 uma mensagem nova; reaproveite `mostrarToast`.
+
+**Atualização — "Construir":** o botão e a gaveta se chamam **Construir**
+(a gaveta tem Usinas também, não só fábricas), e a gaveta virou um
+**catálogo** em linhas agrupadas por categoria — `renderizarCartasFabricas()`
+insere um `<h3 class="lista-fabricas-grupo">` ("Fábricas"/"Usinas",
+`GRUPOS_CONSTRUCAO`) quando a categoria muda, em vez de repetir o rótulo
+em cada cartão; preço em estêncil. O texto abaixo descreve a versão
+original.
 
 **Botão "Fábricas"** (fixo embaixo, centro) abre um painel-gaveta
 (`.painel-fabricas`, sobe de baixo). **Os cards não são mais HTML
@@ -793,6 +854,15 @@ das Configurações — ver seção abaixo).
 
 ### Painel de Configurações (Esc / botão de engrenagem)
 
+**Atualização — virou o painel "Pausado" e PAUSA de verdade.** O rótulo
+dizia "Pausado", mas a economia (`tickEconomia`) e a fiscalização
+(`aplicarFiscalizacao`) continuavam rodando por trás — dava pra levar multa
+com o jogo "pausado". As duas agora saem cedo quando `jogoPausado()` (painel
+aberto). O botão de engrenagem virou um ícone de **pausa** (o painel nunca
+teve configuração nenhuma) com `aria-label="Pausar"`; botões "Voltar ao
+menu", "Sair da conta" (antes "Sair da Sessão") e "Continuar jogando". O
+resto desta seção continua valendo.
+
 `#painel-config` (mesmo padrão `.painel`/`.painel-conteudo` dos outros) é
 acessível de duas formas equivalentes: a tecla **Esc** ou o botão de
 engrenagem fixo no canto superior direito (`#btn-config`) — o botão existe
@@ -823,6 +893,11 @@ nessa cadeia de prioridade antes do `abrirPainelConfig()` final**, senão Esc
 vai pular direto pras Configurações em vez de fechar o painel novo.
 
 ### HUD responsivo (mobile)
+
+**Atualização:** com o HUD-livro-caixa, o bloco mobile (ainda no FINAL do
+`style.css`, pelo mesmo motivo de especificidade explicado abaixo) passou a
+ser um grid — nome da empresa na primeira linha inteira, Caixa/Poluição/
+Construções dividindo a segunda, barras a 100% da coluna, metas escondidas.
 
 `.hud-fase1` não tinha nenhuma regra de responsividade — com o botão de
 engrenagem novo no canto e nomes de empresa mais longos, em telas estreitas
@@ -1040,10 +1115,10 @@ contratos, a paleta, como rodar e testar, e a direção de arte.
 
 ### Como chegar nela
 
-- Botão **"Fase 2 · O Guardião"** no menu principal (`index.html`), que segue a
+- Botão **"Fase 2: o Guardião"** no menu principal (`index.html`), que segue a
   mesma lógica do Continuar e manda pra `fase2.html`.
-- As duas telas de fim da Fase 1 (vitória e colapso) agora oferecem
-  **"Continuar → Fase 2"** em vez de dizer que ela não existe.
+- As duas telas de fim da Fase 1 (vitória e colapso) oferecem **"Ir para a
+  Fase 2"** em vez de dizer que ela não existe.
 
 ### Direção de arte (corrigida pelo autor a meio caminho)
 
@@ -1055,8 +1130,18 @@ serve pra medir nível de acabamento, nunca pra chegar perto do visual dele.
   estalactites no primeiro plano — o plano mais próximo é o que mais define o
   lugar, porque é o mais perto e o mais escuro.
 - O **Guardião é inspirado no Ori**: criatura-espírito pequena, pálida e
-  luminosa, olhos grandes escuros, duas orelhas longas varridas pra trás em V,
+  luminosa, olhos grandes escuros, duas orelhas longas varridas pra trás,
   cauda com inércia. É a principal fonte de luz móvel do jogo.
+  **Bicho, não máscara** (revisão pedida pelo autor): cabeça oval branca com
+  dois olhos pretos e duas lâminas em pé lia como o Cavaleiro do Hollow
+  Knight. Hoje: focinho curto com nariz e dois tufos na bochecha; orelhas em
+  FOLHA, largas e deitadas pra trás, com nervura que acende com a
+  restauração; gola de folhas no pescoço e folhinha na ponta da cauda (o
+  verde `FOLHA_VIVA`, o mesmo das folhas do HUD); pernas de corço (jarrete
+  pra trás) com pata clara, que aparece em chão escuro; golpe com contorno
+  escuro e folhas arrancadas. **Não reintroduzir**: o sinal da mola das
+  orelhas era invertido (correr e a investida as erguiam, "murchas"
+  subiam) — a convenção está documentada em `_passoOrelhas`.
 - Os **parasitas são inspirados na Sombra do Hollow Knight**: vulto preto
   encapuzado, fendas brancas no lugar de rosto, tentáculos saindo só da metade
   DE CIMA (em 360° leem como aranha), manto esfarrapado dissolvendo em fumaça.
@@ -1163,6 +1248,25 @@ metroidvania só aparece jogando, e aparece tarde.
   mesma sala restaurada.
 - **Mapa** — layout DERIVADO do grafo de portas por BFS + passe de separação.
   Mexer numa sala nunca exige lembrar de mexer no mapa.
+- **HUD — o ramo** (`ui/hud.js`). Era uma fila de máscaras no canto, a
+  assinatura do Hollow Knight; agora a vida é um **galho que brota da borda**
+  da tela, uma folha por ponto de vida. A folha se solta e cai secando no
+  quadro do golpe (as máscaras estouravam ~0,8 s atrasadas por causa de uma
+  vida "exibida" amortecida), se abre de novo ao curar e acinzenta com a
+  fumaça (`j.sufoco`). Na ponta, um **broto** enche um quarto por fragmento
+  (`FRAGMENTOS_POR_VIDA`) e no quarto vira folha nova. Embaixo, a **linha da
+  área**: quantos parasitas ainda "seguram a semente" — aparece ao entrar
+  numa sala, quando o número muda e quando a semente recusa, e fica fixa só
+  quando a semente está livre (usa `mundo.sementeDaArea()`, novo, com cache
+  limpo em `ativarSemente`/`aplicarSave`). Avisos em **dois canais** (título
+  no alto, sussurro embaixo) com prioridade e fila — antes qualquer
+  `anunciar` apagava o que estava na tela; `chave` faz nomes de sala se
+  substituírem. O relógio do HUD **congela** na pausa, no mapa e na tela de
+  abertura (`hud.desenhar(dt, tema, bloqueado)`). Sussurro nunca cai em
+  cima da barra do chefe; no toque, barra e avisos sobem (a base é dos
+  polegares). Margem segura do celular lida por uma sonda com `padding:
+  env(safe-area-inset-*)`. Movimento reduzido: a folha apaga no lugar em vez
+  de cair, e não há balanço.
 
 ### Rodar e testar
 
@@ -1313,9 +1417,17 @@ removido intencionalmente — não recriar sem pedir.
   longo. Vale jogar de verdade pra sentir o ritmo e ajustar se ainda
   estiver monótono ou rápido
   demais.
-- Painel de Configurações (Esc / engrenagem) cobre salvar/menu/sair — não
+- Painel "Pausado" da Fase 1 (Esc / botão de pausa) cobre salvar/menu/sair — não
   tem ainda opções de áudio, idioma, ou dificuldade-em-tempo-real (a
   dificuldade é fixada na criação do save, não muda depois).
+- **Cache dos módulos da Fase 2**: só `fase2/main.js` tem `?v=N` em
+  `fase2.html`; os outros módulos (`ui/hud.js`, `entidades/*`...) são
+  importados sem versão, e o GitHub Pages guarda cache por ~10 min — logo
+  depois de um deploy o navegador pode misturar módulo novo com velho. As
+  mudanças até aqui foram feitas compatíveis nos dois sentidos, mas a
+  solução de verdade é um import map em `fase2.html` mapeando cada módulo
+  pra uma URL versionada (import map remapeia URL relativa também, não só
+  especificador "nu").
 
 ## Como configurar o Firebase
 

@@ -191,8 +191,12 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
     referência é GRIS, personagem pequeno num lugar imenso, não corredor
     cheio.
 - **O Guardião é inspirado no Ori**: criatura-espírito pequena, PÁLIDA E
-  LUMINOSA, olhos grandes e escuros, duas orelhas longas varridas para trás
-  em V, cauda com inércia. Ele é a principal fonte de luz móvel do jogo.
+  LUMINOSA, olhos grandes e escuros, duas orelhas longas varridas para trás,
+  cauda com inércia. Ele é a principal fonte de luz móvel do jogo. E é um
+  BICHO da floresta, não uma máscara: focinho com nariz e tufos na bochecha,
+  orelhas em folha deitadas pra trás (em pé, finas e claras, elas liam como
+  os chifres do Cavaleiro do Hollow Knight), gola de folhas, pernas de corço
+  com pata clara.
 - **Os parasitas são inspirados na Sombra de Hollow Knight**: vulto preto
   encapuzado, fendas brancas no lugar de rosto, tentáculos saindo da metade
   DE CIMA como chama fria, barra do manto esfarrapada dissolvendo em fumaça.
@@ -290,7 +294,10 @@ de arquitetura — o sistema estava certo e os números estavam errados. Se algo
 6. **O HUD não pode tirar a estrutura do tema.** As cores do tema foram
    desenhadas pro mundo, onde tudo é escuro de propósito: com elas o contraste
    do HUD variava de 1,17:1 a 10,4:1 dependendo da sala. Contraste é função de
-   um PAR FIXO (`--paper`/`--soot`); o tema entra só como matiz e acento.
+   um PAR FIXO (`--paper`/`--soot`); o tema entra só como matiz e acento. O
+   mesmo vale pro verde das folhas do ramo (`FOLHA` em `ui/hud.js`): fixo,
+   só tingido pelo tema. Tipografia do HUD e do mapa: Archivo, caixa normal
+   (o estêncil é da empresa e não entra na Fase 2).
 
 7. **Espessura constante lê como antena.** Vale pra galho, tentáculo, cauda,
    perna e golpe: se não afina, não é orgânico. E `lineCap:'round'` em
