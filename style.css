@@ -224,8 +224,8 @@ footer{
   inset:0;
   /* 50: precisa ficar acima de TODA a UI da Fase 1 (HUD, botões, gaveta de
      construção) e de qualquer construção no grid (z-index dinâmico até
-     ~32, ver .fabrica-instancia) — só fica abaixo do flash de abertura
-     (.power-on, 60), que só existe em index.html */
+     ~32, ver .fabrica-instancia). (O flash de abertura, que ficava acima
+     disto com z-index 60, saiu na identidade estêncil.) */
   z-index:50;
   display:flex;
   align-items:center;

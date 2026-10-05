@@ -167,11 +167,14 @@ onAuthStateChanged(auth, (user) => {
 async function atualizarResumoContinuar() {
   const resumo = document.getElementById('resumo-continuar');
   if (!resumo) return;
+  // Esconder não basta: o texto da conta anterior ficaria no nó escondido.
   resumo.hidden = true;
-  if (!usuarioAtual) return;
+  resumo.textContent = '';
+  const uid = usuarioAtual?.uid;
+  if (!uid) return;
   const saves = await carregarSavesConta();
   const recente = maisRecenteDe(saves);
-  if (!recente || !usuarioAtual) return;
+  if (!recente || usuarioAtual?.uid !== uid) return;
   const partes = [`Save ${recente.slot}`];
   if (recente.empresa) partes.push(recente.empresa);
   if (recente.progresso) partes.push(formatarDinheiroSimples(recente.progresso.dinheiro));
@@ -292,8 +295,12 @@ function docContaAtual() {
 async function carregarSavesConta() {
   const ref = docContaAtual();
   if (!ref) return { 1: null, 2: null, 3: null };
+  const uid = usuarioAtual.uid;
   try {
     const snap = await getDoc(ref);
+    // Trocou de conta durante a leitura (saiu de A e entrou em B): o que
+    // voltou é de A e não pode aparecer nem ser usado na sessão de B.
+    if (usuarioAtual?.uid !== uid) return { 1: null, 2: null, 3: null };
     const dados = snap.data()?.saves || {};
     return { 1: dados[1] || null, 2: dados[2] || null, 3: dados[3] || null };
   } catch {
