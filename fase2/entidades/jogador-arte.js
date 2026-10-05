@@ -21,6 +21,16 @@
    Regra de silhueta: a forma é SÓLIDA e simples, legível a 100 px. Todo o
    interesse mora no contorno, nos olhos e nas marcas. Detalhe interno em
    personagem pequeno vira sujeira.
+
+   BICHO, NÃO MÁSCARA. Uma cabeça oval branca com dois olhos pretos e duas
+   lâminas em pé por cima é o Cavaleiro do Hollow Knight — e era o que se lia
+   de longe. O que tira o Guardião dessa sombra está todo no contorno:
+     · focinho curto com nariz e dois tufos na bochecha: rosto de bicho;
+     · orelhas em FOLHA, largas e caídas pra trás quase na horizontal (em pé
+       elas liam como chifres), com nervura que acende com a restauração;
+     · uma gola de folhas no pescoço, o mesmo desenho das folhas do HUD;
+     · pernas de corço (jarrete pra trás) e patas claras que aparecem no chão
+       escuro; uma folhinha na ponta da cauda.
    ========================================================================= */
 
 import {
@@ -59,6 +69,10 @@ const CY_CABECA = -35;     // centro da cabeça em relação aos pés
    da divisão do corpo. */
 const AMBAR = '#eaa24f';
 const AMBAR_FUNDO = '#a8622a';
+/* O verde das folhas do corpo (gola, ponta da cauda, nervura das orelhas) é o
+   MESMO das folhas do HUD, misturado ao branco do corpo — bem apagado na mata
+   suja e mais vivo conforme ela volta. O âmbar continua sendo a assinatura. */
+const FOLHA_VIVA = '#a3d483';
 
 export class ArteJogador {
   constructor() {
@@ -180,17 +194,21 @@ export class ArteJogador {
   _passoOrelhas(dt, j) {
     // Ângulo-alvo por estado. As orelhas são o rosto do personagem: elas
     // dizem o que ele está sentindo antes de qualquer outra parte.
+    /* CONVENÇÃO (o sinal estava invertido): `ang` SOMA no ângulo de desenho,
+       e ângulo menor = orelha mais deitada. Negativo = o vento deita (ou
+       murcha, abaixo da horizontal); positivo = ergue. Antes correr e a
+       investida erguiam as orelhas em vez de deitar, e "murchas" subiam. */
     let alvo;
     switch (j.estado) {
-      case ESTADOS.PULANDO:   alvo = -0.55; break;   // pra trás, empolgado
-      case ESTADOS.CAINDO:    alvo = -0.25; break;
-      case ESTADOS.INVESTIDA: alvo = -0.95; break;   // coladas de tanto vento
-      case ESTADOS.PLANEIO:   alvo = 0.30; break;    // abertas, pegando ar
-      case ESTADOS.ATORDOADO: alvo = 0.75; break;    // murchas
-      case ESTADOS.MORTO:     alvo = 0.95; break;
-      case ESTADOS.CANTO:     alvo = -0.15; break;
-      case ESTADOS.CORRENDO:  alvo = -0.34 - Math.abs(j.vx) / 232 * 0.2; break;
-      default:                alvo = -0.05; break;
+      case ESTADOS.PULANDO:   alvo = -0.22; break;   // o vento da subida deita
+      case ESTADOS.CAINDO:    alvo = 0.22; break;    // na queda elas sobem
+      case ESTADOS.INVESTIDA: alvo = -0.42; break;   // coladas de tanto vento
+      case ESTADOS.PLANEIO:   alvo = 0.32; break;    // abertas, pegando ar
+      case ESTADOS.ATORDOADO: alvo = -0.6; break;    // murchas, caídas
+      case ESTADOS.MORTO:     alvo = -0.75; break;
+      case ESTADOS.CANTO:     alvo = 0.2; break;     // erguidas: escutando
+      case ESTADOS.CORRENDO:  alvo = -0.12 - Math.abs(j.vx) / 232 * 0.16; break;
+      default:                alvo = 0; break;
     }
     for (let i = 0; i < 2; i++) {
       const o = this.orelhas[i];
@@ -359,7 +377,7 @@ export class ArteJogador {
     // Fina e mais apagada que o corpo: em velocidade a cauda estica reta, e
     // com base grossa e branca ela virava uma lâmina do tamanho do
     // personagem, competindo com a cabeça pela atenção.
-    const perfil = (t) => 2.1 * Math.pow(1 - t, 0.7) + 0.25;
+    const perfil = (t) => 2.4 * Math.pow(1 - t, 0.7) + 0.25;
     const normal = (i) => {
       const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
       const dx = b.x - a.x, dy = b.y - a.y;
@@ -400,6 +418,35 @@ export class ArteJogador {
     ctx.fillStyle = misturarHex(cores.meio, cores.sombra, 0.55);
     traçar(1);
     ctx.fill();
+
+    // Folhinha na ponta, na direção do último elo: a cauda termina em broto,
+    // não em fio — e é o detalhe que diz "planta" a qualquer distância.
+    const u = pts[n - 1], v = pts[n - 3] ?? pts[0];
+    const ang = Math.atan2(u.y - v.y, u.x - v.x);
+    this._folhinha(ctx, u.x, u.y, ang, 1.1, misturarHex(cores.claro, FOLHA_VIVA, 0.4 + this.floracao * 0.4),
+      rgba(cores.escuro, 0.45));
+    ctx.restore();
+  }
+
+  /** Folha pequena (pecíolo na origem, apontando para `ang`). Mesma forma das
+   *  folhas do HUD — o ramo da tela e o corpo do Guardião falam a mesma língua. */
+  _folhinha(ctx, x, y, ang, esc, cor, contorno = null) {
+    const L = 6.2 * esc, W = 2.6 * esc;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(ang);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(L * 0.42, -W * 1.05, L, 0);
+    ctx.quadraticCurveTo(L * 0.5, W * 0.95, 0, 0);
+    ctx.closePath();
+    ctx.fillStyle = cor;
+    ctx.fill();
+    if (contorno) {
+      ctx.strokeStyle = contorno;
+      ctx.lineWidth = 0.6;
+      ctx.stroke();
+    }
     ctx.restore();
   }
 
@@ -449,7 +496,9 @@ export class ArteJogador {
         const s = Math.sin(fase), c = Math.cos(fase);
         peX = dxQuadril + s * 7 * amp;
         peY = -Math.max(0, c) * 5 * amp;
-        joelhoX = dxQuadril + s * 3.5 * amp;
+        // Jarrete pra TRÁS (perna de corço): o joelho recua do eixo
+        // quadril-pé. Perna reta, de cano, é perna de boneco.
+        joelhoX = dxQuadril + s * 3.5 * amp - 1.5;
         joelhoY = -6 - Math.max(0, c) * 2 * amp;
         /* CONTRAPPOSTO parado. Com `amp = 0` as duas pernas viravam tubos
            verticais idênticos — pose de soldado, o oposto de apelo. O offset
@@ -457,8 +506,8 @@ export class ArteJogador {
            discordar. */
         if (amp < 0.02) {
           joelhoY = atras ? -5.5 : -6.8;
-          joelhoX = dxQuadril + (atras ? -0.8 : 0.6);
-          peX = dxQuadril + (atras ? -1.6 : 0.8);
+          joelhoX = dxQuadril + (atras ? -2.2 : -1.0);
+          peX = dxQuadril + (atras ? -1.2 : 1.2);
         }
       }
 
@@ -490,9 +539,13 @@ export class ArteJogador {
          já separa o personagem do plano. Com o fio, os dois pés viravam dois
          anéis claros sobrepostos e o resultado lia como um decalque oval sob
          o herói — foi exatamente o que apareceu na primeira captura. */
-      ctx.fillStyle = corDentro;
+      /* PATA CLARA. Pé escuro sobre chão escuro some — o personagem
+         parecia andar sobre dois palitos. A pata da frente é clara (lê em
+         qualquer piso); a de trás fica em meio-tom, senão as duas viram um
+         par de faróis. */
+      ctx.fillStyle = atras ? misturarHex(cores.meio, cores.escuro, 0.45) : cores.meio;
       ctx.beginPath();
-      ctx.ellipse(peX + 1, peY, 3.6, 1.7, 0, 0, TAU);
+      ctx.ellipse(peX + 1.2, peY - 0.2, 3.4, 1.7, 0, 0, TAU);
       ctx.fill();
       ctx.restore();
     };
@@ -585,6 +638,18 @@ export class ArteJogador {
     ctx.quadraticCurveTo(0, -24.2, 3.8, -26);
     ctx.stroke();
     ctx.restore();
+
+    /* GOLA DE FOLHAS no pescoço. A junção cabeça-tronco era uma linha limpa
+       entre dois brancos — exatamente a leitura de máscara apoiada num corpo.
+       Três folhas viradas pra baixo quebram essa linha, e esverdeiam conforme
+       o mundo volta (a mesma `floracao` das nervuras). */
+    {
+      const verde = misturarHex(cores.claro, FOLHA_VIVA, 0.4 + this.floracao * 0.4);
+      const contorno = rgba(cores.escuro, 0.4);
+      this._folhinha(ctx, -4.6, -26.4, 2.2, 0.9, misturarHex(verde, cores.sombra, 0.35), contorno);
+      this._folhinha(ctx, -1.2, -25.8, 1.75, 1, verde, contorno);
+      this._folhinha(ctx, 2.6, -25.9, 1.2, 0.95, verde, contorno);
+    }
 
     // Marcas de nervura de folha — o medidor de restauração vestido no corpo.
     const f = this.floracao;
@@ -695,6 +760,12 @@ export class ArteJogador {
     ctx.moveTo(-5.5, -26.5);
     ctx.quadraticCurveTo(-10, -22 + balanco * 0.3, -10.5, -18 + balanco * 0.4);
     ctx.stroke();
+    // Mão: um ponto em meio-tom no fim do braço. Sem ela o braço escuro
+    // termina no vazio e lê como risco, não como membro.
+    ctx.fillStyle = misturarHex(cores.meio, cores.escuro, 0.45);
+    ctx.beginPath();
+    ctx.arc(-10.5, -18 + balanco * 0.4, 1.3, 0, TAU);
+    ctx.fill();
 
     // Braço da frente — durante o ataque acompanha o arco do golpe.
     ctx.strokeStyle = bracoClaro;
@@ -710,11 +781,19 @@ export class ArteJogador {
       ctx.moveTo(0, 0);
       ctx.quadraticCurveTo(1.5, 5, 1, 10);
       ctx.stroke();
+      ctx.fillStyle = cores.meio;
+      ctx.beginPath();
+      ctx.arc(1, 10, 1.45, 0, TAU);
+      ctx.fill();
       ctx.restore();
     } else {
       ctx.moveTo(5.5, -26.5);
       ctx.quadraticCurveTo(10, -22 - balanco * 0.3, 10.5, -18 - balanco * 0.4);
       ctx.stroke();
+      ctx.fillStyle = cores.meio;
+      ctx.beginPath();
+      ctx.arc(10.5, -18 - balanco * 0.4, 1.45, 0, TAU);
+      ctx.fill();
     }
   }
 
@@ -735,18 +814,36 @@ export class ArteJogador {
        meia-largura em cy−4) e o queixo afina pra 4,5 em cy+8, empurrado 2 pra
        FRENTE — vira crânio grande com focinho curto, e a direção do olhar sai
        de graça da silhueta. */
+    /* O miolo do degradê era `#ffffff` puro: sob um feixe de luz o rosto
+       estourava e os olhos boiavam num borrão branco. Um branco já tingido
+       segura a forma mesmo com o bloom por cima. */
     const g = ctx.createRadialGradient(-2, cy - 4, 1, 0, cy, RAIO_CABECA * 1.5);
-    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0, misturarHex('#ffffff', cores.claro, 0.4));
     g.addColorStop(0.5, cores.claro);
     g.addColorStop(1, cores.meio);
     ctx.fillStyle = g;
+    /* FOCINHO E TUFOS. A gota sozinha, com dois olhos, era uma máscara. Um
+       focinho curto à frente (com nariz) e dois tufos de pelo apontando pra
+       trás no queixo transformam o contorno em cara de bicho — e a direção
+       do olhar sai ainda mais clara da silhueta. */
     ctx.beginPath();
     ctx.moveTo(-8.4, cy - 3.2);
-    ctx.bezierCurveTo(-8.4, cy - 10, 8.4, cy - 10, 8.4, cy - 3.2);
-    ctx.bezierCurveTo(8.4, cy + 2, 6.4, cy + 5.2, 5.2, cy + 6.4);
-    ctx.bezierCurveTo(3.2, cy + 8, -2, cy + 7.6, -4, cy + 5.2);
-    ctx.bezierCurveTo(-6.8, cy + 2.8, -8.4, cy + 0.8, -8.4, cy - 3.2);
+    ctx.bezierCurveTo(-8.4, cy - 10, 8.0, cy - 10.2, 8.7, cy - 3.6);    // crânio
+    ctx.bezierCurveTo(9.3, cy - 1.8, 11.4, cy - 0.2, 11.3, cy + 1.6);   // ponte do focinho
+    ctx.bezierCurveTo(11.2, cy + 3.2, 9.6, cy + 4.0, 8.3, cy + 4.2);    // ponta
+    ctx.bezierCurveTo(7.2, cy + 6.0, 5.0, cy + 7.5, 2.6, cy + 7.5);     // queixo
+    ctx.bezierCurveTo(0.2, cy + 7.5, -2.6, cy + 6.8, -4.1, cy + 5.8);   // mandíbula
+    ctx.lineTo(-7.4, cy + 7.6);                                          // tufo 1
+    ctx.lineTo(-6.3, cy + 4.7);
+    ctx.lineTo(-9.4, cy + 5.0);                                          // tufo 2
+    ctx.bezierCurveTo(-8.7, cy + 2.4, -8.4, cy + 0.6, -8.4, cy - 3.2);  // nuca
     ctx.closePath();
+    ctx.fill();
+
+    // Nariz: o ponto mais escuro do rosto depois dos olhos.
+    ctx.fillStyle = misturarHex(cores.escuro, '#000000', 0.2);
+    ctx.beginPath();
+    ctx.ellipse(10.5, cy + 1.0, 1.2, 0.9, 0.3, 0, TAU);
     ctx.fill();
 
     // Sombra própria sob a nuca: é a aresta escura que faz a bola virar
@@ -790,27 +887,34 @@ export class ArteJogador {
        par quando as pontas ficam pelo menos tão separadas quanto as bases.
        Mesmo ângulo pras duas e comprimentos diferentes resolve, e de quebra
        encurta a orelha, que tinha metade do tamanho do corpo. */
-    const BASE_ANG = [2.34, 2.34];
+    /* Terceira volta, e esta muda a natureza delas: a 2,34 (44° acima da
+       horizontal) duas orelhas estreitas e claras liam como os CHIFRES do
+       Cavaleiro do Hollow Knight. Agora são FOLHAS: largas na barriga,
+       deitadas pra trás e com nervura, varridas como no Ori. A barriga da
+       folha puxa a ponta pra cima, então o eixo fica baixo (1,8 ≈ 13°; a de
+       trás um pouco mais erguida pra o par não se fundir): o que se VÊ fica
+       em torno de 25°. */
+    const BASE_ANG = [1.8, 2.2];
     for (let i = 1; i >= 0; i--) {
       const o = this.orelhas[i];
       const atras = i === 1;
-      const comprimento = atras ? 14 : 17;
-      const largura = atras ? 2.4 : 3.2;
+      const comprimento = atras ? 16 : 19.5;
+      const largura = atras ? 3.8 : 5;
       ctx.save();
       // Bases afastadas na horizontal também, não só no ângulo: é o que dá o
       // "V" visto de três quartos em vez de duas linhas saindo do mesmo ponto.
       // A separação vem das bases e da altura, não do ângulo.
       ctx.translate(atras ? -7.5 : 0.5, cy - (atras ? 6 : 7.5));
-      // `ang` negativo = mais varrida para trás, então SOMA em θ.
+      // `ang` soma em θ (ver a convenção em `_passoOrelhas`).
       // A orelha de trás varre um pouco MAIS que a da frente: a diferença de
       // amplitude é o que faz o par parecer dois apêndices independentes em
       // vez de uma peça rígida girando.
-      ctx.rotate(BASE_ANG[i] - o.ang * (atras ? 0.62 : 0.46));
+      ctx.rotate(BASE_ANG[i] + o.ang * (atras ? 1.15 : 1));
       // A de trás era `cores.sombra` — cinza médio, claro demais: lia como
       // um SEGUNDO objeto brigando com a da frente em vez de profundidade.
       ctx.fillStyle = atras
         ? misturarHex(cores.sombra, cores.escuro, 0.62)
-        : cores.claro;
+        : misturarHex(cores.claro, FOLHA_VIVA, 0.1 + this.floracao * 0.15);
       ctx.beginPath();
       ctx.moveTo(-largura * 0.5, 0);
       // Barriga de um lado e ponta CAÍDA: com os controles quase alinhados a
@@ -841,18 +945,25 @@ export class ArteJogador {
       ctx.quadraticCurveTo(largura * 0.92, comprimento * 0.30, largura * 0.5, 0);
       ctx.closePath();
       ctx.fill();
-      // Interior escuro na orelha da frente: sem isso ela é o maior elemento
-      // da silhueta e o menos desenhado — um plano branco chapado.
+      /* NERVURA no lugar do interior escuro. A mancha escura dentro de uma
+         orelha estreita era o que fazia dela uma lâmina; a nervura (central
+         e dois pares de laterais) faz dela uma folha, e acende com a
+         restauração junto com as marcas do corpo. */
       if (!atras) {
-        ctx.fillStyle = rgba(cores.escuro, 0.34);
+        ctx.strokeStyle = rgba(misturarHex(cores.marca, cores.sombra, 0.35), 0.45 + this.floracao * 0.45);
+        ctx.lineWidth = 0.75;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(-largura * 0.22, comprimento * 0.1);
-        ctx.quadraticCurveTo(-largura * 0.5, comprimento * 0.6,
-          -largura * 0.3, comprimento * 0.8);
-        ctx.quadraticCurveTo(largura * 0.28, comprimento * 0.5,
-          largura * 0.24, comprimento * 0.1);
-        ctx.closePath();
-        ctx.fill();
+        ctx.moveTo(0, comprimento * 0.06);
+        ctx.quadraticCurveTo(-largura * 0.16, comprimento * 0.5, -largura * 0.5, comprimento * 0.9);
+        for (const v of [0.34, 0.58]) {
+          const y = comprimento * v, x = -largura * 0.16 * v * 1.6;
+          ctx.moveTo(x, y);
+          ctx.lineTo(x - largura * 0.42, y + comprimento * 0.08);
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + largura * 0.36, y + comprimento * 0.06);
+        }
+        ctx.stroke();
       }
       ctx.restore();
     }
@@ -874,25 +985,33 @@ export class ArteJogador {
        verdade e o de trás encolhe bem mais: diferença grande de tamanho é o
        que vende três-quartos. */
     const CY_OLHO = cy - 2.1;
+    /* Olho escuro com um fundo de VERDE (não o vazio preto da máscara) e um
+       pouco menor que antes: com o focinho, o rosto não precisa ser só olho. */
+    const corOlho = misturarHex(cores.escuro, cores.marca, 0.16);
     const olho = (dx, escala, giro) => {
-      ctx.fillStyle = cores.escuro;
+      ctx.fillStyle = corOlho;
       ctx.beginPath();
-      ctx.ellipse(dx, CY_OLHO, 2.9 * escala, 4.3 * escala * abertura, giro, 0, TAU);
+      ctx.ellipse(dx, CY_OLHO, 2.7 * escala, 4.0 * escala * abertura, giro, 0, TAU);
       ctx.fill();
       if (abertura > 0.5 && escala > 0.8) {
-        // Reflexo só no olho da frente e pequeno, senão vira olho de desenho fofo.
+        // Reflexo grande em cima e um menor embaixo: olho molhado, vivo.
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.ellipse(dx + 0.9, CY_OLHO - 0.5, 0.7, 0.8, 0, 0, TAU);
+        ctx.ellipse(dx + 0.9, CY_OLHO - 0.6, 0.75, 0.85, 0, 0, TAU);
         ctx.fill();
+        ctx.globalAlpha *= 0.6;
+        ctx.beginPath();
+        ctx.arc(dx - 0.7, CY_OLHO + 1.6, 0.4, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha /= 0.6;
       }
     };
 
     // O VÃO entre as duas amêndoas é metade do reconhecimento do rosto: sem
     // ele os dois viram uma máscara escura só, ainda mais com a sobrancelha
     // logo acima.
-    olho(-2.8, 0.66, 0.22);   // olho de trás: bem menor, dá perspectiva de 3/4
-    olho(2.9, 1, -0.30);
+    olho(-2.6, 0.64, 0.22);   // olho de trás: bem menor, dá perspectiva de 3/4
+    olho(3.4, 1, -0.30);
 
     /* SOBRANCELHA. Uma massa escura acompanhando o topo dos dois olhos. É a
        mudança de uma linha que tira o rosto de "vazio" e põe um olhar nele —
@@ -1030,6 +1149,22 @@ export class ArteJogador {
     ctx.fillStyle = g;
     const c = this._crescente(ctx, k);
     ctx.fill();
+    /* Contorno escuro fino: sobre céu claro ou dentro de um feixe de luz o
+       corte claro sumia no fundo claro. Com a borda, lê em qualquer sala. */
+    ctx.strokeStyle = rgba(misturarHex(tema.ceuTopo, '#000000', 0.3), 0.42);
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    // Folhas arrancadas pelo corte, soltando da borda de fora: o golpe do
+    // Guardião é vento de mata, não lâmina.
+    if (k > 0.25) {
+      const cor = misturarHex(tema.crista, '#ffffff', 0.25);
+      for (const [u, dr, giro] of [[0.35, 4, 0.6], [0.62, 7, -0.4], [0.86, 5, 1.1]]) {
+        const ang = lerp(c.ang0, c.ang1, u) - (k - 0.25) * 0.5;
+        const r = c.rMed + c.esp * 0.5 + dr * (0.5 + k);
+        this._folhinha(ctx, Math.cos(ang) * r, Math.sin(ang) * r, ang + Math.PI / 2 + giro * k, 0.8, cor);
+      }
+    }
 
     ctx.globalAlpha = a;
     ctx.strokeStyle = '#ffffff';
@@ -1070,7 +1205,7 @@ export class ArteJogador {
        Centrado em −10 com raio 26 ele cobria exatamente a faixa dos joelhos
        aos pés, e lavava de volta pra cinza médio as pernas que `_pernas`
        calcula escuras — o passe de luz desfazendo o trabalho do desenho. */
-    luzRadial(ctx, j.centroX, j.centroY - 18, 24, '#ffffff', 0.24 * compensa);
+    luzRadial(ctx, j.centroX, j.centroY - 18, 24, '#ffffff', 0.18 * compensa);
 
     // 3. Marcas acesas.
     if (this.floracao > 0.05) {
