@@ -1217,6 +1217,16 @@ fase2/
   saem de `2h/t²` e `2h/t`. Mexa nas de cima, nunca nas derivadas.
   Medido no navegador: pulo 99px (3,09 tiles de 32px), ápice 0,342s, corrida
   232px/s, investida ~95px. **Essa é a régua de todo vão de todo mapa.**
+- **Plataforma de mão única: só é chão pra quem NÃO está subindo.**
+  `terreno.noChao` usa uma faixa de tolerância de 2 px sob os pés; sem olhar
+  `vy`, quem atravessava a plataforma de baixo pra cima "pousava" no meio do
+  pulo em ~15% das passagens (recarregava pulo duplo e investida, ligava o
+  coyote — dava pra pular de novo do nada — e soltava poeira/som de
+  aterrissagem). E `sobrePlataforma` (que decide se baixo + pular DESCE) vem
+  de `terreno.apoiadoEmPlataforma`, não do quadro em que o `mover` encaixa os
+  pés: parado em cima, os pés afundam < 1 px por quadro e o encaixe só volta a
+  cada ~4 quadros — com a flag só daí, baixo + pular virava pulo comum quase
+  sempre.
 - **Plataforma, perigo e água precisam de passe de desenho PRÓPRIO** —
   `contornos()` só extrai fronteira de tiles sólidos. Sem eles, existiam na
   colisão e não na tela (o jogador pisava no ar e morria em espinho
@@ -1252,6 +1262,23 @@ comprimento de linha (o parser completa com `.` em SILÊNCIO, e linha curta vira
 buraco na borda da sala), porta sem ligação, ligação pra sala inexistente,
 altar/chefe/portão sem definição, e alcançabilidade. Erro de mapa em
 metroidvania só aparece jogando, e aparece tarde.
+
+**Espaço do corpo (checagem nova do verificador):** o grafo de portas não sabe
+se, DENTRO da sala, dá pra ir de uma porta à outra — e por isso deixou passar
+dois bugs do `varzea-03` desde o mapa original: a saída `>` estava na fileira
+d'água de baixo, numa poça fechada por piso sólido (a Várzea inteira terminava
+ali, e ela é caminho obrigatório), e o salvamento `S` estava num "tronco oco"
+com entrada de 1 tile de altura (o Guardião tem 44 px). Agora o verificador
+inunda, a partir da chegada de cada porta, as células onde cabe o corpo (1
+coluna × 2 fileiras livres, ignorando pulo/gravidade, portão e barreira contam
+como passagem) e acusa PROBLEMA se as portas não se comunicam por dentro ou se
+altar/semente/salvamento/fragmento/fonte/bicho preso fica num bolsão fechado.
+Altura de pulo NÃO entra nessa checagem: isso foi conferido à parte, com uma
+simulação da física real do Guardião (busca por manobras, habilidades ganhas
+na ordem dos altares) — numa simulação dessas, cuidado: o pulo tem altura
+variável, e "soltar" o botão no quadro errado corta o pulo duplo; uma
+primeira versão fazia isso e acusou um altar do Planeio inalcançável que na
+verdade se alcança (subida da `dossel-04` conferida degrau por degrau).
 
 ### Sistemas
 

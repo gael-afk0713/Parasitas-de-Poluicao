@@ -225,9 +225,30 @@ export class Terreno {
     for (let cx = x0; cx <= x1; cx++) {
       const t = this.em(cx, cy);
       if (ehBloqueante(t)) return true;
-      if (t === PLATAFORMA && corpo.y + corpo.altura <= cy * this.tile + tolerancia) return true;
+      /* Plataforma só é chão pra quem NÃO está subindo. Sem o teste de `vy`,
+         quem atravessava a plataforma de baixo pra cima tinha um quadro com
+         os pés na faixa de tolerância e "pousava" no meio do pulo (~15% das
+         passagens): recarregava pulo duplo e investida, ligava o coyote (dava
+         pra pular de novo do nada) e disparava poeira/som de aterrissagem. */
+      if (t === PLATAFORMA && !(corpo.vy < 0) && corpo.y + corpo.altura <= cy * this.tile + tolerancia) return true;
     }
     return false;
+  }
+
+  /** Apoiado SÓ em plataforma (nenhum sólido sob os pés)? É o que decide se
+   *  baixo + pular desce. Mesma faixa de tolerância do `noChao`. */
+  apoiadoEmPlataforma(corpo, tolerancia = 2) {
+    const y = corpo.y + corpo.altura + tolerancia - 1;
+    const cy = Math.floor(y / this.tile);
+    const x0 = Math.floor(corpo.x / this.tile);
+    const x1 = Math.floor((corpo.x + corpo.largura - 1) / this.tile);
+    let plataforma = false;
+    for (let cx = x0; cx <= x1; cx++) {
+      const t = this.em(cx, cy);
+      if (ehBloqueante(t)) return false;
+      if (t === PLATAFORMA) plataforma = true;
+    }
+    return plataforma;
   }
 
   /** Distância em px até o chão abaixo de um ponto (Infinity se não houver). */

@@ -98,6 +98,15 @@ registrarSala({
    Sala-marco. O altar fica numa saliência que exige salto duplo, e logo à
    direita há um vão de 6 tiles que SÓ a investida vence — a habilidade é
    ensinada e cobrada na mesma tela, sem uma linha de texto.
+   A saída (`>`) fica no NÍVEL DO CHÃO da direita, logo depois do vão. **Bug
+   corrigido, não reintroduzir**: ela estava na fileira d'água de baixo, dentro
+   de uma poça fechada por piso sólido em cima — sem passagem nenhuma. Como a
+   sala é caminho obrigatório (02 → 03 → 04 → … → Clareira), a Várzea
+   terminava aqui; e quem voltava da varzea-04 nascia preso na poça.
+   O ponto de salvamento (`S`) mora no "tronco oco" do canto de baixo: a
+   entrada dele era um túnel de 1 tile de altura, e o Guardião tem 44 px —
+   ninguém entrava. O bloco sobre o túnel (fileira 12, colunas 11-15) saiu:
+   descendo do degrau `###` pra dentro sobra vão de sobra.
    -------------------------------------------------------------------------- */
 registrarSala({
   id: 'varzea-03',
@@ -118,11 +127,11 @@ registrarSala({
     '<................................................#',
     '#####.........................e..................#',
     '#...#######................................#######',
-    '#..........#####.....................####........#',
-    '#.....S.........###...............###...........$#',
+    '#....................................####........#',
+    '#.....S.........###...............###...........$>',
     '####################......########################',
     '#~~~~~~~~~~~~~~~~~~#^^^^^^#~~~~~~#~~~~~~~~~~~~~~~#',
-    '#~~~~~~~~~~~~~~~~~~########~~~~~~#~~~~~~~~~~~~~~>#',
+    '#~~~~~~~~~~~~~~~~~~########~~~~~~#~~~~~~~~~~~~~~~#',
     '##################################################',
   ],
   ligacoes: {

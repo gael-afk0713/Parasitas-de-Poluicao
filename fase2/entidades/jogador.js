@@ -248,10 +248,14 @@ export class Jogador {
       atravessaPlataforma: this._descer > 0
         || (controlavel && entrada.ativo('baixo') && entrada.ativo('pular')),
     });
-    this.sobrePlataforma = res.plataforma;
-
     this.eraNoChao = this.noChao;
     this.noChao = res.chao || terreno.noChao(this, 2);
+    /* `res.plataforma` só é verdade no quadro em que o mover ENCAIXA os pés —
+       parado em cima, os pés afundam menos de 1 px por quadro e o encaixe só
+       volta a cada ~4 quadros. Com a flag só daí, baixo + pular quase sempre
+       virava pulo comum em vez de descer. Agora vem do que está sob os pés. */
+    // (`?.`: terreno.js antigo em cache logo depois de um deploy não quebra o quadro)
+    this.sobrePlataforma = res.plataforma || (this.noChao && !!terreno.apoiadoEmPlataforma?.(this, 2));
 
     // Parede: precisa estar no ar, encostado, e empurrando contra ela.
     this.naParede = 0;

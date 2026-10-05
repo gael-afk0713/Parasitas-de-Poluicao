@@ -6,13 +6,16 @@
  * Roda `validarRegistro()` (comprimento de linha, portas sem ligação,
  * ligação para sala inexistente, altar/chefe/portão sem definição) e depois
  * faz uma checagem de ALCANÇABILIDADE: percorre o grafo de portas a partir da
- * sala inicial e lista o que ficou órfão.
+ * sala inicial e lista o que ficou órfão. Por fim, o ESPAÇO DO CORPO dentro
+ * de cada sala: portas que não se comunicam por dentro e objetos (altar,
+ * semente, salvamento, fragmento...) presos em bolsão onde o Guardião não cabe.
  *
  * Existe porque erro de mapa em metroidvania só aparece jogando, e aparece
  * tarde — você descobre a porta quebrada quando já caiu numa sala sem saída.
  */
 
 import { validarRegistro, todasAsSalas, carregarSala, PORTA_OPOSTA } from './mundo/salas.js';
+import { SOLIDO, TILE } from './mundo/terreno.js';
 
 await import('./mundo/salas-raizes.js');
 await import('./mundo/salas-varzea.js');
@@ -41,6 +44,67 @@ while (fila.length) {
 
 const todas = todasAsSalas().map((d) => d.id);
 const orfas = todas.filter((id) => !visitadas.has(id));
+
+// --- espaço do corpo, DENTRO de cada sala ---------------------------------
+/* O grafo de portas acima não sabe se, dentro da sala, dá pra ir de uma
+   porta à outra. Foi assim que passou, por meses, a saída do varzea-03
+   emparedada numa poça (a Várzea inteira terminava ali) e o salvamento dela
+   num "tronco oco" com entrada de 1 tile de altura.
+   O Guardião ocupa 1 coluna × 2 fileiras (22 × 44 px): uma célula serve se
+   ela e a de cima não são sólidas. Inunda a partir da chegada de cada porta,
+   IGNORANDO gravidade e altura de pulo (portão e barreira contam como
+   passagem) — então só acusa bolsão fisicamente fechado, que é defeito com
+   certeza. Altura de pulo é com a simulação de verdade (ver CONTEXTO). */
+const ALVOS_DO_CORPO = new Set(['altar', 'semente', 'salvamento', 'fragmento', 'fonte', 'bichoPreso']);
+for (const def of todasAsSalas()) {
+  let sala;
+  try { sala = carregarSala(def.id); } catch { continue; }
+  const t = sala.terreno;
+  const livre = (cx, cy) => t.em(cx, cy) !== SOLIDO && t.em(cx, cy - 1) !== SOLIDO;
+  const celula = (p) => [Math.floor(p.x / TILE), Math.floor((p.y - 1) / TILE)];
+  const rotulo = new Int32Array(t.largura * t.altura).fill(-1);
+  const regiao = (cx, cy) => {
+    if (cx < 0 || cy < 0 || cx >= t.largura || cy >= t.altura || !livre(cx, cy)) return -1;
+    const i0 = cy * t.largura + cx;
+    if (rotulo[i0] >= 0) return rotulo[i0];
+    const id = i0;
+    const pilha = [[cx, cy]];
+    rotulo[i0] = id;
+    while (pilha.length) {
+      const [x, y] = pilha.pop();
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (nx < 0 || ny < 0 || nx >= t.largura || ny >= t.altura) continue;
+        const i = ny * t.largura + nx;
+        if (rotulo[i] >= 0 || !livre(nx, ny)) continue;
+        rotulo[i] = id;
+        pilha.push([nx, ny]);
+      }
+    }
+    return id;
+  };
+  const regioesDePorta = new Map();
+  for (const tipo of new Set(sala.portas.map((p) => p.tipo))) {
+    const [cx, cy] = celula(sala.pontoDeEntrada(tipo));
+    regioesDePorta.set(tipo, regiao(cx, cy));
+  }
+  const comPorta = new Set(regioesDePorta.values());
+  if (def.id === SALA_INICIAL) comPorta.add(regiao(...celula(sala.inicio)));
+  for (const [tipo, r] of regioesDePorta) {
+    if (r < 0) problemas.push(`${def.id}: a chegada pela ${tipo} não cabe o corpo do Guardião`);
+  }
+  if (regioesDePorta.size > 1 && new Set(regioesDePorta.values()).size > 1) {
+    const grupos = {};
+    for (const [tipo, r] of regioesDePorta) (grupos[r] ??= []).push(tipo);
+    problemas.push(`${def.id}: portas que não se comunicam por dentro da sala — ${Object.values(grupos).map((g) => g.join('+')).join(' | ')}`);
+  }
+  for (const o of sala.objetos) {
+    if (!ALVOS_DO_CORPO.has(o.tipo)) continue;
+    const r = regiao(...celula(o));
+    if (r < 0 || !comPorta.has(r)) {
+      problemas.push(`${def.id}: "${o.tipo}" em (col ${o.cx}, row ${o.cy}) fica num bolsão onde o Guardião não entra`);
+    }
+  }
+}
 
 // --- relatório ------------------------------------------------------------
 const porArea = {};
