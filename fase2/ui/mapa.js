@@ -270,7 +270,7 @@ export class TelaMapa {
             ctx.fill();
           }
         } else {
-          ctx.font = `700 ${Math.max(7, Math.min(11, h * 0.3))}px "JetBrains Mono", monospace`;
+          ctx.font = `700 ${Math.max(8, Math.min(12, h * 0.32))}px "Archivo", system-ui, sans-serif`;
           ctx.textAlign = 'right'; ctx.textBaseline = 'top';
           ctx.fillText(String(vivos), x + w - 4, y + 3);
         }
@@ -343,7 +343,7 @@ export class TelaMapa {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
 
-    ctx.font = '700 20px "Space Grotesk", sans-serif';
+    ctx.font = '800 22px "Archivo", system-ui, sans-serif';
     ctx.fillStyle = misturarHex('#efe8d6', tema.crista, 0.3);
     ctx.fillText(nomeArea(m.sala?.area, m.purezaDaArea(m.sala?.area ?? '')), largura / 2, 40);
 
@@ -353,27 +353,31 @@ export class TelaMapa {
        salas já limpas sem saber quantas ainda devem alguma coisa. Fica no
        mapa porque é lá que se decide pra onde ir. */
     const faltam = m.parasitasVivosNaArea?.(m.sala?.area) ?? 0;
-    ctx.font = '600 12px "JetBrains Mono", monospace';
+    // "a semente pode ser colhida" depois de colhida mandava o jogador
+    // procurar o que já tinha pegado.
+    const colhida = m.sementeDaArea?.(m.sala?.area)?.colhida ?? false;
+    ctx.font = '500 14px "Archivo", system-ui, sans-serif';
     ctx.fillStyle = faltam > 0
-      ? rgba(misturarHex(tema.particula, '#ffffff', 0.3), 0.9)
+      ? rgba(misturarHex(tema.particula, '#ffffff', 0.3), 0.92)
       : rgba(tema.acento, 0.95);
     ctx.fillText(
       faltam > 0
-        ? `${faltam} ${faltam === 1 ? 'PARASITA' : 'PARASITAS'} NESTA ÁREA`
-        : 'ÁREA LIMPA · A SEMENTE PODE SER COLHIDA',
-      largura / 2, 62);
+        ? `${faltam} ${faltam === 1 ? 'parasita' : 'parasitas'} nesta área`
+        : colhida ? 'Área restaurada' : 'Área limpa. A semente já pode ser colhida',
+      largura / 2, 64);
 
     // Percentual de restauração — o único número do jogo inteiro, e ele existe
     // porque "quanto do mundo eu já trouxe de volta" é exatamente a pergunta
     // que o jogo está fazendo.
     const pct = Math.round(m.purezaGlobal * 100);
-    ctx.font = '600 12px "JetBrains Mono", monospace';
-    ctx.fillStyle = rgba(tema.particula, 0.85);
-    ctx.fillText(`RESTAURADO  ${pct}%`, largura / 2, altura - 42);
+    ctx.font = '600 14px "Archivo", system-ui, sans-serif';
+    ctx.fillStyle = rgba(tema.particula, 0.88);
+    ctx.fillText(`Mundo restaurado: ${pct}%`, largura / 2, altura - 44);
 
     const frag = m.fragmentosColetados?.size ?? 0;
-    ctx.fillStyle = rgba(tema.particula, 0.55);
-    ctx.fillText(`FRAGMENTOS ${frag}   ·   TAB PARA FECHAR`, largura / 2, altura - 22);
+    ctx.font = '500 13px "Archivo", system-ui, sans-serif';
+    ctx.fillStyle = rgba(tema.particula, 0.62);
+    ctx.fillText(`${frag} ${frag === 1 ? 'fragmento' : 'fragmentos'}. Tab fecha o mapa`, largura / 2, altura - 22);
   }
 
   _visitada(id) {

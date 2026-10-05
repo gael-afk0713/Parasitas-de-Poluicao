@@ -71,6 +71,7 @@ export class Mundo {
        torna o objetivo legível — o contador só desce. */
     this.parasitasMortos = new Set();
     this._cacheVivos = new Map();   // area -> quantos faltam
+    this._cacheSemente = new Map(); // area -> { sala, colhida } | null
     this.fragmentosColetados = new Set();
     this.barreirasQuebradas = new Set();
     /** Bichos presos que o Canto já soltou (entidades/perigos.js). */
@@ -227,6 +228,28 @@ export class Mundo {
     return vivos;
   }
 
+  /**
+   * A semente da área e se ela já foi colhida (`null` = área sem semente).
+   * Mesma varredura da definição das salas que `parasitasVivosNaArea`; o HUD
+   * e o mapa perguntam isto todo quadro, então fica em cache até uma semente
+   * abrir ou um save ser carregado.
+   */
+  sementeDaArea(areaId) {
+    if (this._cacheSemente.has(areaId)) return this._cacheSemente.get(areaId);
+    let r = null;
+    for (const id of idsDeArea(areaId)) {
+      const o = carregarSala(id).objetos.find((x) => x.tipo === 'semente');
+      if (!o) continue;
+      // chave nova (`sala:cx,cy`) ou a antiga (`cx,cy`), como em catalogo.js
+      const colhida = this.sementesAtivadas.has(`${id}:${o.cx},${o.cy}`)
+        || this.sementesAtivadas.has(`${o.cx},${o.cy}`);
+      r = { sala: id, colhida };
+      break;
+    }
+    this._cacheSemente.set(areaId, r);
+    return r;
+  }
+
   purezaDaSala(id) { return this.pureza.get(id) ?? 0; }
 
   /* DENOMINADOR FIXO: todas as salas da área, não só as visitadas.
@@ -261,6 +284,7 @@ export class Mundo {
   ativarSemente(chave, salaId = this.sala?.id, x = null, y = null) {
     if (this.sementesAtivadas.has(chave)) return false;
     this.sementesAtivadas.add(chave);
+    this._cacheSemente.clear();
     this._restaurando = { sala: salaId, de: this.purezaDaSala(salaId), para: 1, t: 0, dur: 2.6 };
     // A posição vai junto: quem desenha o efeito precisa saber DE ONDE a
     // restauração sai. Sem isso a onda nasceria no jogador, e o momento é da
@@ -562,6 +586,7 @@ export class Mundo {
       : []);
     this.pureza = new Map(pares(dados.pureza));
     this.sementesAtivadas = new Set(lista(dados.sementes));
+    this._cacheSemente.clear();
     this.parasitasMortos = new Set(lista(dados.parasitas));
     this._cacheVivos.clear();
     this.fragmentosColetados = new Set(lista(dados.fragmentos));

@@ -318,7 +318,9 @@ function quadro(alpha, dtReal) {
   transicao.desenhar(tela.ctx, tela.largura, tela.altura);
   efeitos.atualizar(dtReal);
   mapa.atualizar(dtReal);
-  hud.desenhar(dtReal, tema);
+  // Pausa, mapa e abertura congelam o relógio do HUD (avisos não vencem
+  // enquanto ninguém está olhando).
+  hud.desenhar(dtReal, tema, laco.pausado || mapa.aberta || !!paineis?.bloqueiaJogo);
   if (mapa.visivel) {
     const ctxHud = hud.ctx;
     if (ctxHud) mapa.desenhar(ctxHud, hud.larguraCss, hud.alturaCss, tema);
@@ -348,9 +350,10 @@ function efeitoDeEvento(ev) {
       // a mensagem inteira — título sozinho aqui não apareceria na tela.
       hud.anunciar(null,
         ev.faltam === 1
-          ? 'A semente não abre — 1 parasita ainda respira na área'
-          : `A semente não abre — ${ev.faltam} parasitas ainda respiram na área`,
+          ? 'A semente não abre: 1 parasita ainda respira na área'
+          : `A semente não abre: ${ev.faltam} parasitas ainda respiram na área`,
         3, 'sussurro');
+      hud.mostrarArea(5);
       mundo.emitir(ev.x, ev.y, 14, {
         velMin: 30, velMax: 120, g: 120, vidaMin: 0.3, vidaMax: 0.8,
         cor: tema.particula, arrasto: 0.4,
@@ -358,7 +361,7 @@ function efeitoDeEvento(ev) {
       camera.sacudir(0.12);
       break;
     case 'areaLimpa':
-      hud.anunciar('A área silenciou', 'A SEMENTE PODE SER COLHIDA', 3.4, 'marco');
+      hud.anunciar('A área silenciou', 'a semente pode ser colhida', 3.4, 'marco');
       render.piscar(tema.crista, 0.3);
       break;
     case 'habilidade':
@@ -416,9 +419,11 @@ function efeitoDeEvento(ev) {
     case 'fragmento':
       // Fragmento é ganho pequeno e frequente: sussurro na base da tela, não
       // um título de 30 px no meio, com o mesmo peso de destravar habilidade.
+      // O broto na ponta do ramo (HUD) enche um quarto por fragmento; no
+      // quarto ele vira folha — o aviso usa a mesma imagem.
       hud.anunciar(
-        ev.subiuVida ? 'Vitalidade' : 'Fragmento',
-        ev.subiuVida ? 'a vida máxima cresceu' : `faltam ${ev.faltam} para o próximo`,
+        ev.subiuVida ? 'Folha nova' : 'Fragmento',
+        ev.subiuVida ? 'o ramo cresceu: sua vida máxima subiu' : `faltam ${ev.faltam} para a próxima folha`,
         2.6, ev.subiuVida ? 'marco' : 'sussurro'
       );
       render.piscar(tema.crista, 0.3);
@@ -437,7 +442,7 @@ function efeitoDeEvento(ev) {
     /* --- a catástrofe no plano do jogo (entidades/perigos.js) --- */
     case 'bichoPreso':
       hud.anunciar(null, ev.temCanto
-        ? 'Ele está preso — cante perto dele'
+        ? 'Ele está preso: cante perto dele'
         : 'Ele está preso. Um canto que acalmasse a mata poderia soltá-lo.',
       3.4, 'sussurro');
       break;
@@ -456,14 +461,14 @@ function efeitoDeEvento(ev) {
       // Uma vez por sessão basta: a vinheta fechando já diz o resto.
       if (!efeitoDeEvento._fumacaAvisada) {
         efeitoDeEvento._fumacaAvisada = true;
-        hud.anunciar(null, 'A fumaça sufoca — ela se alimenta dos parasitas da área', 3.4, 'sussurro');
+        hud.anunciar(null, 'A fumaça sufoca. Ela se alimenta dos parasitas da área', 3.4, 'sussurro');
       }
       break;
     case 'fogoApagado':
       efeitos.anelChoque(ev.x, ev.y - 10, { raio: 30, cor: 'crista' });
       break;
     case 'portaoTrancado':
-      hud.anunciar('Trancado', 'algo que você ainda não sabe fazer', 2.2, 'sussurro');
+      hud.anunciar('Trancado', 'pede algo que você ainda não sabe fazer', 2.2, 'sussurro');
       break;
     case 'lore':
       if (ev.texto) hud.anunciar('', ev.texto, 4.5, 'sussurro');

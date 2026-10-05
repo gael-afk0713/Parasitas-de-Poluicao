@@ -7,9 +7,9 @@
 <title>Fase 2 · Parasitas de Poluição</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Space+Grotesk:wght@500;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=5">
-<link rel="stylesheet" href="fase2.css?v=9">
+<link rel="stylesheet" href="fase2.css?v=10">
 </head>
 <body class="fase2-body">
 
@@ -70,7 +70,7 @@
       <p class="painel-status" id="status-pausa"></p>
       <div class="config-acoes">
         <button class="painel-voltar" id="btn-pausa-salvar">Salvar agora</button>
-        <button class="painel-voltar config-acao-sair" id="btn-pausa-menu">Voltar ao Menu</button>
+        <button class="painel-voltar config-acao-sair" id="btn-pausa-menu">Voltar ao menu</button>
       </div>
       <div class="painel-acoes painel-acoes--fim">
         <button class="painel-confirmar" id="btn-pausa-continuar">Continuar</button>
@@ -91,7 +91,7 @@
   <section class="painel painel--fim" id="painel-fim" aria-hidden="true">
     <div class="painel-conteudo">
       <p class="painel-rotulo">Fim</p>
-      <h2 class="painel-titulo">O Coração Desperto</h2>
+      <h2 class="painel-titulo">O Coração desperto</h2>
       <p class="painel-explicacao">
         O que você derrubou não volta igual. Volta diferente — e volta porque
         alguém ficou para plantar. A floresta não te perdoou; ela apenas
@@ -103,7 +103,7 @@
         <li><span>Salas visitadas</span><strong id="fim-salas">—</strong></li>
       </ul>
       <div class="painel-acoes painel-acoes--fim">
-        <a class="painel-confirmar" href="index.html">Voltar ao Menu</a>
+        <a class="painel-confirmar" href="index.html">Voltar ao menu</a>
       </div>
     </div>
   </section>
@@ -116,21 +116,22 @@
       <p class="abertura-rotulo">Fase 2</p>
       <h1 class="abertura-titulo">O Guardião</h1>
       <p class="abertura-texto">
-        A empresa caiu. O que sobrou dela ainda respira debaixo da terra —
+        A empresa caiu. O que sobrou dela ainda respira debaixo da terra,
         e chama o que resta de você.
       </p>
       <button class="abertura-comecar" id="btn-comecar-fase2">Descer</button>
-      <ul class="abertura-controles">
+      <ul class="abertura-controles" aria-label="Controles">
         <li><kbd>A</kbd><kbd>D</kbd> mover</li>
         <li><kbd>Espaço</kbd> pular</li>
         <li><kbd>C</kbd> atacar</li>
         <li><kbd>Shift</kbd> investida</li>
         <li><kbd>E</kbd> canto</li>
+        <li><kbd>Tab</kbd> mapa</li>
         <li><kbd>Esc</kbd> pausar</li>
       </ul>
     </div>
   </div>
 
-<script type="module" src="fase2/main.js?v=55"></script>
+<script type="module" src="fase2/main.js?v=56"></script>
 </body>
 </html>

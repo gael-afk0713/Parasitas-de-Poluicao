@@ -102,7 +102,7 @@
     background:var(--f2-vidro);
     backdrop-filter:blur(6px);
     color:var(--paper);
-    font-family:'JetBrains Mono',monospace;
+    font-family:var(--fonte-texto);
     font-size:20px;
     line-height:1;
     display:grid;
@@ -133,10 +133,6 @@
 .fase2-body .painel-rotulo,
 .fase2-body .painel-lista--stats strong{
   color:var(--f2-vivo);
-}
-.fase2-body .painel-conteudo::before,
-.fase2-body .painel-conteudo::after{
-  border-color:var(--f2-vivo-dim);
 }
 .fase2-body .painel-voltar{
   border-color:rgba(127,216,166,0.28);
@@ -200,19 +196,20 @@
 .abertura-conteudo{ max-width:34rem; }
 
 .abertura-rotulo{
-  font-family:'JetBrains Mono',monospace;
-  font-size:11px;
-  letter-spacing:0.34em;
-  text-transform:uppercase;
-  color:var(--f2-vivo-dim);
-  margin-bottom:14px;
+  font-size:0.9375rem;
+  font-weight:500;
+  color:var(--f2-vivo);
+  margin-bottom:10px;
 }
 
+/* O avesso do estêncil do menu: lá a empresa fala grosso e apertado; aqui o
+   Guardião é leve e largo — Archivo fina e expandida, a mesma família do
+   resto do jogo, sem a marca da empresa. */
 .abertura-titulo{
-  font-family:'Space Grotesk',sans-serif;
-  font-weight:900;
+  font-weight:300;
+  font-stretch:125%;
   font-size:clamp(2.6rem,8vw,4.6rem);
-  letter-spacing:0.02em;
+  letter-spacing:0.01em;
   line-height:1;
   color:var(--paper);
   margin-bottom:20px;
@@ -233,23 +230,25 @@
 }
 
 .abertura-comecar{
-  font-family:'JetBrains Mono',monospace;
-  font-size:13px;
-  letter-spacing:0.22em;
-  text-transform:uppercase;
+  font-family:var(--fonte-texto);
+  font-size:1.0625rem;
+  font-weight:600;
   color:var(--paper);
   background:transparent;
   border:1px solid var(--f2-vivo-dim);
-  padding:15px 44px;
+  padding:14px 52px;
   cursor:pointer;
-  transition:border-color .2s ease, background .2s ease, letter-spacing .2s ease;
+  transition:border-color .2s ease, background .2s ease;
 }
-.abertura-comecar:hover,
+.abertura-comecar:hover{
+  border-color:var(--f2-vivo);
+  background:rgba(127,216,166,0.08);
+}
 .abertura-comecar:focus-visible{
   border-color:var(--f2-vivo);
   background:rgba(127,216,166,0.08);
-  letter-spacing:0.3em;
-  outline:none;
+  outline:2px solid var(--paper);
+  outline-offset:3px;
 }
 
 .abertura-controles{
@@ -259,21 +258,22 @@
   justify-content:center;
   gap:8px 18px;
   margin-top:38px;
-  font-family:'JetBrains Mono',monospace;
-  font-size:10px;
-  letter-spacing:0.1em;
-  text-transform:uppercase;
+  font-size:0.8125rem;
   color:var(--paper-dim);
-  opacity:0.72;
 }
 .abertura-controles kbd{
   display:inline-block;
-  padding:2px 7px;
+  min-width:1.6em;
+  padding:2px 6px;
   margin-right:5px;
-  border:1px solid rgba(157,148,127,0.32);
+  border:1px solid rgba(157,148,127,0.4);
+  border-bottom-width:2px;
   border-radius:3px;
-  font-size:10px;
+  font-family:var(--fonte-texto);
+  font-size:0.75rem;
+  font-weight:600;
   color:var(--paper);
+  text-align:center;
 }
 
 /* ============ MOVIMENTO REDUZIDO ============
@@ -290,8 +290,7 @@
 }
 .painel-som-linha{
   display:grid; grid-template-columns:5.5rem 1fr; align-items:center; gap:.9rem;
-  font-family:"JetBrains Mono",monospace; font-size:.7rem; font-weight:600;
-  letter-spacing:.16em; text-transform:uppercase;
+  font-size:.875rem; font-weight:500;
   color:var(--paper-dim);
 }
 .painel-som input[type="range"]{
@@ -320,8 +319,6 @@
 @media (prefers-reduced-motion:reduce){
   .abertura-titulo{ animation:none; text-shadow:0 0 26px rgba(127,216,166,0.2); }
   .abertura-comecar{ transition:none; }
-  .abertura-comecar:hover,
-  .abertura-comecar:focus-visible{ letter-spacing:0.22em; }
   .fase2-abertura{ transition:opacity .2s ease, visibility .2s; }
   .toque-botao{ transition:none; }
   .fase2-body .painel-voltar,
@@ -331,8 +328,10 @@
      continuar valendo como índice de tudo que anima):
        · tremor de câmera e aberração cromática — desligados
        · flash de tela cheia — teto de 0.12
-       · HUD: tremor ao perder máscara — desligado
-       · HUD: pulso de invulnerabilidade a 26 Hz — vira esmaecido constante
+       · HUD (o ramo, fase2/ui/hud.js): a folha perdida não cai — apaga no
+         lugar; a folha que volta não se desenrola — só acende; o balanço
+         das folhas, o tremor da última e o tremor do galho no golpe —
+         desligados
        · catástrofe (render/catastrofe.js): fogo (frentes, paredes de fogo,
          árvores-tocha, tocos em brasa com fagulhas), fumaça e pirocúmulo,
          o jorro de lodo e o vapor da fonte do Coração, manadas e bandos do
