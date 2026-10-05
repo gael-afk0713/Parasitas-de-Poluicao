@@ -132,6 +132,16 @@ saiu do projeto inteiro):
   estilo, então os campos de e-mail e senha do login apareciam como barras
   brancas padrão do navegador. A regra agora é `.campo input` (cobre
   text/email/password), com `:-webkit-autofill` tratado.
+- **Tela baixa** (celular deitado, notebook com zoom alto): com o título no
+  alto, abaixo de ~510 px de altura "Como jogar" e "Créditos" saíam da tela
+  sem rolagem (o body é `overflow:hidden`). `@media (max-height:560px)`
+  compacta título/itens e deixa o `<main>` rolar; abaixo de 340 px a linha
+  de apoio some. Esses blocos vêm DEPOIS do `@media (max-width:640px)` de
+  propósito (tela estreita E baixa: o de altura tem que vencer).
+- O resumo do Continuar se refaz ao fechar o painel Novo jogo (apagar ou
+  editar save muda qual é o "mais recente"), e `carregarSavesConta()` descarta
+  a leitura se a conta mudou no meio dela (logout de A + login de B — achado
+  teórico do security-reviewer; hoje o próprio SDK já barraria).
 - Navegação do menu por teclado (setas + Enter/Espaço nativo dos botões).
 - Painel **Como Jogar** — lista estática de regras.
 - Painel **Créditos**.
@@ -444,7 +454,8 @@ COLAPSO** (`#hud-barra-poluicao`, até `LIMIAR_COLAPSO`) com um risco na
 meta (75%, `META_POLUICAO`) e o trecho depois dela em ferrugem — é a
 história da fase numa linha só: você precisa chegar no risco, e logo depois
 dele a empresa quebra. A meta de poluição voltou a aparecer como texto
-("meta 15 mil, colapso em 20 mil"). Ícones de fábrica/poluição do HUD
+("meta 15 mil, colapso em 20 mil", em `#hud-meta-poluicao`, montado por
+`fase1.js` a partir das constantes — nunca escrito à mão no HTML). Ícones de fábrica/poluição do HUD
 saíram (repetiam o rótulo). **`META_DINHEIRO`/`META_POLUICAO`/
 `LIMIAR_COLAPSO` subiram pra antes de `let dinheiro`**: as barras são
 desenhadas já na carga (`atualizarHudDinheiro()` roda na avaliação do
@@ -857,8 +868,13 @@ das Configurações — ver seção abaixo).
 **Atualização — virou o painel "Pausado" e PAUSA de verdade.** O rótulo
 dizia "Pausado", mas a economia (`tickEconomia`) e a fiscalização
 (`aplicarFiscalizacao`) continuavam rodando por trás — dava pra levar multa
-com o jogo "pausado". As duas agora saem cedo quando `jogoPausado()` (painel
-aberto). O botão de engrenagem virou um ícone de **pausa** (o painel nunca
+com o jogo "pausado". Agora, com o painel aberto (`jogoPausado()`), o tick
+que cair é **ADIADO** pro fim da pausa (`ticksAdiados`, executados em
+`fecharPainelConfig`), nunca descartado: uma primeira versão só dava
+`return`, e pausar 1 s em volta dos 25 s pulava a multa sem perder renda
+(achado do code-reviewer). E `segundosJogados()` desconta o tempo pausado
+(`pausadoTotalMs`/`pausaInicioMs`), senão o "Tempo jogado" das telas de fim
+contava a pausa. O botão de engrenagem virou um ícone de **pausa** (o painel nunca
 teve configuração nenhuma) com `aria-label="Pausar"`; botões "Voltar ao
 menu", "Sair da conta" (antes "Sair da Sessão") e "Continuar jogando". O
 resto desta seção continua valendo.
@@ -1141,7 +1157,11 @@ serve pra medir nível de acabamento, nunca pra chegar perto do visual dele.
   pra trás) com pata clara, que aparece em chão escuro; golpe com contorno
   escuro e folhas arrancadas. **Não reintroduzir**: o sinal da mola das
   orelhas era invertido (correr e a investida as erguiam, "murchas"
-  subiam) — a convenção está documentada em `_passoOrelhas`.
+  subiam) — a convenção está documentada em `_passoOrelhas`. E no ar as
+  pernas usavam `3 * fase`/`5 * fase` com `fase = faseAndar`, que cresce sem
+  limite: depois de alguns segundos de corrida, pular desenhava a perna como
+  uma linha de 100–400 px (bug antigo, achado pelo code-reviewer). No ar a
+  pose agora é fixa (frente recolhida, trás esticada).
 - Os **parasitas são inspirados na Sombra do Hollow Knight**: vulto preto
   encapuzado, fendas brancas no lugar de rosto, tentáculos saindo só da metade
   DE CIMA (em 360° leem como aranha), manto esfarrapado dissolvendo em fumaça.
@@ -1258,7 +1278,10 @@ metroidvania só aparece jogando, e aparece tarde.
   área**: quantos parasitas ainda "seguram a semente" — aparece ao entrar
   numa sala, quando o número muda e quando a semente recusa, e fica fixa só
   quando a semente está livre (usa `mundo.sementeDaArea()`, novo, com cache
-  limpo em `ativarSemente`/`aplicarSave`). Avisos em **dois canais** (título
+  limpo em `ativarSemente`/`aplicarSave`). **Uma área pode ter mais de uma
+  semente** — o Sub-bosque tem duas (`raizes-01` e `raizes-03`):
+  `sementeDaArea` devolve `{ total, pendentes, sala, colhida }` e `colhida`
+  só é verdade com todas colhidas; HUD e mapa têm plural. Avisos em **dois canais** (título
   no alto, sussurro embaixo) com prioridade e fila — antes qualquer
   `anunciar` apagava o que estava na tela; `chave` faz nomes de sala se
   substituírem. O relógio do HUD **congela** na pausa, no mapa e na tela de

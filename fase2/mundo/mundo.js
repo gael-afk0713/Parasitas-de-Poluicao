@@ -229,23 +229,29 @@ export class Mundo {
   }
 
   /**
-   * A semente da área e se ela já foi colhida (`null` = área sem semente).
+   * As sementes da área: `{ total, pendentes, sala, colhida }`, ou `null`
+   * se a área não tem nenhuma. `colhida` só é verdade com TODAS colhidas, e
+   * `sala` aponta a primeira que falta. (Uma versão anterior parava na
+   * primeira semente achada — mas o Sub-bosque tem duas, em `raizes-01` e
+   * `raizes-03`, e colher só uma das duas deixava o HUD e o mapa errados.)
    * Mesma varredura da definição das salas que `parasitasVivosNaArea`; o HUD
    * e o mapa perguntam isto todo quadro, então fica em cache até uma semente
    * abrir ou um save ser carregado.
    */
   sementeDaArea(areaId) {
     if (this._cacheSemente.has(areaId)) return this._cacheSemente.get(areaId);
-    let r = null;
+    let total = 0, pendentes = 0, sala = null;
     for (const id of idsDeArea(areaId)) {
-      const o = carregarSala(id).objetos.find((x) => x.tipo === 'semente');
-      if (!o) continue;
-      // chave nova (`sala:cx,cy`) ou a antiga (`cx,cy`), como em catalogo.js
-      const colhida = this.sementesAtivadas.has(`${id}:${o.cx},${o.cy}`)
-        || this.sementesAtivadas.has(`${o.cx},${o.cy}`);
-      r = { sala: id, colhida };
-      break;
+      for (const o of carregarSala(id).objetos) {
+        if (o.tipo !== 'semente') continue;
+        total++;
+        // chave nova (`sala:cx,cy`) ou a antiga (`cx,cy`), como em catalogo.js
+        const colhida = this.sementesAtivadas.has(`${id}:${o.cx},${o.cy}`)
+          || this.sementesAtivadas.has(`${o.cx},${o.cy}`);
+        if (!colhida) { pendentes++; sala ??= id; }
+      }
     }
+    const r = total ? { total, pendentes, sala, colhida: pendentes === 0 } : null;
     this._cacheSemente.set(areaId, r);
     return r;
   }

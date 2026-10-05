@@ -180,13 +180,17 @@ export class Hud {
     if (igual(atual)) { atual.t = Math.min(atual.t, 0.5); atual.dur = Math.max(atual.dur, dur); return; }
     if (canal.fila.some(igual)) return;
 
-    if ((PESO[peso] ?? 1) > (PESO[atual.peso] ?? 1)) {
+    const p = PESO[peso] ?? 1;
+    if (p > (PESO[atual.peso] ?? 1)) {
       // Passa na frente; o que estava na tela volta pra fila se ainda tinha
       // o que dizer.
       if (atual.dur - atual.t > 1) canal.fila.unshift({ ...atual, t: 0 });
       canal.atual = novo;
     } else {
-      canal.fila.push(novo);
+      // Na fila também: entra antes do primeiro de peso menor (um marco não
+      // espera atrás de um nome de sala).
+      const i = canal.fila.findIndex((a) => (PESO[a.peso] ?? 1) < p);
+      if (i < 0) canal.fila.push(novo); else canal.fila.splice(i, 0, novo);
     }
     // Fila curta: se encher, sai primeiro o de menor peso.
     while (canal.fila.length > 3) {
@@ -556,8 +560,15 @@ export class Hud {
 
     let texto = null, livre = false;
     if (semente && !semente.colhida) {
-      if (faltam > 0) texto = faltam === 1 ? '1 parasita segura a semente' : `${faltam} parasitas seguram a semente`;
-      else { texto = 'A semente da área está livre'; livre = true; }
+      // O Sub-bosque tem duas sementes: o plural precisa existir.
+      const varias = (semente.pendentes ?? 1) > 1;
+      if (faltam > 0) {
+        const alvo = varias ? 'as sementes' : 'a semente';
+        texto = faltam === 1 ? `1 parasita segura ${alvo}` : `${faltam} parasitas seguram ${alvo}`;
+      } else {
+        texto = varias ? `${semente.pendentes} sementes da área estão livres` : 'A semente da área está livre';
+        livre = true;
+      }
     } else if (faltam > 0) {
       texto = faltam === 1 ? '1 parasita nesta área' : `${faltam} parasitas nesta área`;
     }

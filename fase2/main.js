@@ -353,7 +353,9 @@ function efeitoDeEvento(ev) {
           ? 'A semente não abre: 1 parasita ainda respira na área'
           : `A semente não abre: ${ev.faltam} parasitas ainda respiram na área`,
         3, 'sussurro');
-      hud.mostrarArea(5);
+      // `?.`: os módulos da Fase 2 não têm `?v=` próprio, e por alguns minutos
+      // depois de um deploy um hud.js antigo (sem este método) pode vir do cache.
+      hud.mostrarArea?.(5);
       mundo.emitir(ev.x, ev.y, 14, {
         velMin: 30, velMax: 120, g: 120, vidaMin: 0.3, vidaMax: 0.8,
         cor: tema.particula, arrasto: 0.4,

@@ -355,7 +355,8 @@ export class TelaMapa {
     const faltam = m.parasitasVivosNaArea?.(m.sala?.area) ?? 0;
     // "a semente pode ser colhida" depois de colhida mandava o jogador
     // procurar o que já tinha pegado.
-    const colhida = m.sementeDaArea?.(m.sala?.area)?.colhida ?? false;
+    const sementes = m.sementeDaArea?.(m.sala?.area);
+    const colhida = sementes?.colhida ?? false;
     ctx.font = '500 14px "Archivo", system-ui, sans-serif';
     ctx.fillStyle = faltam > 0
       ? rgba(misturarHex(tema.particula, '#ffffff', 0.3), 0.92)
@@ -363,7 +364,9 @@ export class TelaMapa {
     ctx.fillText(
       faltam > 0
         ? `${faltam} ${faltam === 1 ? 'parasita' : 'parasitas'} nesta área`
-        : colhida ? 'Área restaurada' : 'Área limpa. A semente já pode ser colhida',
+        : colhida ? 'Área restaurada'
+          : (sementes?.pendentes ?? 1) > 1 ? 'Área limpa. As sementes já podem ser colhidas'
+            : 'Área limpa. A semente já pode ser colhida',
       largura / 2, 64);
 
     // Percentual de restauração — o único número do jogo inteiro, e ele existe

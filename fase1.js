@@ -184,15 +184,31 @@ const btnConfig = document.getElementById('btn-config');
 const painelConfig = document.getElementById('painel-config');
 const statusConfig = document.getElementById('status-config');
 
+/* PAUSA (este painel). O relógio da fase para junto: `segundosJogados()`
+   desconta o tempo pausado, e os ticks de economia/fiscalização que cairiam
+   durante a pausa são ADIADOS pro fim dela, não descartados — descartar
+   deixava pausar 1 s em volta dos 25 s pra pular a multa sem perder renda. */
+let pausaInicioMs = null;
+let pausadoTotalMs = 0;
+const ticksAdiados = new Set();
+
 function abrirPainelConfig() {
   statusConfig.textContent = '';
   statusConfig.classList.remove('visivel');
   painelConfig.classList.add('aberto');
   painelConfig.setAttribute('aria-hidden', 'false');
+  if (pausaInicioMs == null) pausaInicioMs = Date.now();
 }
 function fecharPainelConfig() {
   painelConfig.classList.remove('aberto');
   painelConfig.setAttribute('aria-hidden', 'true');
+  if (pausaInicioMs != null) {
+    pausadoTotalMs += Date.now() - pausaInicioMs;
+    pausaInicioMs = null;
+  }
+  const adiados = [...ticksAdiados];
+  ticksAdiados.clear();
+  for (const tick of adiados) tick();
 }
 btnConfig.addEventListener('click', abrirPainelConfig);
 
@@ -495,7 +511,7 @@ function atualizarCartasFabricas() {
 
 // níveis de severidade visual do HUD de poluição — puramente estético,
 // sem efeito de jogo além do aviso narrativo abaixo. Valores = 25%/75%
-// de META_POLUICAO (15.000, definida mais abaixo junto de META_DINHEIRO)
+// de META_POLUICAO (15.000, declarada lá em cima, antes de `let dinheiro`)
 // — mesmos cortes usados pelos estágios da neblina de poluição (ver
 // ESTAGIOS_NEBLINA), pra HUD e neblina concordarem sobre "o que é grave".
 const LIMIAR_POLUICAO_ATENCAO = 3750;
@@ -675,7 +691,8 @@ function jogoPausado() {
 }
 
 function tickEconomia() {
-  if (jogoEncerrado || jogoPausado() || instanciasConstruidas.length === 0) return;
+  if (jogoEncerrado || instanciasConstruidas.length === 0) return;
+  if (jogoPausado()) { ticksAdiados.add(tickEconomia); return; }
   let ganhoDoTick = 0;
   let reducaoGlobalDoTick = 0;
   instanciasConstruidas.forEach((instancia) => {
@@ -822,7 +839,9 @@ function pulsarMultaNoHud() {
 }
 
 function aplicarFiscalizacao() {
-  if (jogoEncerrado || jogoPausado() || poluicaoTotal <= 0) return;
+  if (jogoEncerrado || poluicaoTotal <= 0) return;
+  // Adiada, nunca pulada: ver PAUSA, junto do painel de Configurações.
+  if (jogoPausado()) { ticksAdiados.add(aplicarFiscalizacao); return; }
   const multa = Math.round(poluicaoTotal * FATOR_MULTA * configDificuldade().multMulta);
   if (multa <= 0) return;
   dinheiro = Math.max(0, dinheiro - multa);
@@ -851,7 +870,10 @@ setInterval(aplicarFiscalizacao, FISCALIZACAO_INTERVALO_MS);
 let jogoEncerrado = null; // null | 'colapso' | 'vitoria'
 
 function segundosJogados() {
-  return tempoJogadoAcumulado + Math.floor((Date.now() - inicioSessaoMs) / 1000);
+  // Tempo pausado não conta como tempo jogado (ver PAUSA).
+  const agora = Date.now();
+  const pausado = pausadoTotalMs + (pausaInicioMs != null ? agora - pausaInicioMs : 0);
+  return tempoJogadoAcumulado + Math.floor(Math.max(0, agora - inicioSessaoMs - pausado) / 1000);
 }
 function formatarTempo(segundosTotais) {
   const min = Math.floor(segundosTotais / 60);
@@ -890,6 +912,13 @@ function verificarFimDeJogo() {
 }
 const hudMetaEl = document.getElementById('hud-meta');
 if (hudMetaEl) hudMetaEl.textContent = 'meta ' + formatarDinheiro(META_DINHEIRO);
+// Sai das constantes, não do HTML: mudar a meta ou o colapso não deixa o
+// HUD dizendo outra coisa.
+const hudMetaPoluicaoEl = document.getElementById('hud-meta-poluicao');
+if (hudMetaPoluicaoEl) {
+  const mil = (n) => (n / 1000).toLocaleString('pt-BR') + ' mil';
+  hudMetaPoluicaoEl.textContent = `meta ${mil(META_POLUICAO)}, colapso em ${mil(LIMIAR_COLAPSO)}`;
+}
 
 // ============ COLOCAÇÃO DE FÁBRICAS NO GRID ============
 function chaveCelula(col, row) {

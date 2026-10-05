@@ -486,9 +486,14 @@ export class ArteJogador {
         // entre SUBIR (recolhido) e CAIR (estendido), que é a leitura que o
         // jogador usa pra saber em que parte do arco ele está.
         const recolhe = clamp01(0.4 - j.vy / 900 + (pose.encolhe ?? 0) * 0.45);
-        joelhoX = dxQuadril + 3 * fase;
+        /* Perna da frente recolhida à frente, a de trás esticada pra trás:
+           silhueta de salto. **Bug corrigido, não reintroduzir**: era
+           `3 * fase` e `5 * fase`, com `fase` = `faseAndar`, que CRESCE SEM
+           LIMITE — depois de alguns segundos de corrida a perna no ar virava
+           uma linha de 100+ px (e 400+ px com mais corrida acumulada). */
+        joelhoX = dxQuadril + (atras ? -1.5 : 2.6);
         joelhoY = -9 + recolhe * 2;
-        peX = dxQuadril + 5 * fase;
+        peX = dxQuadril + (atras ? -4 : 1.2);
         peY = -3 - recolhe * 3;
       } else {
         // Ciclo de passada: o pé desenha uma elipse achatada, o joelho

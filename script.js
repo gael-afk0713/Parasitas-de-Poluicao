@@ -264,6 +264,9 @@ function fecharPainel(id) {
   if (!painel) return;
   painel.classList.remove('aberto');
   painel.setAttribute('aria-hidden', 'true');
+  // No Novo jogo dá pra apagar ou editar saves — o que muda qual é o "mais
+  // recente". Sem isto a linha do Continuar seguia mostrando o save antigo.
+  if (id === 'painel-novo-jogo') atualizarResumoContinuar();
 }
 
 document.getElementById('btn-como-jogar').addEventListener('click', () => {

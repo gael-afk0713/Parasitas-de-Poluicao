@@ -9,6 +9,7 @@
   --agua:#5f97a6;        /* acento das construções de "usina" (água), contraste com o âmbar do carvão */
   --agua-dim:#3f7383;
   --patina:#6fae93;      /* verde-pátina: o lado da floresta (Fase 2). O âmbar é o lucro. */
+  --rust-claro:#d0805e;  /* ferrugem clareada pra TEXTO/traço: --rust puro não lê sobre o escuro */
 
   /* Duas vozes. O ESTÊNCIL é a empresa falando — título, o nome dela e o
      dinheiro dela; some na Fase 2, quando a empresa cai. O resto é Archivo,
@@ -514,7 +515,7 @@ footer{
   font-weight:500;
   min-height:1.2em;
   margin:0.4rem 0 0.8rem;
-  color:#d0805e; /* ferrugem clareada: --rust puro não lê sobre o fundo escuro */
+  color:var(--rust-claro);
   opacity:0;
   transition:opacity 0.2s ease;
 }
@@ -611,6 +612,25 @@ footer{
   footer{left:6vw;right:6vw;bottom:1.2rem;justify-content:flex-end;}
   .campo-linha{grid-template-columns:1fr;}
   .slots{flex-direction:column;}
+}
+
+/* TELA BAIXA (celular deitado, notebook com zoom alto): com o título no
+   alto, abaixo de ~510 px de altura "Como jogar" e "Créditos" saíam da tela
+   e, com o body em overflow:hidden, não havia como chegar neles. Compacta
+   tudo e, se ainda não couber, o próprio <main> rola. */
+@media (max-height:560px){
+  main{top:1rem;bottom:1rem;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;}
+  .titulo{font-size:clamp(2.2rem, min(10vw, 14vh), 4rem);}
+  .titulo-sub{margin-top:0.6rem;font-size:0.9375rem;}
+  nav.menu{margin-top:0.8rem;}
+  .item{padding:0.25rem 0;font-size:1.125rem;}
+  .item-principal{font-size:1.3rem;}
+  .item::before{top:calc(0.25rem + 0.58em);}
+}
+/* Baixa de verdade (celular deitado pequeno): o menu vem antes da linha de
+   apoio — ela sai pra os cinco itens caberem sem rolar. */
+@media (max-height:340px){
+  .titulo-sub{display:none;}
 }
 
 /* ============ FASE 1 — GRID ISOMÉTRICO ============ */
@@ -794,7 +814,7 @@ footer{
 .hud-stat--poluicao[data-nivel="atencao"] .hud-stat-valor,
 .hud-stat--poluicao[data-nivel="atencao"] .hud-barra{color:var(--amber);}
 .hud-stat--poluicao[data-nivel="critico"] .hud-stat-valor,
-.hud-stat--poluicao[data-nivel="critico"] .hud-barra{color:#d0805e;}
+.hud-stat--poluicao[data-nivel="critico"] .hud-barra{color:var(--rust-claro);}
 
 /* ---- pulso na Caixa a cada tick que rende dinheiro ---- */
 .hud-stat-valor.pulso-ganho{animation:pulso-ganho 0.6s ease-out;}
@@ -806,7 +826,7 @@ footer{
 /* ---- pulso na Caixa quando leva multa de fiscalização ---- */
 .hud-stat-valor.pulso-multa{animation:pulso-multa 0.7s ease-out;}
 @keyframes pulso-multa{
-  0%{color:#d0805e;text-shadow:0 0 10px rgba(138,74,47,0.7);}
+  0%{color:var(--rust-claro);text-shadow:0 0 10px rgba(138,74,47,0.7);}
   100%{color:var(--amber);text-shadow:none;}
 }
 
