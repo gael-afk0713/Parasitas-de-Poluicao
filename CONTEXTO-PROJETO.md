@@ -1275,10 +1275,17 @@ como passagem) e acusa PROBLEMA se as portas não se comunicam por dentro ou se
 altar/semente/salvamento/fragmento/fonte/bicho preso fica num bolsão fechado.
 Altura de pulo NÃO entra nessa checagem: isso foi conferido à parte, com uma
 simulação da física real do Guardião (busca por manobras, habilidades ganhas
-na ordem dos altares) — numa simulação dessas, cuidado: o pulo tem altura
-variável, e "soltar" o botão no quadro errado corta o pulo duplo; uma
-primeira versão fazia isso e acusou um altar do Planeio inalcançável que na
-verdade se alcança (subida da `dossel-04` conferida degrau por degrau).
+na ordem dos altares). Duas armadilhas de simulação, as duas cometidas e
+corrigidas: (1) o pulo tem altura variável, e "soltar" o botão no quadro
+errado corta o pulo duplo — uma versão fazia isso e acusou o altar do Planeio
+inalcançável, quando ele se alcança (subida da `dossel-04` conferida degrau
+por degrau); (2) simular o Guardião invulnerável faz ele andar por cima de
+poço de espinho como se fosse chão — espinho/escória tem que MATAR a
+tentativa, senão nenhuma trava de habilidade aparece.
+Resultado (outubro/2026, depois das correções do `varzea-03`): sem habilidade
+nenhuma chega-se a 8 salas e só ao altar do Salto Duplo; com o Salto Duplo,
+às 30 salas e a todos os altares; e os 46 objetos (altares, sementes,
+salvamentos, fragmentos, fontes, bichos presos, chefes) são alcançáveis.
 
 ### Sistemas
 
@@ -1467,6 +1474,14 @@ removido intencionalmente — não recriar sem pedir.
   longo. Vale jogar de verdade pra sentir o ritmo e ajustar se ainda
   estiver monótono ou rápido
   demais.
+- **Trancas de habilidade fracas depois do Salto Duplo (decisão de design
+  pendente, perguntar ao autor)**: a simulação de progressão mostra que, com
+  só o Salto Duplo, todas as 30 salas e todos os altares já são alcançáveis —
+  o vão de espinhos do `varzea-03` que o comentário diz que "SÓ a investida
+  vence" se cruza com pulo + pulo duplo (alcance horizontal ~7 tiles contra 6
+  de vão), e portões/barreiras não isolam nenhuma sala nem objeto. Não é trava
+  (o jogo fica mais permissivo, não impossível), mas a ordem pensada das áreas
+  não é garantida. Apertar exige mexer em mapas — não foi feito sem perguntar.
 - Painel "Pausado" da Fase 1 (Esc / botão de pausa) cobre salvar/menu/sair — não
   tem ainda opções de áudio, idioma, ou dificuldade-em-tempo-real (a
   dificuldade é fixada na criação do save, não muda depois).
