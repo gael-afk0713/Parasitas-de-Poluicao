@@ -1,1 +1,3 @@
 fase2/_capturas/
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
