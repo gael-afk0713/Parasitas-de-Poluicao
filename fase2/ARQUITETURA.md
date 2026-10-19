@@ -1,6 +1,9 @@
 # Fase 2 — Arquitetura e contratos
 
-Leia isto inteiro antes de tocar em qualquer arquivo de `fase2/`.
+Leia isto inteiro antes de tocar em qualquer arquivo de `fase2/`. Pra
+tipografia, cores de interface, HUD e textos, a regra está em
+[`DESIGN.md`](../DESIGN.md) na raiz (a Fase 2 usa só Archivo — sem o estêncil
+da empresa).
 
 ## O que é
 

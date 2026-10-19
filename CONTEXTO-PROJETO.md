@@ -66,6 +66,10 @@ carregam o **mesmo** `style.css`.
 
 ## Paleta e tipografia (usar em tudo daqui pra frente)
 
+> A regra visual atual, completa e curta, está em **[DESIGN.md](DESIGN.md)**
+> (tokens, as duas vozes tipográficas, regras de texto, HUDs, direção de arte
+> da Fase 2, movimento). Esta seção guarda o histórico e os detalhes.
+
 ```css
 --soot:#0b0906;        /* fundo escuro industrial */
 --paper:#efe8d6;        /* texto claro principal */
@@ -1357,22 +1361,33 @@ completa em `fase2/ARQUITETURA.md`.
   estilo novo (ex: os botões Confirmar/Cancelar da construção reaproveitam
   `.painel-confirmar`/`.painel-voltar` já usadas nos outros painéis).
 
-## Automações do Claude Code (`.claude/`)
+## Automações do Claude Code (`.claude/`) e do Codex (`.codex/`, `.agents/`)
 
 Configuradas via o skill `claude-automation-recommender` (plugin
 `claude-code-setup`). Se algum desses arquivos não existir mais, foi
 removido intencionalmente — não recriar sem pedir.
 
+**Arquivos de instrução** (mantenha os pares em sincronia ao mudar regra):
+`CLAUDE.md` (Claude Code) e `AGENTS.md` (Codex) têm o MESMO conteúdo, só o
+nome da ferramenta muda; `DESIGN.md` é o sistema de design; este arquivo é o
+contexto completo; `fase2/ARQUITETURA.md`, os contratos da Fase 2. As skills
+existem em `.claude/skills/` e espelhadas em `.agents/skills/`; os hooks em
+`.claude/hooks/` e espelhados em `.codex/hooks/` (`.codex/hooks.json`); os
+revisores em `.claude/agents/` e `.codex/agents/*.toml`.
+
 - **Skills** (`.claude/skills/`):
-  - `testar-fluxo` — roteiro de teste manual completo (subir servidor,
-    Menu → Novo Jogo → Fase 1 → construção, checar console). Invocável
-    pelo usuário (`/testar-fluxo`) ou pelo Claude.
+  - `testar-fluxo` — roteiro de teste manual completo (subir o
+    `fase2/dev-servidor.py`, Menu → Novo Jogo → Fase 1 → construção →
+    Fase 2, telas de celular e baixa, checar console). Invocável pelo
+    usuário (`/testar-fluxo`) ou pelo Claude.
   - `atualizar-contexto` — instrui o Claude a manter este próprio arquivo
     (`CONTEXTO-PROJETO.md`) atualizado depois de mudanças relevantes, sem
     precisar ser pedido. Só o Claude invoca (`user-invocable: false`).
 - **Hooks** (`.claude/settings.json`, scripts em `.claude/hooks/*.py`):
-  - `PostToolUse` em Edit/Write de `script.js`, `fase1.js` ou `style.css`
-    → lembrete pra checar o cache-busting (`?v=N`) nos HTMLs.
+  - `PostToolUse` em Edit/Write de `style.css` (→ `?v` igual nos TRÊS
+    HTMLs), `script.js`, `fase1.js`, `fase2.css`, `fase2/main.js` → lembrete
+    do cache-busting; em qualquer outro `.js` de `fase2/` → lembrete de subir
+    o `?v` do `main.js` e chamar função nova de outro módulo com `?.`.
   - `PreToolUse` em Edit/Write de `firestore.rules` → força confirmação
     extra antes de aplicar (arquivo que controla segurança de dados reais
     de usuário).

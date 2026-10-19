@@ -1,0 +1,28 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 'C:\\Users\\gaels\\OneDrive\\Desktop\\Parasitas de Poluição\\.codex\\hooks\\confirmar_firestore_rules.py' 2>/dev/null",
+            "statusMessage": "Checando se e o firestore.rules..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 'C:\\Users\\gaels\\OneDrive\\Desktop\\Parasitas de Poluição\\.codex\\hooks\\lembrete_cache_busting.py' 2>/dev/null",
+            "statusMessage": "Checando se precisa subir o ?v=N..."
+          }
+        ]
+      }
+    ]
+  }
+}

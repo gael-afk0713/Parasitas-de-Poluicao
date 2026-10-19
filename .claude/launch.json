@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fase2-dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["fase2/dev-servidor.py", "8771"],
+      "port": 8771
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+[mcp_servers.firebase]
+command = "firebase.cmd"
+args = [
+    "mcp",
+    "--dir",
+    'C:\Users\gaels\OneDrive\Desktop\Parasitas de Poluição',
+]
