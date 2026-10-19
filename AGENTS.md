@@ -10,6 +10,12 @@ sistema de design do jogo (identidade "estêncil industrial", tokens, regras
 de texto, HUDs). Na Fase 2, **[fase2/ARQUITETURA.md](fase2/ARQUITETURA.md)**
 tem os contratos do código e a direção de arte.
 
+As skills de gosto visual instaladas do `leonxlnx/taste-skill`
+(`design-taste-frontend`, `high-end-visual-design`) são genéricas: aqui o
+**DESIGN.md manda**. Use-as pra crítica e checagem (tells, inspetor no
+navegador), nunca pra sortear uma "direção" nova ou trocar paleta/fonte do
+jogo sem perguntar ao autor.
+
 O jogo é HTML/CSS/JS puro, sem build: menu (`index.html` + `script.js`),
 Fase 1 isométrica (`fase1.html` + `fase1.js`), Fase 2 metroidvania em canvas
 (`fase2.html` + `fase2.css` + módulos ES em `fase2/`). Publicado no GitHub
