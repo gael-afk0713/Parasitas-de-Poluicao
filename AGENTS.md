@@ -103,7 +103,9 @@ dia, não uma licença geral pra ações irreversíveis sem aviso.
 Mudança grande (várias telas, lógica de jogo, economia, save): rode o
 agente `code-reviewer` (`.codex/agents/`) no diff antes do push e corrija o que ele
 confirmar. Mexeu em `firestore.rules`, `firebase-config.js` ou no fluxo de
-login/senha do `script.js`: `security-reviewer`. `firestore.rules` tem hook
+login/senha do `script.js`: `security-reviewer`. Mexeu em
+algo visual (CSS, HTMLs, textos de interface, HUDs): `design-reviewer`, que
+confere o diff contra o DESIGN.md. `firestore.rules` tem hook
 que pede confirmação — ele controla a segurança de dados reais de usuário.
 
 ## Mensagens de commit
