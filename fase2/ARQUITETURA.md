@@ -200,6 +200,12 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
   orelhas em folha deitadas pra trás (em pé, finas e claras, elas liam como
   os chifres do Cavaleiro do Hollow Knight), gola de folhas, pernas de corço
   com pata clara.
+  Desde out/2026 ele é desenhado por uma FOLHA DE SPRITES gerada por IA
+  (`fase2/arte/guardiao.png`, preparada por `fase2/arte/preparar-guardiao.py`,
+  desenhada por `entidades/jogador-sprite.js`); o desenho em código de
+  `jogador-arte.js` fica de reserva enquanto a imagem não carrega. Os efeitos
+  (arco do golpe, Canto, luz) continuam em código, porque dependem do tempo
+  real da ação e do tema da área.
 - **Os parasitas são inspirados na Sombra de Hollow Knight**: vulto preto
   encapuzado, fendas brancas no lugar de rosto, tentáculos saindo da metade
   DE CIMA como chama fria, barra do manto esfarrapada dissolvendo em fumaça.

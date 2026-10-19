@@ -1166,6 +1166,33 @@ serve pra medir nível de acabamento, nunca pra chegar perto do visual dele.
   limite: depois de alguns segundos de corrida, pular desenhava a perna como
   uma linha de 100–400 px (bug antigo, achado pelo code-reviewer). No ar a
   pose agora é fixa (frente recolhida, trás esticada).
+- **O Guardião agora é SPRITE** (out/2026, pedido do autor): uma folha de 24
+  quadros gerada no ChatGPT (prompt com a grade 6x4 e a pose de cada célula,
+  sem foto de referência, pra não sair cópia do desenho em código), aprovada
+  com ressalvas pelo `design-reviewer`. Ela é bípede, como o desenho em
+  código (o autor vetou bicho de quatro patas). Pipeline:
+  - `fase2/arte/preparar-guardiao.py` lê a folha original e grava o atlas
+    `guardiao.png`. Precisa existir porque **a IA não respeita a grade
+    pedida**: os pés da linha 1 caíam na célula da linha 2, e cortar por 256
+    px decepava pés. O script acha cada quadro pelas faixas vazias, apaga a
+    névoa de brilho (55% da folha tinha alfa 1..49, que virava neblina verde
+    sobre o jogo), tira folhinhas soltas e o arco do golpe (o código já os
+    desenha), e alinha tudo num PIVÔ comum: pé no chão nos quadros de chão,
+    centro dos pixels ESCUROS do corpo em x (o centro de massa puxava pro
+    rastro da investida). Folha nova → rodar o script e copiar as constantes
+    impressas pra `CELULA` em `jogador-sprite.js`.
+  - `jogador-sprite.js` escolhe o quadro pelo estado do `Jogador` (corrida
+    1→2→3→2, sem o `corrida4`, que quebrava o ritmo; agachado na aterrissagem
+    pesada; cambalhota girando no salto duplo, detectada pela queda de
+    `saltosRestantes` no ar). `ArteJogador.desenhar` usa o sprite quando ele
+    carregou e cai no desenho em código antes disso ou se a imagem falhar
+    (`mundo.arteJogador.usarSprite = false` no `?debug` compara os dois).
+  - Ficou em código: arco do golpe, onda do Canto, passe de luz, squash
+    (pela metade, porque o sprite já tem a pose). Saíram os fantasmas da
+    investida: cópias do sprite em alfa baixo liam como fumaça cinza.
+  - Perdido com a troca (pendência, decidir com o autor): floração das
+    nervuras com a restauração, piscar, cauda/orelhas com mola e a tinta do
+    tema no corpo.
 - Os **parasitas são inspirados na Sombra do Hollow Knight**: vulto preto
   encapuzado, fendas brancas no lugar de rosto, tentáculos saindo só da metade
   DE CIMA (em 360° leem como aranha), manto esfarrapado dissolvendo em fumaça.
@@ -1190,8 +1217,10 @@ fase2/
            dossel,coracao,ramos}.js
   render/  paleta.js · renderizador.js · parallax.js · terreno-arte.js ·
            particulas.js · efeitos.js
-  entidades/ jogador.js · jogador-arte.js · catalogo.js · parasitas.js ·
-             chefes.js · projeteis.js
+  entidades/ jogador.js · jogador-arte.js · jogador-sprite.js · catalogo.js ·
+             parasitas.js · chefes.js · projeteis.js
+  arte/    guardiao-folha-original.png (folha 6x4 gerada no ChatGPT) ·
+           preparar-guardiao.py (recorta/alinha) · guardiao.png (atlas usado)
   ui/      hud.js · mapa.js · paineis.js
   audio/   audio.js · musica.js
   sistemas/ save.js

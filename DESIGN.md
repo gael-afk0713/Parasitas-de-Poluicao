@@ -151,6 +151,11 @@ sufocada `#6f6a62`, casca `#7d6650`.
   ponta da cauda. Faixa âmbar na cintura é a assinatura (`AMBAR #eaa24f`,
   únicas cores dele que não vêm do tema). O verde das folhas do corpo é o
   mesmo das folhas do HUD.
+  **Desde out/2026 ele é sprite** (folha gerada por IA, `fase2/arte/`), com
+  o desenho em código só de reserva. No sprite o verde puxa pro amarelo, e
+  ficaram SÓ na reserva: nervura acendendo com a restauração, cauda e
+  orelhas com mola, piscar, tinta do tema. Arco do golpe, Canto e luz
+  seguem em código.
 - **Parasitas**: vulto preto encapuzado (inspiração na Sombra do HK),
   tentáculos só da metade de cima. Contraste invertido: herói claro sobre
   escuro, inimigo buraco preto com pontos de luz.

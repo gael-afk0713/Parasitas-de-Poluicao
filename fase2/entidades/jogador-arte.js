@@ -39,6 +39,7 @@ import {
 } from '../core/mat.js';
 import { ESTADOS } from './jogador.js';
 import { luzRadial } from '../render/renderizador.js';
+import { SpriteGuardiao } from './jogador-sprite.js';
 
 /* ------------------------------------------------------------ proporções --
    Origem do desenho: PÉS do personagem, olhando para a direita, y negativo
@@ -91,6 +92,13 @@ export class ArteJogador {
 
     this.rastro = [];           // cópias fantasma da investida
     this.respiro = 0;
+
+    /* Arte por IA (`jogador-sprite.js`). Enquanto ela não carrega — ou com
+       `usarSprite = false` no ?debug, pra comparar — vale o desenho em
+       código abaixo. As molas de cauda e orelha continuam rodando nos dois
+       casos: são baratas e mantêm a troca instantânea. */
+    this.sprite = new SpriteGuardiao();
+    this.usarSprite = true;
   }
 
   /** `v` 0..1 = pureza média do mundo. Sobe devagar, de propósito. */
@@ -107,6 +115,7 @@ export class ArteJogador {
 
     this._passoCauda(dt, j);
     this._passoOrelhas(dt, j);
+    this.sprite.atualizar(dt, j);
 
     // Piscada: intervalo irregular, senão vira metrônomo.
     this._proxPiscada -= dt;
@@ -232,6 +241,10 @@ export class ArteJogador {
    * @param {import('../render/paleta.js').Tema} tema
    */
   desenhar(ctx, j, tema) {
+    if (this.usarSprite && this.sprite.pronto) {
+      this._desenharSprite(ctx, j, tema);
+      return;
+    }
     const cores = this._cores(tema);
 
     // Rastro da investida — atrás de tudo, some rápido.
@@ -275,6 +288,38 @@ export class ArteJogador {
     this._cabeca(ctx, j, cores, tema, pose);
 
     ctx.restore();
+
+    this._ataque(ctx, j, tema);
+  }
+
+  /** O mesmo `desenhar`, com a folha de sprites no lugar do corpo. */
+  _desenharSprite(ctx, j, tema) {
+    /* Sem os fantasmas da investida: o quadro dela já traz o rastro de luz,
+       e cópias do sprite em alfa baixo saíam como fumaça cinza (os membros
+       escuros dominam a cópia translúcida). O brilho do rastro continua no
+       passe de luz (`desenharLuz`). */
+
+    if (!j.visivel) return;
+
+    this._canto(ctx, j, tema);
+
+    const q = this.sprite.quadro(j);
+    // Na parede o quadro olha PRA parede (desenhado com ela à direita); no
+    // pulo da parede ele foi desenhado olhando pra esquerda.
+    let dir = j.direcao;
+    if (q.nome === 'parede' && j.naParede) dir = j.naParede;
+    if (q.espelhado) dir = -dir;
+
+    /* Squash/stretch e inclinação continuam vindo da física, mas pela
+       metade: o sprite já tem a pose (o corpo inclinado na corrida, esticado
+       no pulo), e o valor inteiro somava as duas e deformava o desenho. */
+    // Na cambalhota, sem squash: escala desigual seguida da rotação do giro
+    // cisalhava a bolinha (o salto duplo começa com esticar 1,34).
+    const gira = q.nome === 'saltoDuplo';
+    const sx = gira ? 1 : 1 + (j.esticar - 1) * 0.5;
+    const sy = gira ? 1 : 1 + (j.achatar - 1) * 0.5;
+    const rot = q.nome === 'investida' || q.nome === 'saltoDuplo' ? 0 : j.inclinacao * 0.5;
+    this.sprite.desenhar(ctx, q.nome, j.centroX, j.pesY, { dir, sx, sy, rot, giro: q.giro ?? 0 });
 
     this._ataque(ctx, j, tema);
   }

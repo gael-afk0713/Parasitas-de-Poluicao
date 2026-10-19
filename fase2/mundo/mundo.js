@@ -467,7 +467,9 @@ export class Mundo {
 
   /** Chamado fora do passo fixo — animação puramente visual. */
   atualizarApresentacao(dtReal, pausado = false) {
-    this.arteJogador.atualizar(dtReal, this.jogador);
+    // A arte do Guardião para com a pausa: a cambalhota do sprite (e as molas
+    // de cauda e orelha) seguiam girando com o jogo parado.
+    this.arteJogador.atualizar(pausado ? 0 : dtReal, this.jogador);
     /* As aves reagem ao jogador, mas são apresentação: andam no tempo real,
        não no passo fixo. E PARAM com a pausa, o mapa e a tela de abertura —
        senão o pânico aleatório seguia sorteando com o jogo parado (em dois
