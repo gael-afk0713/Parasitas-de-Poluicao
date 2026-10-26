@@ -1293,6 +1293,12 @@ fase2/
   colisão e não na tela (o jogador pisava no ar e morria em espinho
   invisível). A face de cima da plataforma é o elemento mais claro da cena
   depois do Guardião: legibilidade de affordance vence sutileza de atmosfera.
+- **Patrulha vira pela COLISÃO, não pelo quanto andou.** O teste antigo
+  ("andou menos que 60% do passo") falhava encostado numa parede: o encaixe
+  da colisão empurra o corpo até 0,8 px pra trás, em valor absoluto isso
+  contava como movimento, e o Errante (e o andador de `catalogo.js`) ficava
+  tremendo na parede pra sempre (achado testando no `raizes-02`). Hoje usa
+  `paredeDir`/`paredeEsq` do retorno de `terreno.mover`.
 - **`projeteis.js` tem assinaturas NÃO uniformes** (herdado de um subagente):
   `new PocaAcida(x, y, {largura, duracao})` é POSICIONAL e usa `largura`, não
   `raio`; `new OndaChoque({x, y, dir, alcance})` viaja numa direção só;

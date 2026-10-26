@@ -767,14 +767,15 @@ export class ParasitaBase {
     this.vx = this.vel * this.dir;
     this.vy = Math.min(this.vy + 1500 * dt, 800);
 
-    const antes = this.x;
-    terreno.mover(this, this.vx * dt, this.vy * dt);
+    const col = terreno.mover(this, this.vx * dt, this.vy * dt);
     // Bateu na parede OU chegou na beirada → vira. Sem o teste de beirada o
-    // parasita cai da plataforma e a sala se esvazia sozinha.
+    // parasita cai da plataforma e a sala se esvazia sozinha. A parede vem da
+    // colisão: medir o quanto andou falha encostado nela (ver `_patrulhar`
+    // em parasitas.js).
     const beirada = !terreno.caixaSolida(
       this.dir > 0 ? this.x + this.largura + 2 : this.x - 4, this.y + this.altura + 2, 4, 6
     );
-    if (Math.abs(this.x - antes) < Math.abs(this.vx * dt) * 0.6 || beirada) this.dir *= -1;
+    if ((this.dir > 0 ? col.paredeDir : col.paredeEsq) || beirada) this.dir *= -1;
   }
 
   receberDano(n, deX, deY, mundo) {

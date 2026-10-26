@@ -274,15 +274,18 @@ export class Sombra {
     this.vx = vel * this.dir;
     this.vy = Math.min(this.vy + GRAVIDADE * dt, VEL_QUEDA_MAX);
 
-    const antes = this.x;
-    terreno.mover(this, this.vx * dt, this.vy * dt);
+    const col = terreno.mover(this, this.vx * dt, this.vy * dt);
 
     // Sem o teste de beirada o parasita despenca da plataforma e a sala se
     // esvazia sozinha depois de alguns segundos.
     const sondaX = this.dir > 0 ? this.x + this.largura + 2 : this.x - 6;
     const semChaoAdiante = !terreno.caixaSolida(sondaX, this.y + this.altura + 2, 4, 8)
       && terreno.emPx(sondaX, this.y + this.altura + 4) !== PLATAFORMA;
-    const bateuParede = Math.abs(this.x - antes) < Math.abs(this.vx * dt) * 0.6;
+    /* A colisão diz se bateu. O teste antigo ("andou menos que 60% do
+       passo") falhava encostado na parede: o encaixe empurra o corpo até
+       0,8 px pra TRÁS, e em valor absoluto isso contava como ter andado — o
+       parasita nunca virava e ficava tremendo na parede pra sempre. */
+    const bateuParede = this.dir > 0 ? col.paredeDir : col.paredeEsq;
     if (bateuParede || semChaoAdiante) this.dir *= -1;
   }
 
