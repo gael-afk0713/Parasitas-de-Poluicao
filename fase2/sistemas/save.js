@@ -51,6 +51,24 @@ function lerLocal(info) {
   } catch { return null; }
 }
 
+/** A Fase 1 deste slot terminou (vitória ou colapso)? Só aí a Fase 2 abre. */
+export function fase1Completa(slot) {
+  const p = slot?.progresso;
+  return !!(p && (p.vitoriaAlcancada || p.colapsada));
+}
+
+/* A cópia local é do SLOT, mas um slot pode ser recomeçado (Novo jogo com
+   outros dados) ou apagado e criado de novo — e aí a cópia deste navegador
+   era de OUTRO jogo. Com a nuvem vazia ela vencia, e todo save novo abria a
+   mesma Fase 2 de antes. Um progresso gravado antes de o slot nascer
+   (`criadoEm`) não é deste jogo. */
+function daGeracao(progresso, criadoEm) {
+  if (!progresso) return null;
+  // Sem um dos dois carimbos (save antigo) não dá pra provar que é de outro jogo.
+  if (!Number.isFinite(criadoEm) || !Number.isFinite(progresso.salvoEm)) return progresso;
+  return progresso.salvoEm >= criadoEm ? progresso : null;
+}
+
 function gravarLocal(info, progresso) {
   try {
     localStorage.setItem(chaveLocal(info), JSON.stringify(progresso));
@@ -64,6 +82,7 @@ export class Save {
     this.mundo = mundo;
     this.pronto = false;
     this.disponivel = false;      // há sessão + slot válidos?
+    this.bloqueado = false;       // o slot existe, mas a Fase 1 dele não terminou
     this.ultimoErro = null;
     this._ultimoSerializado = null;
     this._ultimoLocal = null;
@@ -99,7 +118,7 @@ export class Save {
   async iniciar() {
     if (!this.info?.uid || !this.info?.slot) {
       // Sem sessão ainda dá pra continuar de onde parou NESTE navegador.
-      const local = lerLocal(this.info);
+      const local = daGeracao(lerLocal(this.info), this.info?.criadoEm);
       if (local && this._aplicar(local)) {
         this._ultimoSerializado = JSON.stringify({ ...this.mundo.paraSave(), salvoEm: 0 });
         this._estado('progresso restaurado deste navegador');
@@ -137,14 +156,26 @@ export class Save {
       this.pronto = true;
 
       const snap = await fsMod.getDoc(this._ref);
-      const dados = snap.exists()
-        ? snap.data()?.saves?.[this.info.slot]?.progressoFase2
-        : null;
+      const slot = snap.exists() ? snap.data()?.saves?.[this.info.slot] : null;
+
+      /* A Fase 2 é a continuação do save: sem a Fase 1 dele terminada (ou sem
+         o slot), não abre — e não grava nada, pra não criar progresso de
+         Fase 2 num save que nem chegou lá. */
+      if (!fase1Completa(slot)) {
+        this.disponivel = false;
+        this.bloqueado = true;
+        this._estado('a Fase 1 deste save ainda não terminou');
+        return false;
+      }
+      // `criadoEm` da NUVEM é o que vale: o do menu pode ser de antes de um
+      // recomeço feito em outro aparelho.
+      if (Number.isFinite(slot.criadoEm)) this.info.criadoEm = slot.criadoEm;
+      const dados = daGeracao(slot.progressoFase2 ?? null, this.info.criadoEm);
 
       /* O MAIS NOVO vence, não "a nuvem sempre". Mortes de parasita e o save
          de saída da aba vão só pro navegador — com a nuvem vencendo sempre,
          recarregar os desfazia. */
-      const local = lerLocal(this.info);
+      const local = daGeracao(lerLocal(this.info), this.info.criadoEm);
       const novo = (d) => (Number.isFinite(d?.salvoEm) ? d.salvoEm : 0);
       const daNuvem = dados && local ? (novo(local) > novo(dados) ? local : dados) : (dados || local);
       if (daNuvem) {
@@ -162,7 +193,7 @@ export class Save {
       // jogar, nem de continuar de onde parou.
       this.ultimoErro = e;
       console.warn('[fase2/save] indisponível:', e?.message || e);
-      const local = lerLocal(this.info);
+      const local = daGeracao(lerLocal(this.info), this.info?.criadoEm);
       if (local && this._aplicar(local)) {
         this._ultimoSerializado = JSON.stringify({ ...this.mundo.paraSave(), salvoEm: 0 });
         this._estado('sem conexão — progresso deste navegador');
@@ -178,6 +209,7 @@ export class Save {
    * @param {string} motivo  só para log/telemetria
    */
   async salvar(motivo = 'manual') {
+    if (this.bloqueado) return false;
     const progresso = this.mundo.paraSave();
     // Compara SEM o carimbo de tempo — senão todo save pareceria novo.
     const serializado = JSON.stringify({ ...progresso, salvoEm: 0 });
@@ -237,6 +269,7 @@ export class Save {
 
   /** Só a cópia deste navegador. Síncrona, sem rede, sem cota. */
   salvarLocal() {
+    if (this.bloqueado) return false;
     const progresso = this.mundo.paraSave();
     const serializado = JSON.stringify({ ...progresso, salvoEm: 0 });
     if (serializado === this._ultimoLocal) return false;

@@ -205,6 +205,11 @@ nav.menu{
 }
 .item-principal.clicado{color:var(--paper);}
 .item-guardiao{color:var(--patina);}
+/* Fase 2 trancada (nenhum save terminou a Fase 1): apagado e sem o marcador
+   de hover, mas ainda focável — a linha de baixo explica o que falta. */
+.item[aria-disabled="true"]{color:var(--paper-dim);cursor:default;}
+.item[aria-disabled="true"]:hover{padding-left:0;}
+.item[aria-disabled="true"]:hover::before{width:0;}
 
 /* ============ RODAPÉ ============ */
 footer{

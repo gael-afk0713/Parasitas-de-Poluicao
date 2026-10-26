@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Big+Shoulders+Stencil+Display:wght@800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=7">
+<link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
 
@@ -30,12 +30,11 @@
       <!-- a linha de baixo diz QUAL save o Continuar vai abrir (o mais
            recente da conta) — antes ele escolhia sem avisar -->
       <button class="item" id="btn-continuar">Continuar<span class="item-sub" id="resumo-continuar" hidden></span></button>
-      <!-- Atalho direto pra Fase 2. Existe porque a Fase 2 só é alcançada
-           terminando a Fase 1, o que leva bastante tempo — e sem esse atalho
-           ela ficaria inacessível pra quem quer só voltar de onde parou.
-           A Fase 2 lê o mesmo save ativo, então continuar por aqui restaura o
-           progresso normalmente. -->
-      <button class="item item-guardiao" id="btn-fase2">Fase 2: o Guardião</button>
+      <!-- Atalho pra Fase 2 do save mais recente que já terminou a Fase 1.
+           Trancado (aria-disabled) enquanto nenhum save terminou: a Fase 2 é a
+           continuação de um save, com o progresso guardado nele. A linha de
+           baixo diz qual save abre, ou o que falta pra liberar. -->
+      <button class="item item-guardiao" id="btn-fase2" aria-disabled="true">Fase 2: o Guardião<span class="item-sub" id="resumo-fase2" hidden></span></button>
       <button class="item" id="btn-como-jogar">Como jogar</button>
       <button class="item" id="btn-creditos">Créditos</button>
     </nav>
@@ -167,6 +166,6 @@
     </div>
   </section>
 
-<script type="module" src="script.js?v=12"></script>
+<script type="module" src="script.js?v=13"></script>
 </body>
 </html>

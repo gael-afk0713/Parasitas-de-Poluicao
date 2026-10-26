@@ -171,13 +171,16 @@ async function atualizarResumoContinuar() {
   resumo.hidden = true;
   resumo.textContent = '';
   const uid = usuarioAtual?.uid;
-  if (!uid) return;
+  if (!uid) { atualizarBotaoFase2(null); return; }
   const saves = await carregarSavesConta();
+  if (usuarioAtual?.uid !== uid) return;
+  atualizarBotaoFase2(saves);
   const recente = maisRecenteDe(saves);
-  if (!recente || usuarioAtual?.uid !== uid) return;
+  if (!recente) return;
   const partes = [`Save ${recente.slot}`];
   if (recente.empresa) partes.push(recente.empresa);
-  if (recente.progresso) partes.push(formatarDinheiroSimples(recente.progresso.dinheiro));
+  if (fase1Completa(recente)) partes.push('Fase 2');
+  else if (recente.progresso) partes.push(formatarDinheiroSimples(recente.progresso.dinheiro));
   resumo.textContent = partes.join(', ');
   resumo.hidden = false;
 }
@@ -185,6 +188,43 @@ function maisRecenteDe(saves) {
   const existentes = [1, 2, 3].map((n) => saves[n]).filter(Boolean);
   if (existentes.length === 0) return null;
   return existentes.sort((a, b) => (b.atualizadoEm || 0) - (a.atualizadoEm || 0))[0];
+}
+// A Fase 2 é a continuação de um save: só abre depois que a Fase 1 DELE
+// terminou (vitória ou colapso). Mesma regra de `fase2/sistemas/save.js`.
+function fase1Completa(save) {
+  const p = save?.progresso;
+  return !!(p && (p.vitoriaAlcancada || p.colapsada));
+}
+// O save mais recente que já pode entrar na Fase 2.
+function maisRecenteCompleto(saves) {
+  return maisRecenteDe(Object.fromEntries([1, 2, 3].map((n) => [n, fase1Completa(saves[n]) ? saves[n] : null])));
+}
+// O botão da Fase 2 diz qual save ele abre, ou o que falta pra liberar.
+function atualizarBotaoFase2(saves) {
+  const botao = document.getElementById('btn-fase2');
+  const sub = document.getElementById('resumo-fase2');
+  if (!botao || !sub) return;
+  const completo = saves ? maisRecenteCompleto(saves) : null;
+  botao.setAttribute('aria-disabled', completo ? 'false' : 'true');
+  sub.textContent = completo
+    ? [`Save ${completo.slot}`, completo.empresa].filter(Boolean).join(', ')
+    : 'Termine a Fase 1 de um save para liberar';
+  sub.hidden = false;
+}
+// A cópia da Fase 2 que fica neste navegador (ver fase2/sistemas/save.js).
+// Recomeçar ou apagar o slot tem que levá-la junto, senão o save novo
+// herdava a Fase 2 do anterior.
+function limparFase2Local(uid, slot) {
+  try { localStorage.removeItem(`fase2:progresso:${uid}:${slot}`); } catch { /* aba anônima */ }
+}
+// A ponte de `localStorage` que as duas fases leem. `criadoEm` vai junto
+// pra Fase 2 saber se uma cópia local é deste jogo ou de um anterior.
+function ativarSave(save) {
+  localStorage.setItem('parasitas-save-ativo', JSON.stringify({
+    uid: usuarioAtual.uid, slot: save.slot, nomeSave: save.nomeSave,
+    jogador: save.jogador, empresa: save.empresa, dificuldade: save.dificuldade,
+    criadoEm: save.criadoEm,
+  }));
 }
 
 // gera partículas de fuligem caindo, densidade contida
@@ -459,11 +499,14 @@ document.getElementById('btn-comecar').addEventListener('click', async () => {
     && snapshotSlotAtual.dificuldade === dificuldade;
   const continuando = mesmaConfiguracao && salvoAnterior && !!salvoAnterior.progresso;
 
+  // Recomeçar é um jogo NOVO: `criadoEm` novo e sem Fase 2. Continuar
+  // carrega a Fase 2 junto — antes ela sumia da nuvem aqui.
   savesConta[slotAtual] = {
     slot: slotAtual, nomeSave, jogador, empresa, dificuldade,
-    criadoEm: salvoAnterior?.criadoEm || Date.now(),
+    criadoEm: continuando ? (salvoAnterior.criadoEm ?? null) : Date.now(),
     atualizadoEm: Date.now(),
     progresso: continuando ? salvoAnterior.progresso : null,
+    progressoFase2: continuando ? (salvoAnterior.progressoFase2 ?? null) : null,
   };
 
   mostrarStatus('Salvando na nuvem...', true);
@@ -474,12 +517,12 @@ document.getElementById('btn-comecar').addEventListener('click', async () => {
     return;
   }
 
+  if (!continuando) limparFase2Local(usuarioAtual.uid, slotAtual);
   mostrarStatus(continuando ? 'Continuando de onde você parou...' : 'Save criado! Preparando a Fase 1...', true);
-  localStorage.setItem('parasitas-save-ativo', JSON.stringify({
-    uid: usuarioAtual.uid, slot: slotAtual, nomeSave, jogador, empresa, dificuldade,
-  }));
+  ativarSave(savesConta[slotAtual]);
+  const destino = fase1Completa(savesConta[slotAtual]) ? 'fase2.html' : 'fase1.html';
   setTimeout(() => {
-    window.location.href = 'fase1.html';
+    window.location.href = destino;
   }, 900);
 });
 
@@ -516,6 +559,7 @@ document.querySelectorAll('.slot-apagar').forEach((botao) => {
       return;
     }
     savesConta[slot] = null;
+    limparFase2Local(usuarioAtual.uid, slot);
     if (slot === slotAtual) renderSlotAtual();
     else atualizarRotulosSlots();
     mostrarStatus(`Save ${slot} apagado.`, true);
@@ -533,32 +577,24 @@ document.getElementById('btn-continuar').addEventListener('click', async () => {
     setTimeout(() => mostrarStatus('Nenhum save ainda. Crie um para começar.', false), 260);
     return;
   }
-  localStorage.setItem('parasitas-save-ativo', JSON.stringify({
-    uid: usuarioAtual.uid, slot: maisRecente.slot, nomeSave: maisRecente.nomeSave,
-    jogador: maisRecente.jogador, empresa: maisRecente.empresa, dificuldade: maisRecente.dificuldade,
-  }));
-  window.location.href = 'fase1.html';
+  ativarSave(maisRecente);
+  // Fase 1 terminada: o save continua na Fase 2.
+  window.location.href = fase1Completa(maisRecente) ? 'fase2.html' : 'fase1.html';
 });
 
 /* ---------------------------------------------------------------------------
-   Fase 2 — mesma lógica do Continuar, outro destino.
+   Fase 2 — o save mais recente que JÁ terminou a Fase 1.
    A Fase 2 lê `parasitas-save-ativo` igual à Fase 1 e guarda o progresso dela
-   num campo próprio do mesmo slot (`progressoFase2`), então entrar por aqui
-   restaura o Guardião de onde ele parou sem tocar no save da Fase 1.
+   num campo próprio do mesmo slot (`progressoFase2`): cada save tem a sua.
+   Sem nenhum save com a Fase 1 terminada, o botão fica trancado.
 --------------------------------------------------------------------------- */
 document.getElementById('btn-fase2')?.addEventListener('click', async () => {
   if (!usuarioAtual) { abrirGateLogin(); return; }
   const saves = await carregarSavesConta();
-  const maisRecente = maisRecenteDe(saves);
-  if (!maisRecente) {
-    document.getElementById('btn-novo-jogo').click();
-    setTimeout(() => mostrarStatus('Crie um save antes de descer.', false), 260);
-    return;
-  }
-  localStorage.setItem('parasitas-save-ativo', JSON.stringify({
-    uid: usuarioAtual.uid, slot: maisRecente.slot, nomeSave: maisRecente.nomeSave,
-    jogador: maisRecente.jogador, empresa: maisRecente.empresa, dificuldade: maisRecente.dificuldade,
-  }));
+  atualizarBotaoFase2(saves);
+  const maisRecente = maisRecenteCompleto(saves);
+  if (!maisRecente) return;
+  ativarSave(maisRecente);
   window.location.href = 'fase2.html';
 });
 

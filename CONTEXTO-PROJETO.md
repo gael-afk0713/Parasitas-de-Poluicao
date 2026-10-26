@@ -1135,10 +1135,28 @@ contratos, a paleta, como rodar e testar, e a direção de arte.
 
 ### Como chegar nela
 
-- Botão **"Fase 2: o Guardião"** no menu principal (`index.html`), que segue a
-  mesma lógica do Continuar e manda pra `fase2.html`.
-- As duas telas de fim da Fase 1 (vitória e colapso) oferecem **"Ir para a
-  Fase 2"** em vez de dizer que ela não existe.
+**A Fase 2 é a continuação de um save** (out/2026, pedido do autor): só abre
+depois que a Fase 1 DAQUELE save terminou (`progresso.vitoriaAlcancada` ou
+`progresso.colapsada`), e o progresso dela mora no mesmo slot.
+
+- Botão **"Fase 2: o Guardião"** no menu: abre o save mais recente com a
+  Fase 1 terminada (`maisRecenteCompleto` em `script.js`) e diz qual na linha
+  de baixo (`#resumo-fase2`). Sem nenhum, fica `aria-disabled` e a linha diz
+  "Termine a Fase 1 de um save para liberar".
+- **Continuar** (e Começar num save que continua) vai direto pra
+  `fase2.html` quando a Fase 1 do save já terminou.
+- As telas de fim da Fase 1 levam pra Fase 2; o link ESPERA o
+  `salvarProgresso()` (a Fase 2 confere o fim na nuvem, e sair no mesmo
+  instante cortava a escrita).
+- `fase2.html` sem save ativo, ou com a Fase 1 do slot em aberto, volta pro
+  menu (`Save.bloqueado`, conferido em `main.js`). `?debug` pula a trava.
+- **Recomeçar um slot (Começar com dados novos) ou apagar** zera a Fase 2
+  dele: o slot ganha `criadoEm` novo e `progressoFase2: null`, e a cópia
+  local (`fase2:progresso:{uid}:{slot}`) é apagada. Em outro navegador a
+  cópia velha é descartada porque foi gravada antes do `criadoEm` do slot
+  (`daGeracao` em `save.js`). Antes, a cópia local vencia a nuvem vazia e
+  todo save novo abria a mesma Fase 2. E Começar com os MESMOS dados
+  apagava o `progressoFase2` da nuvem (o objeto do slot era montado sem ele).
 
 ### Direção de arte (corrigida pelo autor a meio caminho)
 
@@ -1328,8 +1346,15 @@ salvamentos, fragmentos, fontes, bichos presos, chefes) são alcançáveis.
 - **Save** — `usuarios/{uid}.saves.{slot}.progressoFase2`, campo próprio pra
   não arriscar o `progresso` da Fase 1 do mesmo slot. Grava em MOMENTOS
   (checkpoint, habilidade, semente, fragmento, chefe morto), nunca em laço —
-  cota diária do Firestore. Degrada em silêncio sem sessão: abrir
-  `fase2.html` direto roda igual, só não salva.
+  cota diária do Firestore. Sem sessão (só com `?debug`, fora disso volta
+  pro menu) roda igual, só não salva na nuvem.
+  **Semente colhida = sala restaurada, sempre**: `aplicarSave` põe a pureza
+  da sala de cada semente em 1. Havia saves com a semente aberta e o cenário
+  destruído — uma restauração nova (Canto em outra sala logo depois de
+  colher) SUBSTITUÍA a da semente no meio, e a sala ficava parada ali. Agora
+  `_concluirRestauracao` termina a anterior antes de outra começar, e
+  `entrarNaSala` recalcula o tema (com o laço pausado na abertura, a sala
+  restaurada aparecia suja até o primeiro passo).
 - **Trilha** — sintetizada, agendada por lookahead (setTimeout tem jitter que
   destrói ritmo). A pureza abre o filtro: 354 Hz numa sala poluída, 2337 Hz na
   mesma sala restaurada.

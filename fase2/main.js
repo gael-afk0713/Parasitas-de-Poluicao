@@ -88,6 +88,11 @@ laco.iniciar();
 // jogo já começa jogável na sala inicial e o save TROCA a sala se houver
 // progresso. É o mesmo padrão da Fase 1 — nunca deixar a tela esperando a rede.
 const save = new Save(mundo);
+/* A Fase 2 continua um save que terminou a Fase 1 — o menu e as telas de fim
+   da Fase 1 são as portas. Sem save ativo (abriu `fase2.html` direto) ou com
+   a Fase 1 dele em aberto, volta pro menu. `?debug` pula a trava, pra testar. */
+const DEPURANDO = new URLSearchParams(location.search).has('debug');
+if (!DEPURANDO && !(save.info?.uid && save.info?.slot)) location.replace('index.html');
 paineis = new Paineis(mundo, laco, {
   aoSalvar: (motivo) => save.salvar(motivo),
   resultadoSave: () => save.ultimoResultado,
@@ -96,6 +101,7 @@ paineis.ligarSom(audio);
 save.iniciar()
   .catch(() => false)
   .then((restaurou) => {
+    if (save.bloqueado && !DEPURANDO) { location.replace('index.html'); return; }
     // Sempre: mesmo com uma carga que falhou, o jogo continua salvando.
     save.ligarGatilhos();
     tutor.aplicarSave(mundo.dicasVistas);

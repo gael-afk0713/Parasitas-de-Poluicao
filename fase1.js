@@ -1479,20 +1479,32 @@ function progressoAtual() {
 // realmente mudou
 let ultimoProgressoSalvo = null;
 
+// a escrita em andamento: o link pra Fase 2 espera por ela (ver abaixo)
+let gravacaoEmCurso = Promise.resolve();
+
 async function salvarProgresso() {
   const ref = refContaAtiva();
-  if (!ref) return;
+  if (!ref) return gravacaoEmCurso;
   const progresso = progressoAtual();
   const serializado = JSON.stringify(progresso);
-  if (serializado === ultimoProgressoSalvo) return;
+  if (serializado === ultimoProgressoSalvo) return gravacaoEmCurso;
   ultimoProgressoSalvo = serializado;
+  gravacaoEmCurso = gravarProgresso(ref, progresso, serializado);
+  return gravacaoEmCurso;
+}
+// devolve se gravou. Falhou: esquece o "último salvo", senão o estado parado
+// do fim de jogo nunca seria regravado (todo tick seria "igual ao último")
+async function gravarProgresso(ref, progresso, serializado) {
   try {
     await updateDoc(ref, {
       [`saves.${saveAtivoInfo.slot}.progresso`]: progresso,
       [`saves.${saveAtivoInfo.slot}.atualizadoEm`]: Date.now(),
     });
+    return true;
   } catch (erro) {
     console.error('Falha ao salvar progresso na nuvem:', erro);
+    if (ultimoProgressoSalvo === serializado) ultimoProgressoSalvo = null;
+    return false;
   }
 }
 // melhor esforço: ao fechar a aba, o navegador pode matar a página antes
@@ -1500,6 +1512,22 @@ async function salvarProgresso() {
 // localStorage (síncrono), mas o autosave a cada tick já cobre a maior
 // parte dos casos de perda de progresso
 window.addEventListener('beforeunload', salvarProgresso);
+
+// A Fase 2 só abre com a Fase 1 do save terminada NA NUVEM (é lá que ela
+// confere). Sair pelo link no mesmo instante do fim podia cortar essa
+// escrita, e a Fase 2 mandava de volta pro menu: o link espera gravar.
+document.querySelectorAll('.painel--fim a[href="fase2.html"]').forEach((link) => {
+  link.addEventListener('click', async (e) => {
+    e.preventDefault();
+    // sem conta ativa (abriu a fase direto) não há o que esperar: a Fase 2
+    // devolve pro menu de qualquer jeito
+    if (refContaAtiva() && (await salvarProgresso()) === false && (await salvarProgresso()) === false) {
+      mostrarToast('Não deu pra salvar o fim da Fase 1 na nuvem. Confere a internet e tenta de novo.');
+      return;
+    }
+    window.location.href = link.href;
+  });
+});
 
 // reconstrói o estado salvo (dinheiro, poluição, construções no grid) em
 // vez de começar do zero — chamada de dentro de onAuthStateChanged, só

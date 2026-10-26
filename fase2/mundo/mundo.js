@@ -123,6 +123,10 @@ export class Mundo {
     this.camera.encaixar(this.jogador.centroX, this.jogador.centroY);
 
     this._purezaExibida = this.purezaDaSala(id);
+    /* O tema só era recalculado no passo do jogo: com o laço pausado (tela de
+       abertura, logo depois de carregar o save) a cena aparecia com o tema da
+       sala anterior — uma sala restaurada era desenhada suja. */
+    this.tema = resolver(sala.area, this._purezaExibida);
     this.aoTrocarSala?.(sala);
   }
 
@@ -291,6 +295,7 @@ export class Mundo {
     if (this.sementesAtivadas.has(chave)) return false;
     this.sementesAtivadas.add(chave);
     this._cacheSemente.clear();
+    this._concluirRestauracao();
     this._restaurando = { sala: salaId, de: this.purezaDaSala(salaId), para: 1, t: 0, dur: 2.6 };
     // A posição vai junto: quem desenha o efeito precisa saber DE ONDE a
     // restauração sai. Sem isso a onda nasceria no jogador, e o momento é da
@@ -317,8 +322,20 @@ export class Mundo {
     // no meio dela a interrompia em 0,28 pra sempre, com a semente já gasta.
     const r = this._restaurando;
     if (r && r.sala === salaId && r.para >= alvo) return false;
+    this._concluirRestauracao();
     this._restaurando = { sala: salaId, de: atual, para: alvo, t: 0, dur: 1.4 };
     return true;
+  }
+
+  /** Uma restauração nova SUBSTITUÍA a anterior no meio: colher a semente,
+   *  sair da sala e cantar na seguinte em menos de 2,6 s deixava a sala da
+   *  semente parada na pureza do meio do caminho, pra sempre. A anterior
+   *  agora termina na hora antes de outra começar. */
+  _concluirRestauracao() {
+    const r = this._restaurando;
+    if (!r) return;
+    this.pureza.set(r.sala, Math.max(this.purezaDaSala(r.sala), r.para));
+    this._restaurando = null;
   }
 
   /** O golpe tem 46 px de alcance — mais que um tile. Sem esta checagem a
@@ -595,6 +612,15 @@ export class Mundo {
     this.pureza = new Map(pares(dados.pureza));
     this.sementesAtivadas = new Set(lista(dados.sementes));
     this._cacheSemente.clear();
+    this._restaurando = null;
+    /* Semente colhida = sala restaurada, sempre. Saves gravados com a pureza
+       no meio da animação (ou cortada por outra restauração) carregavam a
+       semente aberta e o cenário destruído. A semente é a fonte da verdade:
+       a sala dela volta a 1 ao carregar. */
+    for (const chave of this.sementesAtivadas) {
+      const sala = chave.includes(':') ? chave.split(':')[0] : null;
+      if (sala && definicaoSala(sala)) this.pureza.set(sala, 1);
+    }
     this.parasitasMortos = new Set(lista(dados.parasitas));
     this._cacheVivos.clear();
     this.fragmentosColetados = new Set(lista(dados.fragmentos));

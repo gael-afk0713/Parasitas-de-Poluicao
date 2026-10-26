@@ -102,7 +102,10 @@ Regras:
 Título em estêncil no alto à esquerda ("de Poluição" na cor do lucro), linha
 de apoio, menu em coluna: **Novo jogo** (âmbar), **Continuar** (com a linha
 "Save 2, Nortec Ind., R$ 48.250" dizendo qual save abre), **Fase 2: o
-Guardião** (pátina), Como jogar, Créditos. Rodapé: só a conta (e-mail + Sair).
+Guardião** (pátina, com a linha dizendo qual save abre; trancado em
+`--paper-dim` com "Termine a Fase 1 de um save para liberar" enquanto nenhum
+save terminou a Fase 1 — aí o Continuar diz "Save 2, Nortec Ind., Fase 2"),
+Como jogar, Créditos. Rodapé: só a conta (e-mail + Sair).
 Foco por teclado = faixa de tinta à esquerda + recuo. Tela baixa
 (`max-height:560px`) compacta e deixa o `<main>` rolar; abaixo de 340 px a
 linha de apoio some.
