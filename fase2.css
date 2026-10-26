@@ -92,33 +92,43 @@
     gap:10px;
     pointer-events:auto;
   }
-  .toque-mini{ width:44px; height:44px; font-size:15px; opacity:0.8; }
-  .toque-baixo{ width:50px; height:50px; font-size:16px; align-self:flex-end; }
-
+  /* Forma e ícone vêm do pacote Mobile Controls da Kenney (CC0), estilo A:
+     cinza-escuro discreto, que não disputa com o Guardião (a coisa mais clara
+     da tela). Os ícones foram recoloridos de branco puro pro --paper. A
+     forma é a imagem de fundo; o botão em si fica sem borda nem vidro. */
   .toque-botao{
     width:62px; height:62px;
+    padding:0;
+    border:none;
     border-radius:50%;
-    border:1px solid var(--f2-borda);
-    background:var(--f2-vidro);
-    backdrop-filter:blur(6px);
-    color:var(--paper);
-    font-family:var(--fonte-texto);
-    font-size:20px;
-    line-height:1;
+    background:url(fase2/ui/toque/button_circle.svg) center / 100% 100% no-repeat;
+    opacity:0.88;
     display:grid;
     place-items:center;
-    transition:transform .08s ease, background .12s ease, border-color .12s ease;
+    transition:transform .08s ease, filter .12s ease;
   }
+  .toque-botao img{ width:44%; height:44%; pointer-events:none; }
+  /* Tamanhos DEPOIS de .toque-botao: antes vinham acima dela, com a mesma
+     especificidade, e perdiam — pausa, mapa e baixo saíam com 62 px. */
+  .toque-mini{ width:44px; height:44px; opacity:0.8; }
+  .toque-baixo{ width:50px; height:50px; align-self:flex-end; }
+  /* Setas: a peça de direção da Kenney só tem um triângulo de 4 px, que
+     sumia no escuro; o ícone de seta (aponta pra direita) gira pra cada lado. */
+  .toque-direcional img{ width:38%; height:38%; opacity:0.85; }
+  .toque-seta-esq img{ transform:rotate(180deg); }
+  .toque-baixo img{ transform:rotate(90deg); }
+  .toque-mini{ border-radius:6px; background-image:url(fase2/ui/toque/button_square.svg); }
+  .toque-seta-esq{ border-radius:6px; background-image:url(fase2/ui/toque/direction_left.svg); }
+  .toque-seta-dir{ border-radius:6px; background-image:url(fase2/ui/toque/direction_right.svg); }
+  .toque-baixo{ border-radius:6px; background-image:url(fase2/ui/toque/dpad_element_south.svg); }
+  /* Pressionado: clareia e ganha o halo do acento da Fase 2 (o mesmo verde
+     dos painéis), em vez do âmbar — âmbar é do Guardião e da Fase 1. */
   .toque-botao:active{
     transform:scale(0.92);
-    background:rgba(127,216,166,0.2);
-    border-color:var(--f2-vivo);
+    filter:brightness(1.4) drop-shadow(0 0 6px var(--f2-vivo));
   }
-  .toque-acao--principal{
-    width:76px; height:76px;
-    font-size:24px;
-    border-color:rgba(127,216,166,0.4);
-  }
+  .toque-botao:focus-visible{ outline:2px solid var(--paper); outline-offset:3px; }
+  .toque-acao--principal{ width:76px; height:76px; }
 }
 
 /* ============ PAINÉIS ============

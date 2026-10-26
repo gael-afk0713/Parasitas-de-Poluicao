@@ -1221,7 +1221,7 @@ fase2/
              parasitas.js · chefes.js · projeteis.js
   arte/    guardiao-folha-original.png (folha 6x4 gerada no ChatGPT) ·
            preparar-guardiao.py (recorta/alinha) · guardiao.png (atlas usado)
-  ui/      hud.js · mapa.js · paineis.js
+  ui/      hud.js · mapa.js · paineis.js · toque/ (SVGs da Kenney, CC0)
   audio/   audio.js · musica.js
   sistemas/ save.js
 ```
@@ -1357,6 +1357,19 @@ salvamentos, fragmentos, fontes, bichos presos, chefes) são alcançáveis.
   polegares). Margem segura do celular lida por uma sonda com `padding:
   env(safe-area-inset-*)`. Movimento reduzido: a folha apaga no lugar em vez
   de cair, e não há balanço.
+- **Controles de toque com arte da Kenney** (out/2026, pedido do autor): os
+  botões de `#toque-fase2` usam o pacote "Mobile Controls" (CC0, estilo A,
+  cinza-escuro), baixado de kenney.nl. Só as peças usadas foram copiadas pra
+  `fase2/ui/toque/` (com a licença), e os ícones foram recoloridos de branco
+  puro pro `--paper`. A forma é o `background` do `<button data-acao>` e o
+  ícone é um `<img>` com `pointer-events:none`: o toque tem que cair no
+  botão, porque `entrada.ligarToque` acha a ação por `closest('[data-acao]')`
+  e captura o ponteiro no alvo. A peça de direção da Kenney só tem um
+  triângulo de 4 px, que sumia no escuro, por isso as setas levam o ícone de
+  seta girado. O pacote não tem ícone de mapa, então o mapa usa a mira.
+  Bug antigo corrigido junto: `.toque-mini`/`.toque-baixo` vinham ANTES de
+  `.toque-botao` com a mesma especificidade e perdiam, então pausa, mapa e o
+  botão de baixo saíam com 62 px em vez de 44/50.
 
 ### Rodar e testar
 

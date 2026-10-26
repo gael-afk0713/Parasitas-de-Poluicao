@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,300..800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=7">
-<link rel="stylesheet" href="fase2.css?v=11">
+<link rel="stylesheet" href="fase2.css?v=13">
 </head>
 <body class="fase2-body">
 
@@ -20,22 +20,25 @@
        interfere na composição/bloom da cena. -->
   <canvas id="hud-fase2" class="fase2-hud" aria-hidden="true"></canvas>
 
-  <!-- Controles de toque — só aparecem em ponteiro grosso (ver fase2.css). -->
+  <!-- Controles de toque — só aparecem em ponteiro grosso (ver fase2.css).
+       Peças do pacote Mobile Controls da Kenney (CC0, fase2/ui/toque/): a
+       forma do botão vem do CSS, o ícone é o <img> (sem eventos de ponteiro,
+       pra o toque cair sempre no <button data-acao>). -->
   <div class="fase2-toque" id="toque-fase2" aria-hidden="true">
     <div class="toque-esquerda">
-      <button class="toque-botao toque-direcional" data-acao="esquerda" aria-label="Esquerda">◀</button>
-      <button class="toque-botao toque-direcional toque-baixo" data-acao="baixo" aria-label="Baixo (com pular: descer da plataforma)">▼</button>
-      <button class="toque-botao toque-direcional" data-acao="direita" aria-label="Direita">▶</button>
+      <button class="toque-botao toque-direcional toque-seta-esq" data-acao="esquerda" aria-label="Esquerda"><img src="fase2/ui/toque/icon_arrow.svg" alt=""></button>
+      <button class="toque-botao toque-direcional toque-baixo" data-acao="baixo" aria-label="Baixo (com pular: descer da plataforma)"><img src="fase2/ui/toque/icon_arrow.svg" alt=""></button>
+      <button class="toque-botao toque-direcional toque-seta-dir" data-acao="direita" aria-label="Direita"><img src="fase2/ui/toque/icon_arrow.svg" alt=""></button>
     </div>
     <div class="toque-topo">
-      <button class="toque-botao toque-mini" data-acao="mapa" aria-label="Mapa">▦</button>
-      <button class="toque-botao toque-mini" data-acao="pausa" aria-label="Pausa">❚❚</button>
+      <button class="toque-botao toque-mini" data-acao="mapa" aria-label="Mapa"><img src="fase2/ui/toque/icon_target.svg" alt=""></button>
+      <button class="toque-botao toque-mini" data-acao="pausa" aria-label="Pausa"><img src="fase2/ui/toque/icon_pause.svg" alt=""></button>
     </div>
     <div class="toque-direita">
-      <button class="toque-botao toque-acao" data-acao="atacar" aria-label="Atacar">✦</button>
-      <button class="toque-botao toque-acao toque-acao--principal" data-acao="pular" aria-label="Pular">▲</button>
-      <button class="toque-botao toque-acao" data-acao="investida" aria-label="Investida">»</button>
-      <button class="toque-botao toque-acao" data-acao="canto" aria-label="Canto">◎</button>
+      <button class="toque-botao toque-acao" data-acao="atacar" aria-label="Atacar"><img src="fase2/ui/toque/icon_sword.svg" alt=""></button>
+      <button class="toque-botao toque-acao toque-acao--principal" data-acao="pular" aria-label="Pular"><img src="fase2/ui/toque/icon_jump.svg" alt=""></button>
+      <button class="toque-botao toque-acao" data-acao="investida" aria-label="Investida"><img src="fase2/ui/toque/icon_burst.svg" alt=""></button>
+      <button class="toque-botao toque-acao" data-acao="canto" aria-label="Canto"><img src="fase2/ui/toque/icon_music.svg" alt=""></button>
     </div>
   </div>
 
