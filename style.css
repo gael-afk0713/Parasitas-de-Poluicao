@@ -328,6 +328,12 @@ footer{
   color:var(--paper-dim);
   font-size:0.875rem;
 }
+/* o valor pode ter vários nomes, um por linha, alinhados à direita */
+.painel-lista--creditos .creditos-nomes{
+  font-weight:inherit;
+  text-align:right;
+  margin-left:1.5rem;
+}
 
 .painel-lista--stats{
   display:flex;

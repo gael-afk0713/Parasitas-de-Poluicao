@@ -148,7 +148,10 @@ saiu do projeto inteiro):
   teórico do security-reviewer; hoje o próprio SDK já barraria).
 - Navegação do menu por teclado (setas + Enter/Espaço nativo dos botões).
 - Painel **Como Jogar** — lista estática de regras.
-- Painel **Créditos**.
+- Painel **Créditos**: Criadores (Gael Schaeppi de Oliveira, Filipe
+  Quiroga Cardoso, Marcelo Caleffi Barbosa), Roteiro (Gael, Filipe e
+  Marcelo), Imagens (ChatGPT e Gemini), Programação (Claude Code). Vários
+  nomes num valor vão em `.creditos-nomes`, um por linha.
 - Todos os painéis compartilham o padrão `.painel` / `.painel-conteudo` /
   `.painel-voltar` — abrir/fechar via classe `.aberto`, Escape fecha.
 - Há um bloco `@media (prefers-reduced-motion: reduce)` que desliga as
@@ -457,9 +460,10 @@ Archivo. Embaixo da Caixa, uma barra até `META_DINHEIRO`
 COLAPSO** (`#hud-barra-poluicao`, até `LIMIAR_COLAPSO`) com um risco na
 meta (75%, `META_POLUICAO`) e o trecho depois dela em ferrugem — é a
 história da fase numa linha só: você precisa chegar no risco, e logo depois
-dele a empresa quebra. A meta de poluição voltou a aparecer como texto
-("meta 15 mil, colapso em 20 mil", em `#hud-meta-poluicao`, montado por
-`fase1.js` a partir das constantes — nunca escrito à mão no HTML). Ícones de fábrica/poluição do HUD
+dele a empresa quebra. A meta de poluição e o colapso **não aparecem em
+texto** (out/2026, pedido do autor: devem ser segredo) — o
+`#hud-meta-poluicao` ("meta 15 mil, colapso em 20 mil") saiu de novo, não
+reintroduzir. Ícones de fábrica/poluição do HUD
 saíram (repetiam o rótulo). **`META_DINHEIRO`/`META_POLUICAO`/
 `LIMIAR_COLAPSO` subiram pra antes de `let dinheiro`**: as barras são
 desenhadas já na carga (`atualizarHudDinheiro()` roda na avaliação do

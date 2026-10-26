@@ -912,13 +912,8 @@ function verificarFimDeJogo() {
 }
 const hudMetaEl = document.getElementById('hud-meta');
 if (hudMetaEl) hudMetaEl.textContent = 'meta ' + formatarDinheiro(META_DINHEIRO);
-// Sai das constantes, não do HTML: mudar a meta ou o colapso não deixa o
-// HUD dizendo outra coisa.
-const hudMetaPoluicaoEl = document.getElementById('hud-meta-poluicao');
-if (hudMetaPoluicaoEl) {
-  const mil = (n) => (n / 1000).toLocaleString('pt-BR') + ' mil';
-  hudMetaPoluicaoEl.textContent = `meta ${mil(META_POLUICAO)}, colapso em ${mil(LIMIAR_COLAPSO)}`;
-}
+// A meta de poluição e o limiar de colapso NÃO aparecem em texto (pedido do
+// autor): o jogador descobre o colapso chegando nele.
 
 // ============ COLOCAÇÃO DE FÁBRICAS NO GRID ============
 function chaveCelula(col, row) {
