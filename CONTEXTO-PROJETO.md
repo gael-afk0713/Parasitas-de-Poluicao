@@ -28,7 +28,13 @@ firebase-config.js      chaves do projeto Firebase — vem com PLACEHOLDERS, pre
 firebase-init.js        initializeApp/getAuth/getFirestore uma vez, exporta auth/db
 firestore.rules         regras de segurança do Firestore — colar manualmente no Console
                           (sem Firebase CLI/deploy configurado neste projeto)
+manifest.webmanifest    instalar na tela inicial (Android/PC): nome, cores, ícones
 imagens/
+  icone/                  ícone do jogo: icone.svg é a FONTE (fábrica âmbar em estêncil
+                            com uma folha no lugar da fumaça); os PNGs (180 iOS, 192/512
+                            Android, 512 maskable com o desenho em 74%, favicon 32) e o
+                            favicon.ico saem dele renderizados no navegador. Os três HTMLs
+                            têm o mesmo bloco de <link rel="icon"/apple-touch-icon/manifest>
   fabrica-fundo.png       fundo da tela de menu (gerado com IA)
   mapa-fase1-clareira.jpg fundo original da Fase 1 (floresta + clareira + lagoa), 1024x572
   mapa-fase1-clareira-hd.jpg  mesma imagem, upscale local 2x (Lanczos+sharpen) — é a que

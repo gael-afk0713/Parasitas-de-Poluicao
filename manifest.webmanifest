@@ -1,0 +1,18 @@
+{
+  "name": "Parasitas de Poluição",
+  "short_name": "Parasitas",
+  "description": "Faça a empresa crescer à custa da floresta. Quando ela cair, volte para consertar o que destruiu.",
+  "lang": "pt-BR",
+  "id": "./index.html",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b0906",
+  "theme_color": "#0b0906",
+  "icons": [
+    { "src": "imagens/icone/icone.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "imagens/icone/icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "imagens/icone/icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "imagens/icone/icone-mascaravel-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

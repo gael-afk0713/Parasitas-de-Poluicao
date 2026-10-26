@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ícone do jogo: a fábrica da empresa (âmbar, em estêncil) e, no lugar
+       da fumaça da chaminé, uma folha brotando (pátina) — as duas fases numa
+       imagem. Cores = tokens do DESIGN.md. Os PNGs de imagens/icone/ saem
+       daqui (rx="96" é o canto do favicon; os ícones de tela cheia usam 0). -->
+  <defs>
+    <radialGradient id="brilho" cx="0.66" cy="0.26" r="0.55">
+      <stop offset="0" stop-color="#6fae93" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#6fae93" stop-opacity="0"/>
+    </radialGradient>
+    <!-- pontes do estêncil: faixas vazadas que atravessam galpão e chaminé -->
+    <mask id="estencil">
+      <rect width="512" height="512" fill="#fff"/>
+      <rect x="0" y="296" width="512" height="10" fill="#000"/>
+      <rect x="0" y="380" width="512" height="10" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="#0b0906"/>
+  <rect width="512" height="512" rx="96" fill="url(#brilho)"/>
+  <g id="desenho" transform="translate(256 262) scale(0.86) translate(-256 -236)">
+    <g mask="url(#estencil)">
+      <!-- galpão de telhado serrilhado -->
+      <path d="M112 432 V350 L152 318 V350 L192 318 V350 L232 318 V432 Z" fill="#8a5d1f"/>
+      <!-- chaminé -->
+      <path d="M262 206 H318 L338 432 H242 Z" fill="#d99a35"/>
+      <rect x="252" y="190" width="76" height="22" rx="3" fill="#d99a35"/>
+    </g>
+    <!-- chão -->
+    <rect x="96" y="432" width="320" height="14" rx="3" fill="#8a5d1f"/>
+    <!-- caule e folha, no lugar da fumaça -->
+    <path d="M290 192 C290 168 296 150 310 136" fill="none" stroke="#6fae93" stroke-width="11" stroke-linecap="round"/>
+    <path d="M306 142 C272 100 300 46 398 26 C406 104 374 146 306 142 Z" fill="#6fae93"/>
+    <path d="M318 130 C340 98 362 70 386 42" fill="none" stroke="#0b0906" stroke-width="5" stroke-linecap="round"/>
+  </g>
+</svg>
