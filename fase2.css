@@ -129,6 +129,25 @@
   }
   .toque-botao:focus-visible{ outline:2px solid var(--paper); outline-offset:3px; }
   .toque-acao--principal{ width:76px; height:76px; }
+  /* Pausa no visual de antes da Kenney, a pedido do autor: círculo de vidro
+     com o glifo. Ficou com os 62 px que ele tinha na tela (o 44 de
+     .toque-mini nunca chegou a valer pra ele, por causa da ordem das regras). */
+  .toque-classico{
+    width:62px; height:62px;
+    border:1px solid var(--f2-borda);
+    border-radius:50%;
+    background:var(--f2-vidro);
+    backdrop-filter:blur(6px);
+    color:var(--paper);
+    font-family:var(--fonte-texto);
+    font-size:15px;
+    line-height:1;
+  }
+  .toque-classico:active{
+    filter:none;
+    background:rgba(127,216,166,0.2);
+    border-color:var(--f2-vivo);
+  }
 }
 
 /* ============ PAINÉIS ============
