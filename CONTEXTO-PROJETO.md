@@ -1272,7 +1272,7 @@ fase2/
   mundo/   terreno.js · salas.js · mundo.js · salas-{raizes,varzea,clareira,
            dossel,coracao,ramos}.js
   render/  paleta.js · renderizador.js · parallax.js · terreno-arte.js ·
-           particulas.js · efeitos.js
+           particulas.js · efeitos.js · subsolo.js
   entidades/ jogador.js · jogador-arte.js · jogador-sprite.js · catalogo.js ·
              parasitas.js · parasitas-sprite.js · chefes.js · projeteis.js
   arte/    guardiao-folha-original.png (folha 6x4 gerada no ChatGPT) ·
@@ -1280,9 +1280,39 @@ fase2/
            parasitas/ (um recorte por espécie, IA) · preparar-parasitas.py ·
            parasitas.png (atlas animado)
   ui/      hud.js · mapa.js · paineis.js · toque/ (SVGs da Kenney, CC0)
-  audio/   audio.js · musica.js
+  audio/   audio.js · musica.js (progressão, motivo, arpejo — ver acima)
   sistemas/ save.js
 ```
+
+### Música, portas e subsolo (out/2026, pedido do autor)
+
+- **Música reescrita** (`audio/musica.js`, "melhore essa música"). Antes era
+  UM acorde aberto parado pra sempre, em dente-de-serra/quadrada cru a 55 Hz
+  (lia como zumbido), com notas sorteadas por cima. Agora cada área tem
+  progressão de 4 acordes (um por compasso; menor i–VI–III–VII, Coração
+  i–iv–VI–v, Dossel maior), pad quente (dois dente-de-serra desafinados ±7
+  cents por nota, num passa-baixa por voz), MOTIVO melódico composto por
+  área em frases de 2 compassos (a pureza decide com que frequência aparece),
+  arpejo dedilhado com eco de colcheia pontuada que cresce com a pureza, e no
+  combate bumbo macio + chimbal; chefe com baixo em colcheias. A interface
+  (`iniciar`, `parar`, `definirEstado`) não mudou. Volume medido igual ao da
+  versão antiga (RMS offline ~0,035 suja, ~0,047 restaurada).
+  Pra ouvir sem jogar: renderizar num `OfflineAudioContext` chamando
+  `_tocarPasso` na mão (o agendador usa `setInterval`, que não avança
+  offline) e `suspend()` pra trocar o estado no meio.
+- **Portas sem abertura** (o autor: "dá pra passar mas não tem abertura").
+  19 portas ficavam DENTRO da sala com parede entre elas e a borda: o jogador
+  encostava numa parede desenhada fechada e trocava de sala. Corrigido nos
+  mapas (caminho aberto até a borda, portas laterais com 2 tiles de altura,
+  portas verticais que boiavam no ar movidas pro teto/chão — a do `dossel-03`
+  agora fica no teto, o jogador chega caindo de lá). `verificar-mapas.mjs`
+  acusa porta com parede na frente (erro) e porta de 1 tile na borda (aviso).
+- **Fundo de subsolo**: A Fenda (`raizes-04`), O Canal Fundo (`varzea-08`) e
+  O Depósito (`clareira-08`) ficam embaixo da terra e mostravam céu, sol e
+  incêndio. Agora `subterranea: true` troca céu + horizonte + parallax por
+  `render/subsolo.js`, e tira aves e a moldura de galho (`main.js`). Feito em
+  código, não com imagem (Canva/IA): imagem não segue a paleta interpolada
+  de cada área nem a restauração.
 
 ### Decisões que custaram caro e não devem ser refeitas
 

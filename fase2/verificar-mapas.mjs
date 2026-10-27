@@ -55,6 +55,34 @@ const orfas = todas.filter((id) => !visitadas.has(id));
    IGNORANDO gravidade e altura de pulo (portão e barreira contam como
    passagem) — então só acusa bolsão fisicamente fechado, que é defeito com
    certeza. Altura de pulo é com a simulação de verdade (ver CONTEXTO). */
+/* PORTA SEM ABERTURA. A porta dispara a troca de sala quando o corpo
+   encosta nela, e se ela fica DENTRO da sala, com parede entre ela e a borda,
+   o jogador atravessa uma parede desenhada fechada (o autor achou 19 assim).
+   Entre a porta e a borda do mapa, na direção dela, não pode haver parede.
+   Porta lateral com parede logo acima vira fresta de 1 tile pra um corpo de
+   1,4: isso é aviso. */
+const DIRECAO_PORTA = { '>': [1, 0], '<': [-1, 0], '¨': [0, -1], '_': [0, 1] };
+for (const def of todasAsSalas()) {
+  const m = def.mapa;
+  m.forEach((linha, y) => [...linha].forEach((ch, x) => {
+    const d = DIRECAO_PORTA[ch];
+    if (!d) return;
+    let cx = x + d[0], cy = y + d[1], fechada = false;
+    while (cy >= 0 && cy < m.length && cx >= 0 && cx < linha.length) {
+      if (m[cy][cx] === '#') { fechada = true; break; }
+      cx += d[0]; cy += d[1];
+    }
+    if (fechada) {
+      problemas.push(`${def.id}: porta "${ch}" em (col ${x}, row ${y}) tem parede entre ela e a borda — passa-se por uma parede fechada`);
+    } else if (d[0] && y > 0) {
+      const borda = d[0] > 0 ? linha.length - 1 : 0;
+      if (m[y - 1][borda] === '#' && m[y - 1][x] !== '#') {
+        avisos.push(`${def.id}: porta "${ch}" em (col ${x}, row ${y}) abre só 1 tile de altura na borda`);
+      }
+    }
+  }));
+}
+
 const ALVOS_DO_CORPO = new Set(['altar', 'semente', 'salvamento', 'fragmento', 'fonte', 'bichoPreso']);
 for (const def of todasAsSalas()) {
   let sala;

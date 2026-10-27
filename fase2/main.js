@@ -17,6 +17,7 @@ import {
   desenharParallax, desenharPrimeiroPlano, anguloLuzArea, desenharHorizonte,
 } from './render/parallax.js';
 import { desenharParticulas, desenharNevoa } from './render/particulas.js';
+import { desenharSubsolo } from './render/subsolo.js';
 import { nomeArea } from './render/paleta.js';
 import { criarEntidade } from './entidades/catalogo.js';
 import { desenharSufoco } from './entidades/perigos.js';
@@ -199,13 +200,20 @@ function quadro(alpha, dtReal) {
 
   render.iniciarFrame(tema, camera);
 
-  // 1 · céu
-  render.desenharCeu(sala.altura, laco.tempo, anguloLuzArea(sala.area));
-  // 1b · a silhueta recortada contra o clarão — sem ela o céu é só degradê.
-  desenharHorizonte(render, sala, mundo);
+  // Sala embaixo da terra: fundo de terra e raízes no lugar de céu,
+  // horizonte e parallax de floresta (ver render/subsolo.js).
+  const subterranea = !!sala.def.subterranea;
+  if (subterranea) {
+    desenharSubsolo(render, sala, mundo);
+  } else {
+    // 1 · céu
+    render.desenharCeu(sala.altura, laco.tempo, anguloLuzArea(sala.area));
+    // 1b · a silhueta recortada contra o clarão — sem ela o céu é só degradê.
+    desenharHorizonte(render, sala, mundo);
 
-  // 2-5 · parallax + luz volumétrica
-  desenharParallax(render, sala, mundo);
+    // 2-5 · parallax + luz volumétrica
+    desenharParallax(render, sala, mundo);
+  }
 
   // 6 · decoração de fundo colada ao terreno
   render.camada(1, (ctx) => {
@@ -224,7 +232,8 @@ function quadro(alpha, dtReal) {
   render.camada(1, (ctx) => mundo.decor.desenhar(ctx, tema));
   render.emissivo(1, (ctx) => mundo.decor.desenharLuz(ctx, tema));
   // 7c · as aves pousadas nas bordas — reagem ao jogador (ver render/fauna.js)
-  render.camada(1, (ctx) => mundo.fauna?.desenhar(ctx, tema, laco.tempo, render.movimentoReduzido));
+  // (embaixo da terra não tem ave pousada)
+  if (!subterranea) render.camada(1, (ctx) => mundo.fauna?.desenhar(ctx, tema, laco.tempo, render.movimentoReduzido));
 
   /* 8 · SOMBRAS DE CONTATO, e só depois as entidades.
      Sem elas, personagem e criatura ficam colados POR CIMA do plano em vez de
@@ -302,7 +311,9 @@ function quadro(alpha, dtReal) {
   render.camada(1.28, (ctx) => {
     for (const e of mundo.entidades) e.desenharFrente?.(ctx, tema, camera);
   });
-  desenharPrimeiroPlano(render, mundo);
+  // A moldura de galho e folha é de floresta aberta; embaixo da terra quem
+  // faz a profundidade são as raízes do subsolo.
+  if (!subterranea) desenharPrimeiroPlano(render, mundo);
 
   // 12 · composição
   render.finalizar(dtReal);

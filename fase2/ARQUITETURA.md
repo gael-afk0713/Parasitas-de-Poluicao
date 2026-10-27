@@ -156,6 +156,18 @@ ligação apontando pra sala inexistente e destino sem a porta de chegada.
 **Confira o console: um erro de ligação só aparece jogando, quando você cai
 numa sala sem saída.**
 
+**Toda porta precisa de ABERTURA desenhada**: entre o caractere da porta e a
+borda do mapa, na direção dela, não pode haver `#`, e porta lateral abre 2
+tiles de altura (o corpo tem 1,4). A porta dispara ao encostar, então uma
+porta dentro da sala fazia o jogador atravessar uma parede desenhada fechada
+— o autor achou isso confuso, e 19 portas estavam assim. Porta vertical mora
+na fileira de topo/fundo, não no meio do ar. `verificar-mapas.mjs` acusa.
+
+`subterranea: true` na definição = sala embaixo da terra (entra-se nela
+caindo por um buraco): sem céu, horizonte, parallax de floresta, aves nem
+moldura de galho; o fundo é `render/subsolo.js` (estratos de terra, pedras,
+raízes pendendo do teto, fungo que acende com a pureza).
+
 ### Física do jogador (para calibrar salas)
 
 Medido no navegador, não estimado:
@@ -188,6 +200,11 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
     desenhe. Hoje o parser abre o céu sozinho (ver `abrirCeu` em
     `mundo/salas.js`); `ceuAberto: false` na definição mantém a sala fechada,
     e é só pra interior de verdade.
+  - **Exceção: sala EMBAIXO DA TERRA** (`subterranea: true` — A Fenda, O
+    Canal Fundo, O Depósito). Pedido do autor: ela mostrava céu, sol e
+    incêndio atrás das paredes. O fundo dela é terra com raízes
+    (`render/subsolo.js`), e isso não abre precedente pras salas da
+    superfície.
   - Três testes rápidos: **(a)** o céu aparece e é a coisa mais CLARA da tela;
     **(b)** dá pra ver onde as copas distantes TERMINAM (copa que sai pelo
     topo do quadro fecha a cena de novo); **(c)** há espaço vazio grande — a
