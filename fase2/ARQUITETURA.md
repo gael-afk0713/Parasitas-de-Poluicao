@@ -211,6 +211,13 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
   DE CIMA como chama fria, barra do manto esfarrapada dissolvendo em fumaça.
   Tentáculo saindo em 360° lê como aranha — mantenha tudo acima da linha de
   ombro.
+  Desde out/2026 eles também são SPRITE: um desenho por espécie gerado por IA
+  (Cloudflare Workers AI) em `fase2/arte/parasitas/`, transformado em atlas
+  animado por `fase2/arte/preparar-parasitas.py` (escurece, tira a cor, corta
+  fio e pavio, deforma em 6 quadros) e desenhado por
+  `entidades/parasitas-sprite.js`. Telégrafo, fenda (redesenhada com tamanho
+  mínimo), piscada, flash de dano, rastro e morte continuam em código; sem a
+  imagem, o desenho em código de `Sombra._massa` assume.
 - **Paleta sombria, na chave fria** (ver `render/paleta.js`). Restaurar não
   clareia a cena: deixa o mundo LUMINOSO, não iluminado. Floresta viva à
   noite, não floresta de dia.

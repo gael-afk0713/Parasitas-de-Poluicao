@@ -1224,6 +1224,34 @@ serve pra medir nível de acabamento, nunca pra chegar perto do visual dele.
 - Os **parasitas são inspirados na Sombra do Hollow Knight**: vulto preto
   encapuzado, fendas brancas no lugar de rosto, tentáculos saindo só da metade
   DE CIMA (em 360° leem como aranha), manto esfarrapado dissolvendo em fumaça.
+- **Os parasitas agora são SPRITE** (out/2026, pedido do autor): um desenho
+  por espécie gerado na Cloudflare Workers AI (skill `gemini-image`), recortado
+  em `fase2/arte/parasitas/<espécie>.png`. A IA da Cloudflare não aceita
+  imagem de referência e NÃO repete a criatura entre quadros (uma folha de 24
+  poses do Guardião saiu com 45 quadros, quase todos iguais, e outro bicho —
+  descartada); por isso a animação não vem da IA:
+  - `fase2/arte/preparar-parasitas.py` escurece o corpo (é um buraco no
+    mundo), tira a cor (as rachaduras laranja do Estopim acendiam sempre, e
+    luz no parasita é só telégrafo), corta o fio do Tecelão e o pavio do
+    Estopim (e recorta ele na esfera, sem tampa e com as rachaduras
+    alisadas), apaga os canos do Cuspidor (abertura morfológica na metade de
+    cima — liam como bule/máquina), engorda o Tecelão (lia como antena a
+    1x), pinta a fenda que faltava no Estopim, e gera 6 quadros por
+    DEFORMAÇÃO (manto ondulando, respiração, onda do rastejar, pêndulo).
+    Grava o atlas `fase2/arte/parasitas.png` e imprime as constantes de
+    `ESPECIES` em `entidades/parasitas-sprite.js`.
+  - Em código continuam: telégrafo (o corpo incha 18%, 30% no Estopim, a fenda e a luz
+    acendem), a fenda por cima do sprite com tamanho MÍNIMO (a da IA tinha
+    menos de 2 px em várias espécies), piscada, flash branco de dano com a
+    fenda escura, rastro, auréola, morte, fio do Tecelão. Contorno claro =
+    silhueta branca deslocada 1 px em 8 direções a 0,24 de alfa. Atlas
+    regerado → subir o `?v` do PNG em `parasitas-sprite.js`.
+  - O espelho usa `dirSuave`: na virada o corpo afina até o perfil e abre
+    do outro lado. Pivô no pé (quem anda) ou no centro (quem flutua); o
+    Rastejante tem `_pivoSprite` próprio, na superfície em que está grudado.
+  - `__fase2` não expõe o módulo; pra comparar com o desenho em código, no
+    console: `(await import('/fase2/entidades/parasitas-sprite.js'))
+    .SPRITES_PARASITAS.ativo = false`.
 - **Contraste invertido** entre herói e inimigo: ele é claro sobre escuro, eles
   são buracos pretos com pontos de luz. Numa tela escura os dois continuam
   legíveis e nunca se confundem.
@@ -1246,9 +1274,11 @@ fase2/
   render/  paleta.js · renderizador.js · parallax.js · terreno-arte.js ·
            particulas.js · efeitos.js
   entidades/ jogador.js · jogador-arte.js · jogador-sprite.js · catalogo.js ·
-             parasitas.js · chefes.js · projeteis.js
+             parasitas.js · parasitas-sprite.js · chefes.js · projeteis.js
   arte/    guardiao-folha-original.png (folha 6x4 gerada no ChatGPT) ·
-           preparar-guardiao.py (recorta/alinha) · guardiao.png (atlas usado)
+           preparar-guardiao.py (recorta/alinha) · guardiao.png (atlas usado) ·
+           parasitas/ (um recorte por espécie, IA) · preparar-parasitas.py ·
+           parasitas.png (atlas animado)
   ui/      hud.js · mapa.js · paineis.js · toque/ (SVGs da Kenney, CC0)
   audio/   audio.js · musica.js
   sistemas/ save.js

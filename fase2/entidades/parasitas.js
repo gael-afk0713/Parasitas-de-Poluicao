@@ -32,6 +32,7 @@ import {
 import { luzRadial } from '../render/renderizador.js';
 import { PLATAFORMA } from '../mundo/terreno.js';
 import { atirarArco, atirarSpray, Explosao } from './projeteis.js';
+import { SPRITES_PARASITAS } from './parasitas-sprite.js';
 
 const GRAVIDADE = 1500;
 const VEL_QUEDA_MAX = 800;
@@ -57,6 +58,10 @@ export class Sombra {
     this.vx = 0; this.vy = 0;
     this.dir = hash2(obj.cx, obj.cy, 7) < 0.5 ? -1 : 1;
 
+    // Linha do atlas de sprites (parasitas-sprite.js); sem ela, só código.
+    this.especie = forma.especie ?? null;
+    // Quanto o telégrafo incha o corpo em sprite (o desenho em código usa 0,18).
+    this.inchaTelegrafo = forma.inchaTelegrafo ?? 0.18;
     this.vida = forma.vida ?? 2;
     this.vidaMax = this.vida;
     this.dano = forma.dano ?? 1;
@@ -348,9 +353,65 @@ export class Sombra {
     // Corpo e chifres num caminho SÓ; as fendas por ÚLTIMO. Antes a massa
     // vinha antes dos tentáculos e as bases dos sete convergiam exatamente
     // sobre os olhos, soterrando o rosto — sobrava um olho visível na tela.
-    this._massa(ctx, tema, cx, cy, ferida);
-    this._olhos(ctx, tema, cx, cy, ferida);
+    if (SPRITES_PARASITAS.usa(this.especie)) {
+      this._corpoSprite(ctx, tema, ferida);
+    } else {
+      this._massa(ctx, tema, cx, cy, ferida);
+      this._olhos(ctx, tema, cx, cy, ferida);
+    }
 
+    ctx.restore();
+  }
+
+  /** Pivô do sprite: o pé de quem anda no chão, o centro de quem flutua. */
+  _pivoSprite() {
+    return { x: this.centroX, y: this.gravidade ? this.y + this.altura : this.centroY };
+  }
+
+  /**
+   * A mesma transformação pro corpo em sprite e pra luz da fenda — se as duas
+   * divergirem, a fenda acesa descola do olho desenhado.
+   *
+   * O espelho usa `dirSuave`, não `dir`: na virada o corpo afina até o perfil
+   * e abre do outro lado em ~0,25 s, que é a antecipação que o jogador lê (o
+   * mesmo motivo do arrasto do manto no desenho em código).
+   */
+  _transformarSprite(ctx) {
+    const p = this._pivoSprite();
+    const s = 1 + this.telegrafo * this.inchaTelegrafo;   // o aviso incha
+    const balanco = SPRITES_PARASITAS.movimentoReduzido ? 0.33 : 1;
+    ctx.translate(p.x, p.y);
+    ctx.rotate(this.dirSuave * 0.08 + Math.sin(this.t * 0.8 * balanco) * 0.03 * balanco);
+    ctx.scale(this.dirSuave * s, s);
+  }
+
+  _corpoSprite(ctx, tema, ferida) {
+    const sp = SPRITES_PARASITAS;
+    const q = sp.quadro(this.especie, this.t);
+    ctx.save();
+    this._transformarSprite(ctx);
+    sp.desenhar(ctx, this.especie, q, { branco: ferida });
+    /* A fenda é redesenhada por cima, no tamanho mínimo de `olho()`: a do
+       sprite fica pequena demais em várias espécies. Na piscada ela some
+       (cor do corpo) e no flash de dano vira escura — o flash sem rosto era
+       um borrão branco. */
+    const o = sp.olho(this.especie, q);
+    const piscada = this._piscando > 0 ? clamp01(this._piscando / 0.06) : 0;
+    if (ferida || piscada > 0) {
+      // Cobre a fenda do próprio sprite antes de fechar a desenhada.
+      ctx.fillStyle = ferida ? rgba(tema.primeiroPlano, 0.9)
+        : misturarHex(tema.primeiroPlano, '#ffffff', 0.07);   // a cor do corpo
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, o.rx * 1.25, o.ry * 1.15, -0.15, 0, TAU);
+      ctx.fill();
+    }
+    if (!ferida && piscada < 1) {
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha *= 0.92;
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, o.rx, o.ry * (1 - piscada), -0.15, 0, TAU);
+      ctx.fill();
+    }
     ctx.restore();
   }
 
@@ -592,6 +653,22 @@ export class Sombra {
        força sem tocar em uma linha da lógica de combate. */
     const cy = this.centroY + this.deslocDesenhoY + Math.sin(this.t * 3.1) * 1.6;
     const piscada = this._piscando > 0 ? 1 : 0;
+    if (SPRITES_PARASITAS.usa(this.especie)) {
+      const sp = SPRITES_PARASITAS;
+      const o = sp.olho(this.especie, sp.quadro(this.especie, this.t));
+      ctx.save();
+      this._transformarSprite(ctx);
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = (0.18 + this.telegrafo * 0.62) * (1 - piscada);
+      ctx.beginPath();
+      ctx.ellipse(o.x, o.y, o.rx * 1.1, o.ry * 1.2, -0.15, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+      if (this.telegrafo > 0.05) {
+        luzRadial(ctx, this.centroX, cy, this.raio * 2.2, tema.acento, this.telegrafo * 0.9);
+      }
+      return;
+    }
     ctx.save();
     ctx.translate(this.centroX, cy);
     ctx.fillStyle = '#ffffff';
@@ -621,7 +698,8 @@ export class Sombra {
 export class Errante extends Sombra {
   constructor(obj) {
     // A REFERÊNCIA da espécie: proporção 1:1, dois chifres, barra longa.
-    super(obj, { vida: 2, raio: 13, largura: 30, altura: 32, tentaculos: 2 });
+    super(obj, { vida: 2, raio: 13, largura: 30, altura: 32, tentaculos: 2,
+      especie: 'errante' });
     this.vel = 46;
   }
   comportamento(dt, mundo) { this._patrulhar(dt, mundo, this.vel); }
@@ -642,7 +720,7 @@ export class Espreita extends Sombra {
       // bestiário, e é o que faz "aquele que flutua" ser lido de longe.
       vida: 1, raio: 11, largura: 26, altura: 26,
       tentaculos: 0, olhos: 1, escalaX: 1.05, escalaY: 0.95,
-      temManto: false, gravidade: false,
+      temManto: false, gravidade: false, especie: 'espreita',
     });
     this.baseY = this.y;
     this.vel = 42;
@@ -695,6 +773,7 @@ export class Cuspidor extends Sombra {
       vida: 3, raio: 15, largura: 34, altura: 36,
       tentaculos: 1, compTentaculo: 13, olhos: 1,
       escalaX: 1.35, escalaY: 0.85, espalhaTentaculos: 0.55,
+      especie: 'cuspidor',
     });
     this.recarga = RECARGA_CUSPIDOR * (0.5 + hash2(obj.cx, obj.cy, 3));
     this.carregando = 0;
@@ -769,7 +848,7 @@ export class Rastejante extends Sombra {
       // ACHATADO contra a superfície — a única silhueta larga e baixa.
       vida: 1, raio: 10, largura: 24, altura: 24,
       tentaculos: 0, olhos: 1, escalaX: 1.6, escalaY: 0.6,
-      temManto: false, gravidade: false,
+      temManto: false, gravidade: false, especie: 'rastejante',
     });
     this.normal = 0;
     this.vel = 96;
@@ -860,6 +939,12 @@ export class Rastejante extends Sombra {
     this.anguloCorpo = Math.atan2(nAtual.ny, nAtual.nx) + Math.PI / 2;
   }
 
+  /** No referencial dele, "chão" é a superfície em que está grudado: o pé
+   *  do sprite fica a `sonda` do centro, como no passo de `comportamento`. */
+  _pivoSprite() {
+    return { x: this.centroX, y: this.centroY + this.raio + 3 };
+  }
+
   desenhar(ctx, tema, camera) {
     // Gira o corpo inteiro para acompanhar a superfície — uma criatura de
     // teto desenhada em pé denuncia o truque na hora.
@@ -903,7 +988,9 @@ export class Estopim extends Sombra {
          "isto vai estourar". */
       vida: 1, raio: 12, largura: 28, altura: 28,
       tentaculos: 0, olhos: 1, dano: 2,
-      escalaX: 1.18, escalaY: 1.18, temManto: false,
+      escalaX: 1.18, escalaY: 1.18, temManto: false, especie: 'estopim',
+      // Dano 2 e explode: o aviso dele precisa ser o mais forte do bestiário.
+      inchaTelegrafo: 0.3,
     });
     this.vel = 88;
     this.raioPercepcao = 210;
@@ -976,6 +1063,7 @@ export class Tecelao extends Sombra {
       vida: 2, raio: 12, largura: 26, altura: 28,
       tentaculos: 1, compTentaculo: 12, olhos: 1,
       escalaX: 0.7, escalaY: 1.45, espalhaTentaculos: 1, gravidade: false,
+      especie: 'tecelao',
     });
     this.tetoY = this.y;
     this.alcanceQueda = 260;

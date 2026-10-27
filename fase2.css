@@ -373,5 +373,8 @@
          muda: desacelerá-lo mudaria a dificuldade, não o movimento.
        · Guardião em sprite (entidades/jogador-sprite.js): a cambalhota do
          salto duplo não gira — fica o quadro da bolinha parado (lido do
-         próprio matchMedia no módulo). */
+         próprio matchMedia no módulo).
+       · parasitas em sprite (entidades/parasitas-sprite.js): os quadros do
+         manto, da respiração e do rastejar correm a 1/3 (também lido do
+         matchMedia no módulo). O telégrafo não muda: é aviso de ataque. */
 }
