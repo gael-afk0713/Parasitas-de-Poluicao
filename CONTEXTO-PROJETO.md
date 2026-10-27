@@ -1310,9 +1310,21 @@ fase2/
 - **Fundo de subsolo**: A Fenda (`raizes-04`), O Canal Fundo (`varzea-08`) e
   O Depósito (`clareira-08`) ficam embaixo da terra e mostravam céu, sol e
   incêndio. Agora `subterranea: true` troca céu + horizonte + parallax por
-  `render/subsolo.js`, e tira aves e a moldura de galho (`main.js`). Feito em
-  código, não com imagem (Canva/IA): imagem não segue a paleta interpolada
-  de cada área nem a restauração.
+  `render/subsolo.js`, e tira aves e a moldura de galho (`main.js`).
+- **Silhueta do Canva no subsolo** (pedido do autor: "faça alguns elementos
+  do fundo usando o criador de imagens do Canva; se ficar ruim, cancele").
+  Imagem colorida não segue a paleta interpolada nem a restauração, então o
+  Canva gera SILHUETA PRETA sobre branco, `fase2/arte/preparar-subsolo.py`
+  vira máscara (branco + alfa) e `subsolo.js` tinge com a cor do tema em
+  tempo de jogo (`tingir`, cache por cor). Ficou o emaranhado de raízes
+  (`fase2/arte/subsolo/raizes.png`, plano 0,62, com o fungo pousado em pontos
+  sorteados dentro da silhueta). Um monte de pedras também foi gerado e o
+  `design-reviewer` mandou CANCELAR: lia como ovos e sujava a faixa do chão.
+  Como baixar do Canva em resolução cheia: a API só devolve miniatura (200
+  px) e a URL é assinada (mudar o tamanho dá 403); o caminho é pôr a mídia
+  numa página do tamanho dela num design (`edit-design` → `insert_fill`),
+  salvar e `export-design` em PNG. Isso deixa um design "Página técnica em
+  branco" na conta do autor.
 
 ### Decisões que custaram caro e não devem ser refeitas
 

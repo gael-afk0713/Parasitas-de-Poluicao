@@ -375,7 +375,8 @@
          salto duplo não gira — fica o quadro da bolinha parado (lido do
          próprio matchMedia no módulo).
        · fundo das salas subterrâneas (render/subsolo.js): o balanço das
-         raízes e o pulso do fungo luminoso — a 1/3.
+         raízes (procedurais e o emaranhado do Canva) e o pulso do fungo
+         luminoso — a 1/3.
        · parasitas em sprite (entidades/parasitas-sprite.js): os quadros do
          manto, da respiração e do rastejar correm a 1/3 (também lido do
          matchMedia no módulo). O telégrafo não muda: é aviso de ataque. */
