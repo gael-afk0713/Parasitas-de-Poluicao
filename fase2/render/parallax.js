@@ -55,6 +55,7 @@ import {
   misturarHex, ajustarBrilho, hexParaRgb, rgbParaHex,
 } from '../core/mat.js';
 import { feixeLuz } from './renderizador.js';
+import { silhueta, tingir } from './silhuetas.js';
 import {
   FORMAS_CATASTROFE, FORMAS_LUZ, confCatastrofe, forcaFogo, forcaFumaca,
   calmaDaFauna, chamaDe, frenteDeFogo, claraoDeFogo, pluma,
@@ -207,6 +208,8 @@ function prepararAmb(camera, sala, tema, tempo, p, c, cAlto, cBase, cTras, ang) 
 
   const area = sala.area;
   _amb.area = area;
+  _amb.salaSemente = sala.def.semente ?? 7;
+  _amb.salaLargura = sala.largura;
   _amb.fogo = forcaFogo(area, _amb.pureza);
   _amb.fumaca = forcaFumaca(area, _amb.pureza);
   _amb.calma = calmaDaFauna(_amb.pureza);
@@ -1260,7 +1263,60 @@ function escombros(ctx, a, s) {
   }
 }
 
+/**
+ * Silhueta feita por IA (render/silhuetas.js), tingida com a cor do plano.
+ *
+ * `imgs` são as variantes da sala suja; `vivas`, as da restaurada (mesma
+ * posição, índice correspondente). Restaurar TROCA A FORMA, não só a cor
+ * (regra do jogo): árvore morta vira árvore com copa, num degradê que só
+ * começa a meio caminho da pureza — antes disso a sala ainda está morta.
+ * Sem `vivas`, a mesma imagem nos dois estados (as ruínas não se curam).
+ */
+function silhuetaIA(ctx, a, s) {
+  const passo = s.passo ?? 600;
+  // Uma coluna a mais de cada lado: a imagem é larga e o pivô é o meio.
+  const x0 = (Math.floor(a.x0 / passo) - 1) * passo;
+  const yb = yDe(a, s.rel);
+  const t = clamp01((a.pureza - 0.35) / 0.4);
+  const viva = s.vivas ? t * t * (3 - 2 * t) : 0;
+  /* `umaPorSala`: um elemento só, num ponto da faixa que a sala enxerga
+     neste plano. É pro que é MARCO (ruínas): num plano distante a câmera
+     quase não anda, e uma grade fixa deixava a maioria das salas sem nada. */
+  const xs = [];
+  if (s.umaPorSala) {
+    const hs = hash2(a.salaSemente, s.semente, 397);
+    if (hs > (s.dens ?? 0.75)) return;
+    xs.push(a.salaLargura * a.p * 0.5 + a.vw * (hs / (s.dens ?? 0.75) - 0.5) * 0.7);
+  } else {
+    for (let x = x0; x <= a.x1 + passo; x += passo) xs.push(x);
+  }
+  for (const x of xs) {
+    // Bosque, não fileira (o mesmo ruído de clareira dos troncos).
+    if (!s.umaPorSala) {
+      if (ruido1(x * 0.0009, s.semente + 41) < (s.clareiras ?? 0.3)) continue;
+      if (hash2(x, s.semente, 401) > (s.dens ?? 0.5)) continue;
+    }
+    const px = s.umaPorSala ? x : x + (hash2(x, s.semente + 1, 409) - 0.5) * passo * 1.2;
+    const alt = a.vh * lerp(s.altura[0], s.altura[1], hash2(x, s.semente + 3, 419));
+    const lado = s.espelhar === false || hash2(x, s.semente + 7, 421) < 0.5 ? 1 : -1;
+    const i = Math.floor(hash2(x, s.semente + 5, 431) * s.imgs.length);
+    for (const [nome, alfa] of [[s.imgs[i], 1 - viva], [s.vivas?.[i % s.vivas.length], viva]]) {
+      if (!nome || alfa < 0.01) continue;
+      const img = silhueta(nome);
+      if (!img) continue;
+      const w = alt * img.naturalWidth / img.naturalHeight;
+      ctx.save();
+      ctx.globalAlpha = alfa;
+      ctx.translate(px, yb + alt * (s.afundar ?? 0.02));
+      ctx.scale(lado, 1);
+      ctx.drawImage(tingir(img, a.cor, a.corAlto), -w / 2, -alt, w, alt);
+      ctx.restore();
+    }
+  }
+}
+
 const FORMAS = {
+  silhuetaIA,
   massa, dentes, arcos, raizes, juncos, troncos, agua,
   chamines, torres, esteiras, cabos, fumaca,
   troncosColossais, galhos, folhagem, organico, escombros,
@@ -1326,6 +1382,12 @@ const CAMADAS = {
       { f: 'troncosColossais', rel: 0.66, passo: 170, dens: 0.82,
         largMin: 8, largMax: 20, semente: 23, altura: [0.42, 0.62] },
       { f: 'galhos', rel: 0.20, passo: 260, dens: 0.55, escalaLarg: 0.45, semente: 29 },
+      /* As RUÍNAS da empresa, recortadas contra o fogo do horizonte (silhueta
+         só lê contra luz). É um marco de onde a poluição veio, não um
+         bairro: uma por sala, em 3 de cada 4 salas. Não se curam com a
+         pureza — a empresa caiu de vez. */
+      { f: 'silhuetaIA', imgs: ['ruinas'], rel: 0.71, umaPorSala: true, dens: 0.75,
+        altura: [0.40, 0.50], afundar: 0.08, semente: 30 },
       { f: 'massa', lado: 'baixo', rel: 0.70, amp: 56, escala: 0.0017, semente: 31, passo: 15 },
       /* O fogo que PASSOU ainda queima nos morros do meio: línguas de 60–90
          px, do lado de onde o incêndio veio. Sem este plano o fogo de Raízes
@@ -1340,6 +1402,10 @@ const CAMADAS = {
         largMin: 6, largMax: 13, semente: 38 },
       { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
+      // Árvores da IA: mortas na sala suja, com copa na restaurada.
+      { f: 'silhuetaIA', imgs: ['arvore-morta-1', 'arvore-morta-2'],
+        vivas: ['arvore-viva-1', 'arvore-viva-2'], rel: 0.74, passo: 420, dens: 0.6,
+        altura: [0.62, 0.9], semente: 40 },
     ] },
     { p: 0.28, d: 0.58, cor: 'medio', brilho: -0.28, formas: [
       { f: 'troncosColossais', rel: 0.74, passo: 340, dens: 0.62,
@@ -1349,6 +1415,9 @@ const CAMADAS = {
       { f: 'raizes', rel: -0.02, passo: 230, dens: 0.55, compMin: 160, compMax: 420,
         largMin: 7, largMax: 20, semente: 47 },
       { f: 'galhos', rel: 0.06, passo: 380, dens: 0.5, escalaLarg: 0.9, semente: 49 },
+      { f: 'silhuetaIA', imgs: ['arvore-morta-2', 'arvore-morta-1'],
+        vivas: ['arvore-viva-2', 'arvore-viva-1'], rel: 0.78, passo: 560, dens: 0.5,
+        altura: [0.95, 1.25], semente: 50 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'troncosColossais', rel: 0.80, passo: 460, dens: 0.55,
@@ -1894,7 +1963,9 @@ const MOLDURA = {
   // referência (GRIS) o primeiro plano não é feito de objetos isolados: é uma
   // FAIXA baixa de terra com plantas pequenas recortadas em cima. Faixa não
   // vira objeto, e é o que emoldura sem competir com o personagem.
-  raizes: { base: 'moitaBaixa', topo: 'galhoFolhado' },
+  raizes: { base: 'moitaBaixa', topo: 'galhoFolhado',
+    // Silhuetas da IA por cima da moldura procedural (render/silhuetas.js).
+    ia: { topo: 'galho-morto', topoVivo: 'galho-vivo', base: 'moita' } },
   varzea: { base: 'folhaLarga', topo: 'juncoAlto' },
   clareira: { base: 'viga', topo: 'cano' },
   dossel: { base: 'raizGrossa', topo: 'galhoFolhado' },
@@ -1938,6 +2009,10 @@ export function desenharPrimeiroPlano(render, mundo) {
     areaAtual = sala.area;
     desenharMolduraBase(ctx, molde.base, esq, vw, vh, yBase, refX, tempo, t);
     desenharMolduraTopo(ctx, molde.topo, esq, vw, vh, yTopo, refX, tempo, t);
+    if (molde.ia) {
+      desenharMolduraIA(ctx, molde.ia, esq, vw, vh, yBase, yTopo, refX,
+        render.movimentoReduzido ? tempo * 0.33 : tempo, t, sala.def.semente ?? 7);
+    }
     ctx.globalAlpha = 1;
     fogueirasDaFrente(ctx, t, sala.area, esq, vw, vh, yBase, refX,
       render.movimentoReduzido ? tempo * 0.33 : tempo, false);
@@ -1952,6 +2027,64 @@ export function desenharPrimeiroPlano(render, mundo) {
       refX, tempo, true);
     ctx.globalAlpha = 1;
   });
+}
+
+/**
+ * Moldura feita de silhuetas da IA: galho pendendo do topo (morto na sala
+ * suja, folhado na restaurada) e faixa de moita na base. Mesma regra da
+ * moldura procedural: alfa pela distância ao Guardião, nunca na linha dele.
+ */
+function desenharMolduraIA(ctx, ia, esq, vw, vh, yBase, yTopo, refX, tempo, tema, sem) {
+  const t = clamp01(((tema.pureza ?? 0) - 0.35) / 0.4);
+  const viva = t * t * (3 - 2 * t);
+  const cor = tema.primeiroPlano;
+
+  /* Galhos: o toco da imagem é cortado no x = 0 do arquivo, então ela só lê
+     natural ENTRANDO PELA BORDA DA TELA. Solto num x do mundo, o toco
+     aparecia cortado no meio do quadro. Um por lado, sorteado pela sala (um
+     terço dos lados fica sem). Balanço de pêndulo leve a partir da borda. */
+  for (const lado of [1, -1]) {
+    const h = hash2(sem, lado + 3, 907);
+    if (h > 0.67) continue;
+    const px = lado > 0 ? esq - vw * 0.02 : esq + vw * 1.02;
+    const x = lado;
+    const alt = vh * lerp(0.36, 0.52, hash2(sem, lado + 3, 929));
+    for (const [nome, alfaEstado] of [[ia.topo, 1 - viva], [ia.topoVivo, viva]]) {
+      const img = nome && alfaEstado > 0.01 ? silhueta(nome) : null;
+      if (!img) continue;
+      const w = alt * img.naturalWidth / img.naturalHeight;
+      const alfa = opacidadeDeBorda(px + lado * w * 0.3 - refX, vw) * alfaEstado;
+      if (alfa < 0.02) continue;
+      ctx.save();
+      ctx.globalAlpha = alfa;
+      ctx.translate(px, yTopo - alt * 0.06);
+      ctx.rotate(Math.sin(tempo * 0.5 + x) * 0.015 * lado);
+      ctx.scale(lado, 1);
+      ctx.drawImage(tingir(img, cor), 0, 0, w, alt);
+      ctx.restore();
+    }
+  }
+
+  // Moita: faixa de terra com plantas, afundada na borda de baixo — baixa o
+  // bastante pra nunca subir por cima de uma plataforma de jogo.
+  const img = ia.base ? silhueta(ia.base) : null;
+  if (!img) return;
+  const alt = vh * 0.12;
+  const w = alt * img.naturalWidth / img.naturalHeight;
+  const passoM = w * 0.85;
+  for (let x = Math.floor((esq - passoM) / passoM) * passoM; x <= esq + vw + passoM; x += passoM) {
+    if (hash2(x, 937, 5) > 0.6) continue;
+    const px = x + (hash2(x, 941, 5) - 0.5) * passoM * 0.4;
+    const alfa = opacidadeDeBorda(px - refX, vw);
+    if (alfa < 0.02) continue;
+    const esc = lerp(0.8, 1.15, hash2(x, 947, 5));
+    ctx.save();
+    ctx.globalAlpha = alfa;
+    ctx.translate(px, yBase + alt * 0.5);
+    ctx.scale(hash2(x, 953, 5) < 0.5 ? -esc : esc, esc);
+    ctx.drawImage(tingir(img, cor), -w / 2, -alt, w, alt);
+    ctx.restore();
+  }
 }
 
 /**

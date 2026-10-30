@@ -200,6 +200,10 @@ errado pelo mesmo motivo que estaria errado se estivesse tosco.
     desenhe. Hoje o parser abre o céu sozinho (ver `abrirCeu` em
     `mundo/salas.js`); `ceuAberto: false` na definição mantém a sala fechada,
     e é só pra interior de verdade.
+  - **Silhuetas de IA** (`render/silhuetas.js`, forma `silhuetaIA` do
+    parallax, `ia` na `MOLDURA`): imagem entra só como MÁSCARA tingida com
+    a cor do plano, nunca colorida — o tema é interpolado pela pureza.
+    Hoje só no Sub-bosque (árvores mortas/vivas, ruínas, galho e moita).
   - **Exceção: sala EMBAIXO DA TERRA** (`subterranea: true` — A Fenda, O
     Canal Fundo, O Depósito). Pedido do autor: ela mostrava céu, sol e
     incêndio atrás das paredes. O fundo dela é terra com raízes

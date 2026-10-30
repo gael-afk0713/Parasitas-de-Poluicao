@@ -1272,7 +1272,7 @@ fase2/
   mundo/   terreno.js · salas.js · mundo.js · salas-{raizes,varzea,clareira,
            dossel,coracao,ramos}.js
   render/  paleta.js · renderizador.js · parallax.js · terreno-arte.js ·
-           particulas.js · efeitos.js · subsolo.js
+           particulas.js · efeitos.js · subsolo.js · silhuetas.js
   entidades/ jogador.js · jogador-arte.js · jogador-sprite.js · catalogo.js ·
              parasitas.js · parasitas-sprite.js · chefes.js · projeteis.js
   arte/    guardiao-folha-original.png (folha 6x4 gerada no ChatGPT) ·
@@ -1325,6 +1325,33 @@ fase2/
   numa página do tamanho dela num design (`edit-design` → `insert_fill`),
   salvar e `export-design` em PNG. Isso deixa um design "Página técnica em
   branco" na conta do autor.
+
+### Cenário por IA no Sub-bosque (out/2026, pedido do autor)
+
+Árvores do fundo, ruínas da empresa e moldura da frente, só na área `raizes`
+por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
+- 8 silhuetas pretas geradas na Cloudflare (skill `gemini-image`, uma por
+  imagem — todas acertaram de primeira com o prompt "flat solid pure black
+  silhouette ... pure flat white background"), fontes em
+  `fase2/arte/cenario/fontes/`. `fase2/arte/preparar-cenario.py` vira máscara
+  (branco + alfa), ENGORDA galhos finos antes de reduzir (fio de 1-2 px
+  virava risco cinza serrilhado) e corta a laje preta da base das ruínas.
+- `render/silhuetas.js` carrega e tinge (cache por cor arredondada a passo
+  8; sai só a mais antiga). O subsolo usa o mesmo módulo.
+- `parallax.js`: forma `silhuetaIA` (dado de camada como as outras).
+  Árvores: `imgs` mortas e `vivas` com copa, trocadas por degradê de pureza
+  que só começa a 0,35 (restaurar troca FORMA). Ruínas: `umaPorSala` — o
+  plano distante quase não anda, e uma grade fixa deixava a maioria das
+  salas sem ruína nenhuma; agora é uma por sala, sorteada pela semente, em
+  3 de cada 4 salas, contra o fogo do horizonte. Não se curam.
+- Moldura (`MOLDURA.raizes.ia`, `desenharMolduraIA`): galho morto/vivo
+  ENTRANDO PELA BORDA da tela (o toco da imagem é cortado na borda do
+  arquivo; solto no mundo ele aparecia cortado no meio do quadro), um por
+  lado, sorteado pela sala; faixa de moita baixa e afundada. Mesma máscara
+  de alfa por distância ao Guardião da moldura procedural.
+- Revisado pelo `design-reviewer` (ajustes aplicados). Pra outra área: gerar
+  as silhuetas dela, rodar o script, acrescentar `silhuetaIA` nas camadas
+  dela em `CAMADAS` e `ia` na `MOLDURA` dela.
 
 ### Decisões que custaram caro e não devem ser refeitas
 
