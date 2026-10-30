@@ -23,6 +23,8 @@ import {
   calmaDaFauna, confCatastrofe, desenharAnimal, forcaFogo, chamaDe,
 } from './catastrofe.js';
 import { VAZIO } from '../mundo/terreno.js';
+// Os bichos PARADOS (urubus na sala suja, fauna que volta na restaurada).
+import { Bichos } from './bichos.js';
 
 const MAX_AVES = 14;
 
@@ -91,6 +93,7 @@ export class Fauna {
     }
     this._primeiro = true;
     this._idade = 0;
+    this.bichos = new Bichos(terreno, semente);
   }
 
   /**
@@ -216,6 +219,7 @@ export class Fauna {
         if (k >= 1) { a.estado = 'pousado'; a.t = 0; }
       }
     }
+    this.bichos.atualizar(dt, jogador.centroX, jogador.centroY);
     const f = this.ferido;
     if (f) {
       /* caído → levantando → de pé. Entrando numa sala já restaurada, o bicho
@@ -256,6 +260,9 @@ export class Fauna {
 
   /** @param {boolean} reduzido  movimento reduzido: bater de asa a 1/3 */
   desenhar(ctx, tema, tempo, reduzido = false) {
+    // Atrás das aves. No Coração sujo nem urubu: lá é silêncio (ver `atualizar`).
+    this.bichos.desenhar(ctx, tema, tempo, tema.pureza ?? 0, reduzido,
+      !!confCatastrofe(this.area).bichos);
     if (reduzido) tempo *= 0.33;
     const calma = calmaDaFauna(tema.pureza ?? 0);
     // Silhueta escura; na sala limpa ganha o peito na cor viva da área.

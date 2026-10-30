@@ -18,6 +18,7 @@
 
 import { clamp01, lerp, hash2, misturarHex } from '../core/mat.js';
 import { silhueta, tingir } from './silhuetas.js';
+import { pertoDePerigo } from '../mundo/perigo.js';
 
 // Retângulos [x, y, l, a] de cada peça no atlas (saída do preparar-chao.py).
 const PECAS = {
@@ -35,7 +36,7 @@ const PECAS = {
  * vãos pelados entre eles — o mesmo cuidado das samambaias: peça a passo
  * fixo vira franja e denuncia geração.
  */
-export function ancorasDoChao(arestas) {
+export function ancorasDoChao(arestas, terreno = null) {
   const pts = [];
   for (const faixa of arestas) {
     let percorrido = 0;
@@ -49,6 +50,8 @@ export function ancorasDoChao(arestas) {
         const passo = 14 + hash2(Math.round(x), Math.round(y), 607) * 46;
         proxima += passo;
         if (hash2(Math.round(x / 130), Math.round(y / 80), 611) > 0.55) continue;
+        // Uma pinha entre os espinhos (captura) confundia a leitura do perigo.
+        if (terreno && pertoDePerigo(terreno, x, y)) continue;
         const h = hash2(Math.round(x), Math.round(y), 613);
         pts.push({
           x, y,

@@ -376,6 +376,8 @@
          próprio matchMedia no módulo).
        · moldura de silhuetas da IA, todas as áreas (render/parallax.js,
          desenharMolduraIA): o balanço do galho / junco / viga — a 1/3.
+       · bichos parados (render/bichos.js, via fauna.js): respiração dos
+         urubus e da fauna do chão e pêndulo dos pendurados — a 1/3.
        · fundo das salas subterrâneas (render/subsolo.js): o balanço das
          raízes (procedurais e o emaranhado do Canva) e o pulso do fungo
          luminoso — a 1/3.

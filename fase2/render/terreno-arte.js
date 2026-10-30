@@ -151,7 +151,7 @@ export class ArteTerreno {
     // --- 8. o que está caído no chão (lixo, folhas) -----------------------
     // Por cima da crista, do musgo e das plataformas, mas ANTES dos perigos:
     // espinho precisa ler limpo, nunca com uma lata na frente.
-    this._cacheChao ??= ancorasDoChao(this.terreno.arestasSuperiores(0.86));
+    this._cacheChao ??= ancorasDoChao(this.terreno.arestasSuperiores(0.86), this.terreno);
     desenharChao(ctx, tema, this._cacheChao, tema.pureza ?? 0);
 
     this.desenharPerigos(ctx, tema, camera);

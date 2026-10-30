@@ -1376,6 +1376,15 @@ por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
   plataformas e ANTES dos perigos (espinho lê limpo). A inclinação da
   aresta é normalizada pra (-90°, 90°) — metade dos contornos corre da
   direita pra esquerda e a peça saía de cabeça pra baixo, enterrada.
+- **Bichos parados** (`render/bichos.js`, criado e desenhado por
+  `fauna.js`; atlas `fase2/arte/bichos/` por `preparar-bichos.py`, que acha
+  as peças por componente conexo e corta o galho dos pendurados): URUBUS
+  pousados na sala suja (saem cedo com a pureza; nenhum no Coração sujo,
+  que é silêncio) e, na restaurada, a fauna que volta — tucano, arara,
+  macaco, tatu, quati, sapo, coruja, jabuti, cutia no chão; preguiça,
+  macaco-aranha, morcego, cobra e bugio pendurados do teto. Tom MÉDIO do
+  terreno, nunca preto (preto com olho é parasita). Somem quando o Guardião
+  chega perto. Lixo, folha e bicho evitam a vizinhança de espinho.
 - Canva: o `generate-image` só devolve miniatura de 200 px. A resolução
   cheia sai colocando cada imagem (`insert_fill`) numa página do tamanho
   exato no design técnico "Página técnica em branco" e exportando em PNG.
