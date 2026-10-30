@@ -1370,6 +1370,12 @@ por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
   ele caía perto da borda esquerda e quase nunca aparecia. Corrigido.
 - Marco atrás de morro só lê se passar da linha do horizonte (silhueta só
   lê contra luz): a fábrica precisou de altura ~0,75 da tela.
+- **Chão** (`render/chao.js`, atlas `fase2/arte/chao/` por
+  `preparar-chao.py`): lixo e folhas caídas do Canva nas arestas pisáveis,
+  em montes. Lixo some com a pureza; folha esverdeia. Desenhado depois das
+  plataformas e ANTES dos perigos (espinho lê limpo). A inclinação da
+  aresta é normalizada pra (-90°, 90°) — metade dos contornos corre da
+  direita pra esquerda e a peça saía de cabeça pra baixo, enterrada.
 - Canva: o `generate-image` só devolve miniatura de 200 px. A resolução
   cheia sai colocando cada imagem (`insert_fill`) numa página do tamanho
   exato no design técnico "Página técnica em branco" e exportando em PNG.

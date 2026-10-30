@@ -25,6 +25,8 @@ import { VAZIO, PLATAFORMA, PERIGO, AGUA } from '../mundo/terreno.js';
 // rajada que a folhagem do fundo, senão o primeiro plano lê como maquete.
 import { vento, direcaoLuzArea } from './parallax.js';
 import { calmaDaFauna, oleoNaLamina } from './catastrofe.js';
+// Lixo e folhas caídos nas arestas pisáveis (silhuetas do Canva).
+import { ancorasDoChao, desenharChao } from './chao.js';
 
 export class ArteTerreno {
   /** @param {import('../mundo/terreno.js').Terreno} terreno */
@@ -48,6 +50,7 @@ export class ArteTerreno {
     this._cacheSalientes = undefined;
     this._cacheEncontros = undefined;
     this._cacheFetos = null;
+    this._cacheChao = null;
     this._musgoPronto = null;
     this._contornoPronto = null;
     this._cristasPronto = null;
@@ -144,6 +147,13 @@ export class ArteTerreno {
     // invisível. (Água tem passe próprio, `desenharAgua`, porque precisa
     // ficar NA FRENTE das entidades pra submergir quem entra nela.)
     this.desenharPlataformas(ctx, tema, camera);
+
+    // --- 8. o que está caído no chão (lixo, folhas) -----------------------
+    // Por cima da crista, do musgo e das plataformas, mas ANTES dos perigos:
+    // espinho precisa ler limpo, nunca com uma lata na frente.
+    this._cacheChao ??= ancorasDoChao(this.terreno.arestasSuperiores(0.86));
+    desenharChao(ctx, tema, this._cacheChao, tema.pureza ?? 0);
+
     this.desenharPerigos(ctx, tema, camera);
   }
 
