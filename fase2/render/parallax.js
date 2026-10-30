@@ -1478,9 +1478,19 @@ const CAMADAS = {
     { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'massa', lado: 'baixo', rel: 0.66, amp: 74, escala: 0.0024, semente: 113, passo: 14 },
       { f: 'juncos', rel: 0.66, passo: 84, dens: 0.78, compMin: 56, compMax: 150, escalaLarg: 0.8, semente: 127 },
+      // Buritis do Canva: mortos e desfolhados na sala suja, com copa na restaurada.
+      { f: 'silhuetaIA', imgs: ['buriti-morto'], vivas: ['buriti-vivo'], rel: 0.67, passo: 300,
+        dens: 0.8, clareiras: 0.15, altura: [0.5, 0.72], semente: 128 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
+      // Antes da água, pra lâmina cobrir o pé: buriti de várzea fica DENTRO d'água.
+      { f: 'silhuetaIA', imgs: ['buriti-morto'], vivas: ['buriti-vivo'], rel: 0.70, passo: 520,
+        dens: 0.5, altura: [0.8, 1.05], afundar: 0.06, semente: 130 },
       { f: 'agua', rel: 0.70, altura: 420, semente: 131 },
+      /* O CANO da empresa despejando na várzea — o marco desta área, como as
+         ruínas são no Sub-bosque. Uma por sala, e não se cura com a pureza. */
+      { f: 'silhuetaIA', imgs: ['cano'], rel: 0.70, umaPorSala: true, dens: 0.7,
+        altura: [0.24, 0.3], afundar: 0.1, semente: 132 },
       // O furta-cor do petróleo e o que boia: é aqui que a várzea adoece.
       { f: 'oleo', rel: 0.70, escala: 1.4, semente: 133 },
       // E o óleo PEGA FOGO: manchas baixas queimando sobre a lâmina, de onde
@@ -1966,7 +1976,9 @@ const MOLDURA = {
   raizes: { base: 'moitaBaixa', topo: 'galhoFolhado',
     // Silhuetas da IA por cima da moldura procedural (render/silhuetas.js).
     ia: { topo: 'galho-morto', topoVivo: 'galho-vivo', base: 'moita' } },
-  varzea: { base: 'folhaLarga', topo: 'juncoAlto' },
+  varzea: { base: 'folhaLarga', topo: 'juncoAlto',
+    // Junco nasce do CHÃO: entra pelos cantos de baixo, não pendurado do alto.
+    ia: { topo: 'junco-seco', topoVivo: 'junco-vivo', topoNaBase: true, base: 'aguape' } },
   clareira: { base: 'viga', topo: 'cano' },
   dossel: { base: 'raizGrossa', topo: 'galhoFolhado' },
   coracao: { base: 'lobo', topo: 'lobo' },
@@ -2049,6 +2061,8 @@ function desenharMolduraIA(ctx, ia, esq, vw, vh, yBase, yTopo, refX, tempo, tema
     const px = lado > 0 ? esq - vw * 0.02 : esq + vw * 1.02;
     const x = lado;
     const alt = vh * lerp(0.36, 0.52, hash2(sem, lado + 3, 929));
+    // `topoNaBase`: a imagem cresce pra cima a partir do canto de baixo.
+    const y = ia.topoNaBase ? yBase - alt * 0.94 : yTopo - alt * 0.06;
     for (const [nome, alfaEstado] of [[ia.topo, 1 - viva], [ia.topoVivo, viva]]) {
       const img = nome && alfaEstado > 0.01 ? silhueta(nome) : null;
       if (!img) continue;
@@ -2057,10 +2071,11 @@ function desenharMolduraIA(ctx, ia, esq, vw, vh, yBase, yTopo, refX, tempo, tema
       if (alfa < 0.02) continue;
       ctx.save();
       ctx.globalAlpha = alfa;
-      ctx.translate(px, yTopo - alt * 0.06);
+      ctx.translate(px, ia.topoNaBase ? yBase : y);
       ctx.rotate(Math.sin(tempo * 0.5 + x) * 0.015 * lado);
       ctx.scale(lado, 1);
-      ctx.drawImage(tingir(img, cor), 0, 0, w, alt);
+      // Na base o pivô do balanço é o pé (o chão), não o alto.
+      ctx.drawImage(tingir(img, cor), 0, ia.topoNaBase ? y - yBase : 0, w, alt);
       ctx.restore();
     }
   }

@@ -374,8 +374,8 @@
        · Guardião em sprite (entidades/jogador-sprite.js): a cambalhota do
          salto duplo não gira — fica o quadro da bolinha parado (lido do
          próprio matchMedia no módulo).
-       · moldura do Sub-bosque (render/parallax.js, desenharMolduraIA): o
-         balanço do galho da IA — a 1/3.
+       · moldura do Sub-bosque e da Várzea (render/parallax.js,
+         desenharMolduraIA): o balanço do galho / junco da IA — a 1/3.
        · fundo das salas subterrâneas (render/subsolo.js): o balanço das
          raízes (procedurais e o emaranhado do Canva) e o pulso do fungo
          luminoso — a 1/3.

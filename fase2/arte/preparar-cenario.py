@@ -3,6 +3,7 @@
 Uso:  python fase2/arte/preparar-cenario.py
 Lê    fase2/arte/cenario/fontes/<nome>.jpg  (silhueta preta sobre branco,
                                               Cloudflare Workers AI)
+      ou fontes/<nome>.png                  (idem, gerada no Canva)
 Grava fase2/arte/cenario/<nome>.png         (máscara: branco + alfa, recortada)
 e imprime o tamanho de cada uma.
 
@@ -26,6 +27,11 @@ TAMANHO = {
     'ruinas': 1100,
     'galho-morto': 800, 'galho-vivo': 800,
     'moita': 1100,
+    # Várzea (fontes do Canva, em .png)
+    'buriti-morto': 600, 'buriti-vivo': 600,
+    'cano': 1100,
+    'junco-seco': 800, 'junco-vivo': 800,
+    'aguape': 1100,
 }
 
 # Engorda (px da FONTE, filtro de máximo) antes de reduzir. A IA desenha
@@ -35,6 +41,8 @@ ENGORDA = {
     'arvore-morta-1': 5, 'arvore-morta-2': 5,
     'arvore-viva-1': 5, 'arvore-viva-2': 5,
     'galho-morto': 7, 'galho-vivo': 5,
+    'buriti-morto': 5, 'buriti-vivo': 3,
+    'junco-seco': 7, 'junco-vivo': 3,
 }
 
 # Ruínas: a fonte tem uma laje preta chapada na base (lia como barra, não
@@ -44,7 +52,10 @@ SEM_LAJE = {'ruinas'}
 
 def main():
     for nome, lado in TAMANHO.items():
-        im = Image.open(PASTA / 'fontes' / f'{nome}.jpg').convert('L')
+        fonte = PASTA / 'fontes' / f'{nome}.jpg'
+        if not fonte.exists():
+            fonte = fonte.with_suffix('.png')      # as do Canva vêm em png
+        im = Image.open(fonte).convert('L')
         a = 255 - np.asarray(im).astype(float)            # preto = opaco
         a = np.clip((a - 24) * 255 / 200, 0, 255)          # o branco do jpeg sai
         if nome in SEM_LAJE:

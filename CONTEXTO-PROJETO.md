@@ -1352,6 +1352,16 @@ por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
 - Revisado pelo `design-reviewer` (ajustes aplicados). Pra outra área: gerar
   as silhuetas dela, rodar o script, acrescentar `silhuetaIA` nas camadas
   dela em `CAMADAS` e `ia` na `MOLDURA` dela.
+- **Várzea** (segunda área, mesmo esquema, silhuetas geradas no CANVA — fonte
+  `.png`; o script aceita jpg ou png): buritis mortos (desfolhados) → buritis
+  com copa em dois planos, o de perto ANTES da `agua` pra lâmina cobrir o
+  pé; o CANO de esgoto da empresa como marco (`umaPorSala`, não se cura);
+  moldura com juncos secos → vivos e faixa de aguapé. Junco nasce do chão,
+  então a moldura ganhou `ia.topoNaBase`: a imagem do "topo" entra pelos
+  cantos DE BAIXO, com o pivô do balanço no pé.
+- Canva: o `generate-image` só devolve miniatura de 200 px. A resolução
+  cheia sai colocando cada imagem (`insert_fill`) numa página do tamanho
+  exato no design técnico "Página técnica em branco" e exportando em PNG.
 
 ### Decisões que custaram caro e não devem ser refeitas
 
