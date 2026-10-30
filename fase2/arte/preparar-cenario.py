@@ -32,6 +32,13 @@ TAMANHO = {
     'cano': 1100,
     'junco-seco': 800, 'junco-vivo': 800,
     'aguape': 1100,
+    # Clareira, Dossel e Coração (Canva)
+    'tocos-queimados': 600, 'arvores-jovens': 600, 'fabrica': 1100,
+    'viga-seca': 800, 'viga-viva': 800, 'escombros': 1100,
+    'sumauma-morta': 700, 'sumauma-viva': 700, 'maquina': 1100,
+    'bromelia-seca': 800, 'bromelia-viva': 800, 'raizes-chao': 1100,
+    'arvore-doente': 600, 'arvore-florida': 600, 'lixao': 1100,
+    'tentaculo': 800, 'trepadeira-florida': 800, 'bolhas': 1100,
 }
 
 # Engorda (px da FONTE, filtro de máximo) antes de reduzir. A IA desenha
@@ -43,6 +50,8 @@ ENGORDA = {
     'galho-morto': 7, 'galho-vivo': 5,
     'buriti-morto': 5, 'buriti-vivo': 3,
     'junco-seco': 7, 'junco-vivo': 3,
+    'viga-seca': 5, 'bromelia-seca': 5, 'sumauma-morta': 3,
+    'tentaculo': 3, 'trepadeira-florida': 3,
 }
 
 # Ruínas: a fonte tem uma laje preta chapada na base (lia como barra, não

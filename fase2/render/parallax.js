@@ -1286,7 +1286,11 @@ function silhuetaIA(ctx, a, s) {
   if (s.umaPorSala) {
     const hs = hash2(a.salaSemente, s.semente, 397);
     if (hs > (s.dens ?? 0.75)) return;
-    xs.push(a.salaLargura * a.p * 0.5 + a.vw * (hs / (s.dens ?? 0.75) - 0.5) * 0.7);
+    /* O centro do que a sala MOSTRA neste plano: câmera no meio da sala
+       (viewX = (largura - vw)/2) mais meia tela. Sem o `+ vw/2·(1-p)` o
+       marco caía perto da borda esquerda e, na maioria das salas, fora. */
+    const centro = (a.salaLargura - a.vw) * a.p * 0.5 + a.vw * 0.5;
+    xs.push(centro + a.vw * (hs / (s.dens ?? 0.75) - 0.5) * 0.7);
   } else {
     for (let x = x0; x <= a.x1 + passo; x += passo) xs.push(x);
   }
@@ -1548,6 +1552,9 @@ const CAMADAS = {
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 0.88, passo: 165, dens: 0.78,
         largMin: 7, largMax: 18, semente: 207, altura: [0.38, 0.58] },
+      // Árvores queimadas do Canva: a mata que sobrou em pé; rebrota na restaurada.
+      { f: 'silhuetaIA', imgs: ['tocos-queimados'], vivas: ['arvores-jovens'], rel: 0.88,
+        passo: 300, dens: 0.7, altura: [0.35, 0.55], semente: 208 },
       // As chaminés começam a aparecer ENTRE as árvores, não no lugar delas.
       { f: 'chamines', rel: 0.84, passo: 320, dens: 0.4, altMin: 120, altMax: 300,
         escalaLarg: 0.6, torcao: 0.2, semente: 211 },
@@ -1559,6 +1566,10 @@ const CAMADAS = {
       // As árvores que ainda queimam: base atrás da crista, copa em chamas.
       { f: 'arvoreEmChamas', rel: 0.92, passo: 340, dens: 0.75, altMin: 130, altMax: 260,
         largMin: 6, largMax: 12, semente: 216 },
+      /* A FÁBRICA caída — o marco desta área, uma por sala. Antes do morro,
+         pra a base afundar atrás da crista. Não se cura. */
+      { f: 'silhuetaIA', imgs: ['fabrica'], rel: 0.86, umaPorSala: true, dens: 0.75,
+        altura: [0.72, 0.82], afundar: 0.04, semente: 218 },
       { f: 'massa', lado: 'baixo', rel: 0.88, amp: 82, escala: 0.0022, semente: 217,
         passo: 14, picos: 0.7 },
       { f: 'incendio', rel: 0.88, solo: { amp: 82, escala: 0.0022, semente: 217, picos: 0.7 },
@@ -1571,6 +1582,8 @@ const CAMADAS = {
       { f: 'arvoreEmChamas', rel: 0.84, passo: 520, dens: 0.65, altMin: 220, altMax: 400,
         largMin: 10, largMax: 18, semente: 228 },
       { f: 'esteiras', rel: 0.62, passo: 480, dens: 0.7, escalaLarg: 0.85, semente: 229 },
+      { f: 'silhuetaIA', imgs: ['tocos-queimados'], vivas: ['arvores-jovens'], rel: 0.82,
+        passo: 480, dens: 0.55, altura: [0.7, 0.95], semente: 232 },
       { f: 'massa', lado: 'baixo', rel: 0.80, amp: 80, escala: 0.003, semente: 233, passo: 13, picos: 0.6 },
       { f: 'escombros', rel: 0.80, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
     ] },
@@ -1620,6 +1633,12 @@ const CAMADAS = {
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'galhos', rel: 0.20, passo: 380, dens: 0.7, escalaLarg: 0.7, semente: 313 },
+      /* A última sumaúma em pé no morro desmatado: seca na sala suja, copa
+         cheia na restaurada. E a máquina que derrubou o resto, uma por sala. */
+      { f: 'silhuetaIA', imgs: ['sumauma-morta'], vivas: ['sumauma-viva'], rel: 0.93,
+        passo: 620, dens: 0.45, altura: [0.7, 0.95], semente: 314 },
+      { f: 'silhuetaIA', imgs: ['maquina'], rel: 0.92, umaPorSala: true, dens: 0.7,
+        altura: [0.22, 0.28], afundar: 0.08, semente: 315 },
       { f: 'massa', lado: 'baixo', rel: 0.92, amp: 88, escala: 0.0021, semente: 317, passo: 14 },
       { f: 'tocos', rel: 0.92, solo: { amp: 88, escala: 0.0021, semente: 317 },
         passo: 110, dens: 0.65, escala: 0.9, semente: 319 },
@@ -1672,11 +1691,17 @@ const CAMADAS = {
     { p: 0.095, d: 0.87, cor: 'distante', brilho: -0.12, formas: [
       { f: 'troncosColossais', rel: 1.06, passo: 190, dens: 0.7,
         largMin: 8, largMax: 22, semente: 407, altura: [0.36, 0.56] },
+      // Árvores do Canva fundidas com a coisa que cresceu nelas; florescem na restaurada.
+      { f: 'silhuetaIA', imgs: ['arvore-doente'], vivas: ['arvore-florida'], rel: 1.08,
+        passo: 320, dens: 0.65, clareiras: 0.2, altura: [0.6, 0.85], semente: 408 },
       { f: 'organico', rel: 1.14, passo: 260, dens: 0.85, rMin: 110, rMax: 280, semente: 409 },
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
       { f: 'troncosColossais', rel: 1.08, passo: 320, dens: 0.55,
         largMin: 14, largMax: 34, semente: 417, altura: [0.5, 0.78] },
+      // O lixão tóxico: a origem do Coração, uma por sala. Não se cura.
+      { f: 'silhuetaIA', imgs: ['lixao'], rel: 1.1, umaPorSala: true, dens: 0.7,
+        altura: [0.24, 0.3], afundar: 0.1, semente: 418 },
       { f: 'organico', rel: 1.16, passo: 240, dens: 0.8, rMin: 90, rMax: 240, semente: 419 },
       // As raízes aéreas continuam — mas curtas, para não virarem cortina.
       { f: 'raizes', rel: -0.04, passo: 300, dens: 0.32, compMin: 120, compMax: 300,
@@ -1979,9 +2004,13 @@ const MOLDURA = {
   varzea: { base: 'folhaLarga', topo: 'juncoAlto',
     // Junco nasce do CHÃO: entra pelos cantos de baixo, não pendurado do alto.
     ia: { topo: 'junco-seco', topoVivo: 'junco-vivo', topoNaBase: true, base: 'aguape' } },
-  clareira: { base: 'viga', topo: 'cano' },
-  dossel: { base: 'raizGrossa', topo: 'galhoFolhado' },
-  coracao: { base: 'lobo', topo: 'lobo' },
+  clareira: { base: 'viga', topo: 'cano',
+    ia: { topo: 'viga-seca', topoVivo: 'viga-viva', base: 'escombros' } },
+  dossel: { base: 'raizGrossa', topo: 'galhoFolhado',
+    ia: { topo: 'bromelia-seca', topoVivo: 'bromelia-viva', base: 'raizes-chao' } },
+  // A faixa de bolhas do Coração vira moita quando a sala sara (`baseViva`).
+  coracao: { base: 'lobo', topo: 'lobo',
+    ia: { topo: 'tentaculo', topoVivo: 'trepadeira-florida', base: 'bolhas', baseViva: 'moita' } },
 };
 
 // Área da sala sendo emoldurada — as molduras precisam saber se ali queima.
@@ -2060,7 +2089,9 @@ function desenharMolduraIA(ctx, ia, esq, vw, vh, yBase, yTopo, refX, tempo, tema
     if (h > 0.67) continue;
     const px = lado > 0 ? esq - vw * 0.02 : esq + vw * 1.02;
     const x = lado;
-    const alt = vh * lerp(0.36, 0.52, hash2(sem, lado + 3, 929));
+    // 0,30-0,42: com 0,36-0,52 a bromélia do Dossel encostava nas plataformas
+    // do alto (design-reviewer).
+    const alt = vh * lerp(0.30, 0.42, hash2(sem, lado + 3, 929));
     // `topoNaBase`: a imagem cresce pra cima a partir do canto de baixo.
     const y = ia.topoNaBase ? yBase - alt * 0.94 : yTopo - alt * 0.06;
     for (const [nome, alfaEstado] of [[ia.topo, 1 - viva], [ia.topoVivo, viva]]) {
@@ -2082,15 +2113,20 @@ function desenharMolduraIA(ctx, ia, esq, vw, vh, yBase, yTopo, refX, tempo, tema
 
   // Moita: faixa de terra com plantas, afundada na borda de baixo — baixa o
   // bastante pra nunca subir por cima de uma plataforma de jogo.
-  const img = ia.base ? silhueta(ia.base) : null;
-  if (!img) return;
+  for (const [nome, alfaEstado] of [[ia.base, ia.baseViva ? 1 - viva : 1], [ia.baseViva, viva]]) {
+    const img = nome && alfaEstado > 0.01 ? silhueta(nome) : null;
+    if (img) desenharFaixaBase(ctx, img, esq, vw, vh, yBase, refX, cor, alfaEstado);
+  }
+}
+
+function desenharFaixaBase(ctx, img, esq, vw, vh, yBase, refX, cor, alfaEstado) {
   const alt = vh * 0.12;
   const w = alt * img.naturalWidth / img.naturalHeight;
   const passoM = w * 0.85;
   for (let x = Math.floor((esq - passoM) / passoM) * passoM; x <= esq + vw + passoM; x += passoM) {
     if (hash2(x, 937, 5) > 0.6) continue;
     const px = x + (hash2(x, 941, 5) - 0.5) * passoM * 0.4;
-    const alfa = opacidadeDeBorda(px - refX, vw);
+    const alfa = opacidadeDeBorda(px - refX, vw) * alfaEstado;
     if (alfa < 0.02) continue;
     const esc = lerp(0.8, 1.15, hash2(x, 947, 5));
     ctx.save();

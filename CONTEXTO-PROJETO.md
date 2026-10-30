@@ -1359,6 +1359,17 @@ por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
   moldura com juncos secos → vivos e faixa de aguapé. Junco nasce do chão,
   então a moldura ganhou `ia.topoNaBase`: a imagem do "topo" entra pelos
   cantos DE BAIXO, com o pivô do balanço no pé.
+- **Clareira, Dossel e Coração** (mesmo esquema, Canva): troncos queimados
+  → árvores jovens e a FÁBRICA caída (Clareira); a última sumaúma seca →
+  copa cheia e a MÁQUINA de desmate (Dossel); árvores inchadas de bolhas →
+  floridas e o LIXÃO tóxico (Coração). Molduras: viga com cabos → viga com
+  trepadeira; galho com bromélias secas → vivas; tentáculo pingando →
+  trepadeira florida. Base: escombros, raízes no chão, bolhas — no Coração
+  a base também sara (`ia.baseViva`, faixa de bolhas vira moita).
+- `umaPorSala` centrava o marco em `largura·p/2` e esquecia `+ vw/2·(1-p)`:
+  ele caía perto da borda esquerda e quase nunca aparecia. Corrigido.
+- Marco atrás de morro só lê se passar da linha do horizonte (silhueta só
+  lê contra luz): a fábrica precisou de altura ~0,75 da tela.
 - Canva: o `generate-image` só devolve miniatura de 200 px. A resolução
   cheia sai colocando cada imagem (`insert_fill`) numa página do tamanho
   exato no design técnico "Página técnica em branco" e exportando em PNG.
