@@ -10,12 +10,13 @@
    Marca: `subterranea: true` na definição da sala. Sem céu, sem horizonte,
    sem fauna; no lugar, três planos:
      1. ESTRATOS — faixas onduladas de solo, a parede de terra mais distante;
-     2. RAÍZES E PEDRAS — raízes finas pendendo do teto, pedras na terra;
-        2b. EMARANHADOS — a silhueta de raízes gerada no Canva;
-     3. RAÍZES GROSSAS — as mais perto, quase pretas.
+     2. PEDRAS — manchas soltas na terra;
+     3. EMARANHADOS — a silhueta de raízes gerada no Canva.
+   Havia também raízes desenhadas em código, retas e ramificadas: cruzadas
+   umas nas outras, liam como riscos e espetos soltos no fundo. Saíram.
    A luz continua vindo do buraco por onde se entrou (o feixe da sala).
 
-   Restaurar não clareia (regra do jogo): com a pureza, as raízes ganham
+   Restaurar não clareia (regra do jogo): com a pureza, os emaranhados ganham
    pontos de fungo luminoso no acento da área — o subsolo fica VIVO, não
    iluminado.
    ========================================================================= */
@@ -58,44 +59,6 @@ function janela(camera, p) {
     y0: camera.viewY * p - 80, y1: camera.viewY * p + vh + 80 };
 }
 
-/** Desvio lateral da raiz (o mesmo no desenho e no fungo pousado nela). */
-const curvaDe = (sem, comp) => (hash2(sem, 3) - 0.5) * comp * 0.55;
-
-/** Ponto `t` (0 = teto, 1 = ponta) sobre a linha central da raiz. */
-function pontoNaRaiz(x, y, comp, balanco, sem, t) {
-  const curva = curvaDe(sem, comp);
-  const cx = x + curva * 0.5, cy = y + comp * 0.55;
-  const px = x + curva + balanco, py = y + comp;
-  const u = 1 - t;
-  return { x: u * u * x + 2 * u * t * cx + t * t * px, y: u * u * y + 2 * u * t * cy + t * t * py };
-}
-
-/** Uma raiz pendurada: curva afinando do topo até a ponta. */
-function raiz(ctx, x, y, comp, grossura, balanco, sem) {
-  const curva = curvaDe(sem, comp);
-  const pontaX = x + curva + balanco;
-  ctx.beginPath();
-  ctx.moveTo(x - grossura, y);
-  ctx.quadraticCurveTo(x + curva * 0.5 - grossura * 0.6, y + comp * 0.55, pontaX, y + comp);
-  ctx.quadraticCurveTo(x + curva * 0.5 + grossura * 0.6, y + comp * 0.55, x + grossura, y);
-  ctx.closePath();
-  ctx.fill();
-  // Ramificações em TODAS: raiz reta e única lê como estalactite ou espeto.
-  for (let r = 0; r < 2; r++) {
-    if (r === 1 && hash2(sem, 5) < 0.5) break;
-    const t = 0.25 + hash2(sem, 7 + r) * 0.4;
-    const { x: bx, y: by } = pontoNaRaiz(x, y, comp, balanco, sem, t);
-    const lado = (hash2(sem, 11) < 0.5 ? -1 : 1) * (r ? -1 : 1);
-    ctx.beginPath();
-    ctx.moveTo(bx - grossura * 0.4, by);
-    ctx.quadraticCurveTo(bx + lado * comp * 0.18, by + comp * 0.2,
-      bx + lado * comp * 0.24 + balanco * 0.7, by + comp * 0.42);
-    ctx.lineTo(bx + grossura * 0.4, by);
-    ctx.closePath();
-    ctx.fill();
-  }
-}
-
 /**
  * Desenha o fundo inteiro de uma sala subterrânea. Substitui, em main.js,
  * céu + horizonte + parallax.
@@ -129,43 +92,21 @@ export function desenharSubsolo(render, sala, mundo) {
       const y = k * passo;
       ctx.fillStyle = corDeTerra(t, 0.12 + hash2(k, sem, 13) * 0.16);
       ctx.beginPath();
-      ctx.moveTo(j.x0, y + passo);
+      /* A base desce além da onda da faixa seguinte: terminando reta em
+         y + passo, sobrava uma fresta escura onde a onda subia, e cada fresta
+         lia como um risco horizontal solto no fundo. */
+      ctx.moveTo(j.x0, y + passo + 16);
       for (let x = j.x0; x <= j.x1; x += 24) {
         ctx.lineTo(x, y + Math.sin(x * 0.006 + k * 1.7) * 9 + Math.sin(x * 0.017 + k) * 4);
       }
-      ctx.lineTo(j.x1, y + passo);
+      ctx.lineTo(j.x1, y + passo + 16);
       ctx.closePath();
       ctx.fill();
     }
     ctx.globalAlpha = 1;
   });
 
-  /* Fungo luminoso pousado SOBRE a raiz (mesma curva e mesmo balanço): um
-     ponto firme e um halo largo e fraco — só o ponto, em meia resolução no
-     buffer de luz, não aparecia. */
-  const fungo = (ctx, x, comp, bal, s, n, i) => {
-    for (let k = 0; k < n; k++) {
-      const p = pontoNaRaiz(x, TETO, comp, bal, s, 0.25 + hash2(i, k, 71) * 0.7);
-      const pulso = 0.65 + 0.35 * Math.sin(tempo * 1.3 + i + k);
-      ctx.globalAlpha = 0.15 * pureza * pulso;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 12, 0, Math.PI * 2); ctx.fill();
-      ctx.globalAlpha = 0.95 * pureza * pulso;
-      ctx.beginPath(); ctx.arc(p.x, p.y, 3.4, 0, Math.PI * 2); ctx.fill();
-    }
-    ctx.globalAlpha = 1;
-  };
-
-  const raizesFinas = (ctx, j, comFungo) => {
-    for (let i = Math.floor(j.x0 / 70); i * 70 < j.x1; i++) {
-      if (hash2(i, sem, 37) < 0.45) continue;
-      const x = i * 70 + hash2(i, 41) * 50, comp = 60 + hash2(i, sem, 43) * 170;
-      const bal = Math.sin(tempo * 0.6 + i) * 3, s = i * 7 + sem;
-      if (comFungo) fungo(ctx, x, comp, bal, s, Math.round(pureza * 2), i);
-      else raiz(ctx, x, TETO, comp, 4 + hash2(i, 47) * 4, bal, s);
-    }
-  };
-
-  // 2 · pedras na terra e raízes finas pendendo do teto
+  // 2 · pedras na terra
   render.camada(0.5, (ctx, t, camera) => {
     const j = janela(camera, 0.5);
     const cel = 120;
@@ -181,21 +122,11 @@ export function desenharSubsolo(render, sala, mundo) {
         ctx.fill();
       }
     }
-    ctx.globalAlpha = 0.85;
-    ctx.fillStyle = misturarHex(corDeTerra(t), '#000000', 0.25);
-    raizesFinas(ctx, j, false);
     ctx.globalAlpha = 1;
   });
-  if (pureza > 0.02) {
-    render.emissivo(0.5, (ctx, t, camera) => {
-      ctx.fillStyle = rgba(t.acento, 1);
-      raizesFinas(ctx, janela(camera, 0.5), true);
-    });
-  }
 
-  // 2b · silhueta do Canva: emaranhados de raízes pendendo do teto, entre os
-  //      dois planos procedurais. Escala e espelho variam por posição (nada se repete
-  //      igual lado a lado).
+  // 3 · silhueta do Canva: emaranhados de raízes pendendo do teto. Escala e
+  //     espelho variam por posição (nada se repete igual lado a lado).
   const ESC_RAIZES = 0.62, PASSO_RAIZES = 760;
   const emaranhados = (j, fn) => {
     for (let i = Math.floor(j.x0 / PASSO_RAIZES) - 1; i * PASSO_RAIZES < j.x1; i++) {
@@ -242,27 +173,5 @@ export function desenharSubsolo(render, sala, mundo) {
         ctx.globalAlpha = 1;
       });
     }
-  }
-
-  // 3 · raízes grossas, as mais perto, e o fungo que acende na restauração
-  const raizesPerto = (ctx, j, comFungo) => {
-    for (let i = Math.floor(j.x0 / 160); i * 160 < j.x1; i++) {
-      if (hash2(i, sem, 53) < 0.4) continue;
-      const x = i * 160 + hash2(i, 59) * 110;
-      const comp = 120 + hash2(i, sem, 61) * 220;
-      const bal = Math.sin(tempo * 0.4 + i * 1.3) * 4, s = i * 13 + sem;
-      if (comFungo) fungo(ctx, x, comp, bal, s, Math.round(pureza * 5), i);
-      else raiz(ctx, x, TETO, comp, 10 + hash2(i, 67) * 7, bal, s);
-    }
-  };
-  render.camada(0.75, (ctx, t, camera) => {
-    ctx.fillStyle = misturarHex(corDeTerra(t), '#000000', 0.55);
-    raizesPerto(ctx, janela(camera, 0.75), false);
-  });
-  if (pureza > 0.02) {
-    render.emissivo(0.75, (ctx, t, camera) => {
-      ctx.fillStyle = rgba(t.acento, 1);
-      raizesPerto(ctx, janela(camera, 0.75), true);
-    });
   }
 }

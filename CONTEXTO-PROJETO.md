@@ -1385,6 +1385,17 @@ por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
   macaco-aranha, morcego, cobra e bugio pendurados do teto. Tom MÉDIO do
   terreno, nunca preto (preto com olho é parasita). Somem quando o Guardião
   chega perto. Lixo, folha e bicho evitam a vizinhança de espinho.
+- **Traços soltos no fundo** (o autor reclamou de "traços aleatórios"). Eram
+  quatro coisas diferentes: `galhos` com o galho escondido (acima da tela, ou
+  atrás da `folhagem` de um plano mais perto) e só os galhinhos à vista, longos
+  e quase retos, agora curtos, finos na proporção do galho e omitidos quando o
+  galho está acima da tela; o `juncoAlto` pendurado no céu da Várzea (saiu da
+  moldura); os `cabos` em arco na Clareira e a raiz solitária no Coração
+  (saíram das camadas). No subsolo: frestas entre os estratos, que terminavam
+  retos e deixavam lentes escuras horizontais (a base agora passa da onda da
+  faixa seguinte), e as raízes em código, que se cruzavam como espetos (saíram;
+  ficou o emaranhado do Canva). Regra: traço de fundo precisa estar visivelmente
+  preso a alguma coisa.
 - Canva: o `generate-image` só devolve miniatura de 200 px. A resolução
   cheia sai colocando cada imagem (`insert_fill`) numa página do tamanho
   exato no design técnico "Página técnica em branco" e exportando em PNG.

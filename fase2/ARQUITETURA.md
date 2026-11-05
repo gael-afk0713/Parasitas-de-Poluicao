@@ -166,7 +166,8 @@ na fileira de topo/fundo, não no meio do ar. `verificar-mapas.mjs` acusa.
 `subterranea: true` na definição = sala embaixo da terra (entra-se nela
 caindo por um buraco): sem céu, horizonte, parallax de floresta, aves nem
 moldura de galho; o fundo é `render/subsolo.js` (estratos de terra, pedras,
-raízes pendendo do teto, fungo que acende com a pureza).
+emaranhados de raízes do Canva pendendo do teto, fungo que acende neles com a
+pureza).
 
 ### Física do jogador (para calibrar salas)
 

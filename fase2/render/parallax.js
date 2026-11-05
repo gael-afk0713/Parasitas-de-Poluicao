@@ -1094,24 +1094,35 @@ function galhos(ctx, a, s) {
          fundo que deveriam balançar MAIS. */
       + vento(t, x) * lerp(9, 3, h) * ((s.escalaLarg ?? 1) > 1 ? 0.4 : 1);
 
-    ctx.lineWidth = lerp(4, 16, h) * (s.escalaLarg ?? 1);
+    const largGalho = lerp(4, 16, h) * (s.escalaLarg ?? 1);
+    ctx.lineWidth = largGalho;
     ctx.beginPath();
     ctx.moveTo(ax, ay);
     ctx.quadraticCurveTo((ax + bx) * 0.5, ay + arco + balanco, bx, ay + arco * 0.25);
     ctx.stroke();
 
-    ctx.lineWidth = Math.max(1.2, lerp(4, 16, h) * 0.35);
+    /* Proporcional ao galho: sem o `escalaLarg`, o galhinho do plano distante
+       ficava quase tão grosso quanto o galho. */
+    ctx.lineWidth = Math.max(1.2, largGalho * 0.35);
+    const topoDaTela = a.camera.viewY * a.p;
     const pontas = [];
     for (let i = 1; i < 5; i++) {
       const tt = i / 5;
       const hx = hash2(x + i * 29, s.semente + 2, 283);
       const gx = lerp(ax, bx, tt);
       const gy = ay + arco * (2 * tt * (1 - tt)) * 2 + arco * 0.25 * tt * tt;
-      const px = gx + (hx - 0.5) * 70;
-      const py = gy + lerp(40, 110, hx) + balanco;
+      /* Galho acima da tela: o galhinho descia sozinho do nada, e era um dos
+         "traços aleatórios" que o autor viu no fundo. */
+      if (gy < topoDaTela + 6) continue;
+      /* Curto, abrindo pro lado. Com 40-110 px quase na vertical, cada galhinho
+         lia como um risco reto cruzando o céu, não como ramo. */
+      const lado = hx < 0.5 ? -1 : 1;
+      const comp = lerp(16, 48, hx) * clamp(s.escalaLarg ?? 1, 0.6, 1.3);
+      const px = gx + lado * comp * 0.75;
+      const py = gy + comp + balanco * 0.4;
       ctx.beginPath();
       ctx.moveTo(gx, gy);
-      ctx.quadraticCurveTo(gx + (hx - 0.5) * 40, gy + lerp(20, 60, hx), px, py);
+      ctx.quadraticCurveTo(gx + lado * comp * 0.2, gy + comp * 0.65, px, py);
       ctx.stroke();
       pontas.push([px, py, hx]);
     }
@@ -1404,8 +1415,9 @@ const CAMADAS = {
         largMin: 13, largMax: 32, semente: 37, altura: [0.58, 0.85] },
       { f: 'arvoreEmChamas', rel: 0.74, passo: 520, dens: 0.55, altMin: 150, altMax: 280,
         largMin: 6, largMax: 13, semente: 38 },
-      { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
+      // Copa ANTES do galho: por cima, ela o escondia e sobrava o galhinho solto.
       { f: 'folhagem', rel: 0.10, passo: 300, dens: 0.5, rMin: 40, rMax: 110, semente: 41 },
+      { f: 'galhos', rel: 0.12, passo: 330, dens: 0.6, escalaLarg: 0.7, semente: 39 },
       // Árvores da IA: mortas na sala suja, com copa na restaurada.
       { f: 'silhuetaIA', imgs: ['arvore-morta-1', 'arvore-morta-2'],
         vivas: ['arvore-viva-1', 'arvore-viva-2'], rel: 0.74, passo: 420, dens: 0.6,
@@ -1588,7 +1600,6 @@ const CAMADAS = {
       { f: 'escombros', rel: 0.80, passo: 200, dens: 0.6, escalaLarg: 0.9, semente: 239 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
-      { f: 'cabos', rel: 0.16, passo: 300, dens: 0.72, escalaLarg: 1, semente: 241 },
       { f: 'chamines', rel: 0.86, passo: 420, dens: 0.42, altMin: 260, altMax: 520,
         escalaLarg: 1.15, torcao: 0.24, semente: 251 },
       { f: 'massa', lado: 'baixo', rel: 0.88, amp: 78, escala: 0.0042, semente: 257, passo: 11, picos: 0.7 },
@@ -1599,7 +1610,6 @@ const CAMADAS = {
       { f: 'escombros', rel: 0.98, passo: 230, dens: 0.55, escalaLarg: 1.2, semente: 271 },
     ] },
     { p: 0.82, d: 0.10, cor: 'proximo', brilho: -0.56, veu: 0, formas: [
-      { f: 'cabos', rel: -0.10, passo: 380, dens: 0.5, escalaLarg: 1.8, semente: 277 },
       { f: 'escombros', rel: 1.12, passo: 300, dens: 0.45, escalaLarg: 1.8, semente: 281 },
     ] },
   ],
@@ -1632,7 +1642,6 @@ const CAMADAS = {
       { f: 'folhagem', rel: 0.22, passo: 210, dens: 0.8, rMin: 70, rMax: 180, semente: 311 },
     ] },
     { p: 0.17, d: 0.72, cor: 'medio', brilho: -0.2, formas: [
-      { f: 'galhos', rel: 0.20, passo: 380, dens: 0.7, escalaLarg: 0.7, semente: 313 },
       /* A última sumaúma em pé no morro desmatado: seca na sala suja, copa
          cheia na restaurada. E a máquina que derrubou o resto, uma por sala. */
       { f: 'silhuetaIA', imgs: ['sumauma-morta'], vivas: ['sumauma-viva'], rel: 0.93,
@@ -1646,7 +1655,6 @@ const CAMADAS = {
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'troncosColossais', rel: 1.5, passo: 420, dens: 0.55, largMin: 46, largMax: 130, semente: 337 },
-      { f: 'galhos', rel: 0.36, passo: 440, dens: 0.65, escalaLarg: 0.9, semente: 347 },
     ] },
     { p: 0.42, d: 0.40, cor: 'proximo', brilho: -0.36, formas: [
       { f: 'massa', lado: 'baixo', rel: 1.04, amp: 74, escala: 0.0034, semente: 349, passo: 12 },
@@ -1703,9 +1711,6 @@ const CAMADAS = {
       { f: 'silhuetaIA', imgs: ['lixao'], rel: 1.1, umaPorSala: true, dens: 0.7,
         altura: [0.24, 0.3], afundar: 0.1, semente: 418 },
       { f: 'organico', rel: 1.16, passo: 240, dens: 0.8, rMin: 90, rMax: 240, semente: 419 },
-      // As raízes aéreas continuam — mas curtas, para não virarem cortina.
-      { f: 'raizes', rel: -0.04, passo: 300, dens: 0.32, compMin: 120, compMax: 300,
-        largMin: 10, largMax: 26, semente: 421 },
     ] },
     { p: 0.28, d: 0.56, cor: 'medio', brilho: -0.28, formas: [
       { f: 'organico', rel: 1.02, passo: 300, dens: 0.7, rMin: 100, rMax: 260, semente: 431 },
@@ -2001,8 +2006,9 @@ const MOLDURA = {
   raizes: { base: 'moitaBaixa', topo: 'galhoFolhado',
     // Silhuetas da IA por cima da moldura procedural (render/silhuetas.js).
     ia: { topo: 'galho-morto', topoVivo: 'galho-vivo', base: 'moita' } },
-  varzea: { base: 'folhaLarga', topo: 'juncoAlto',
-    // Junco nasce do CHÃO: entra pelos cantos de baixo, não pendurado do alto.
+  // Sem `topo`: o `juncoAlto` pendia do céu em pares, sem nada que o segurasse,
+  // e lia como riscos soltos. Junco nasce do chão: entra pelos cantos de baixo.
+  varzea: { base: 'folhaLarga', topo: null,
     ia: { topo: 'junco-seco', topoVivo: 'junco-vivo', topoNaBase: true, base: 'aguape' } },
   clareira: { base: 'viga', topo: 'cano',
     ia: { topo: 'viga-seca', topoVivo: 'viga-viva', base: 'escombros' } },
