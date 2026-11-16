@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Animações em pixel art</title>
+<style>
+  :root { --fundo: #0c0c0e; --cartao: #16303a; --texto: #e8e4da; --apagado: #8a8678; --linha: #2a2a2e; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  h2 { font-size: 18px; font-weight: 600; margin: 24px 0 8px; }
+  h3 { font-size: 15px; font-weight: 600; margin: 16px 0 6px; color: var(--apagado); }
+  .linha { display: flex; flex-wrap: wrap; gap: 10px; }
+  figure { margin: 0; background: var(--cartao); border: 1px solid var(--linha); border-radius: 4px; padding: 6px; }
+  canvas { image-rendering: pixelated; display: block; }
+  figcaption { color: var(--apagado); font-size: 12px; margin-top: 4px; }
+</style></head><body><main>
+<p>Cada animação na velocidade que vai ter no jogo.</p>
+<div id="raiz"></div>
+</main>
+<script>
+const GRUPOS = {"Parasitas": ["parasitas/cuspidor", "parasitas/errante", "parasitas/espreita", "parasitas/estopim", "parasitas/rastejante", "parasitas/tecelao"], "Animais": ["bichos/arara", "bichos/ave", "bichos/beijaflor", "bichos/capivara", "bichos/cobra", "bichos/coruja", "bichos/macaco", "bichos/morcego", "bichos/preguica", "bichos/quati", "bichos/sapo", "bichos/tamandua", "bichos/tartaruga", "bichos/tatu", "bichos/tucano", "bichos/urubu", "bichos/veado"]};
+const Z = 3, itens = [];
+(async () => {
+  const raiz = document.getElementById('raiz');
+  for (const [grupo, lista] of Object.entries(GRUPOS)) {
+    const h2 = document.createElement('h2'); h2.textContent = grupo; raiz.append(h2);
+    for (const caminho of lista) {
+      const meta = await (await fetch(`../${caminho}.json`)).json();
+      const img = new Image(); img.src = `../${caminho}.png`; await img.decode();
+      const h3 = document.createElement('h3'); h3.textContent = caminho.split('/')[1]; raiz.append(h3);
+      const linha = document.createElement('div'); linha.className = 'linha'; raiz.append(linha);
+      const [W, H] = Array.isArray(meta.celula) ? meta.celula : [meta.celula, meta.celula];
+      for (const [nome, a] of Object.entries(meta.animacoes)) {
+        const fig = document.createElement('figure');
+        const cv = document.createElement('canvas'); cv.width = W * Z; cv.height = H * Z;
+        const cap = document.createElement('figcaption'); cap.textContent = nome;
+        fig.append(cv, cap); linha.append(fig);
+        const ctx = cv.getContext('2d'); ctx.imageSmoothingEnabled = false;
+        itens.push({ a, ctx, img, W, H });
+      }
+    }
+  }
+})();
+const t0 = performance.now();
+(function quadro(t) {
+  for (const { a, ctx, img, W, H } of itens) {
+    let i = Math.floor((t - t0) / 1000 * Math.max(1, a.fps));
+    i = a.repete ? i % a.quadros : Math.min(i % (a.quadros + 4), a.quadros - 1);
+    ctx.clearRect(0, 0, W * Z, H * Z);
+    ctx.drawImage(img, i * W, a.linha * H, W, H, 0, 0, W * Z, H * Z);
+  }
+  requestAnimationFrame(quadro);
+})(t0);
+</script></body></html>

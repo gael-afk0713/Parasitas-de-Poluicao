@@ -1,0 +1,25 @@
+{
+ "celula": [
+  28,
+  18
+ ],
+ "pivo": [
+  14,
+  16
+ ],
+ "escala": 2,
+ "animacoes": {
+  "andar": {
+   "linha": 0,
+   "quadros": 2,
+   "fps": 3,
+   "repete": true
+  },
+  "esconder": {
+   "linha": 1,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  }
+ }
+}

@@ -1468,6 +1468,25 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   `parallax.html` já usa o Guardião correndo/parado. Efeitos que o jogo
   desenha em código (arco do golpe, onda do canto) NÃO vão no sprite, como
   já era com a folha de IA; só rastro curto da investida e brilho do canto.
+- **Parasitas** (`preparar-pixel-parasitas.py` -> `pixel/parasitas/<especie>`
+  .png/.json): Errante, Espreita, Cuspidor, Rastejante, Estopim e Tecelão,
+  cada um com andar/flutuar/rastejar/rolar, ataque (preparar, golpe,
+  recuo), dano e morte (dissolve em fumaça de baixo pra cima, olho apaga por
+  último); Cuspidor tem mirar/cuspir, Estopim pavio/explosão, Tecelão
+  descer/subir. Leitura da ARQUITETURA: buraco preto + olho branco, uma
+  máscara só por bicho, aro claro por dentro e anel preto por fora (a prévia
+  testa contra fundo escuro E claro). Chefes ainda não foram feitos.
+- **Animais** (`preparar-pixel-bichos.py` -> `pixel/bichos/`): quadrúpedes
+  por esqueleto (veado, capivara, tamanduá, quati, tatu: correr, andar,
+  pastar, deitado), aves por parâmetro (ave pousada genérica, urubu, tucano,
+  arara, coruja, beija-flor: pousado, bicar, asas, decolar, voar) e avulsos
+  (sapo, tartaruga, preguiça, macaco, morcego, cobra).
+- **Elementos do chão** (`preparar-pixel-itens.py` -> `pixel/itens/lixo` e
+  `vida`): 12 + 12 itens em célula 32x24, base na última linha. A ordem é
+  CASADA: o item N do lixo e o N da vida ocupam o mesmo lugar, pra restaurar
+  trocar lixo por planta no mesmo ponto. Sacola, tambor, samambaia e flores
+  têm quadros.
+- `_previa/animacoes.html` roda todas as animações de parasitas e animais.
 
 ### Decisões que custaram caro e não devem ser refeitas
 

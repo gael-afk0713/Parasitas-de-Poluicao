@@ -1,0 +1,25 @@
+{
+ "celula": [
+  24,
+  20
+ ],
+ "pivo": [
+  12,
+  2
+ ],
+ "escala": 2,
+ "animacoes": {
+  "pendurado": {
+   "linha": 0,
+   "quadros": 2,
+   "fps": 2,
+   "repete": true
+  },
+  "voar": {
+   "linha": 1,
+   "quadros": 4,
+   "fps": 14,
+   "repete": true
+  }
+ }
+}

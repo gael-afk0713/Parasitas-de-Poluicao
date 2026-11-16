@@ -1,0 +1,73 @@
+{
+ "celula": [
+  32,
+  24
+ ],
+ "pivo": [
+  16,
+  23
+ ],
+ "escala": 2,
+ "itens": {
+  "garrafa-pet": {
+   "linha": 0,
+   "quadros": 1,
+   "fps": 0
+  },
+  "garrafa-vidro": {
+   "linha": 1,
+   "quadros": 1,
+   "fps": 0
+  },
+  "lata": {
+   "linha": 2,
+   "quadros": 1,
+   "fps": 0
+  },
+  "pneu": {
+   "linha": 3,
+   "quadros": 1,
+   "fps": 0
+  },
+  "sacola": {
+   "linha": 4,
+   "quadros": 3,
+   "fps": 4
+  },
+  "saco-preto": {
+   "linha": 5,
+   "quadros": 1,
+   "fps": 0
+  },
+  "isopor": {
+   "linha": 6,
+   "quadros": 1,
+   "fps": 0
+  },
+  "tambor": {
+   "linha": 7,
+   "quadros": 3,
+   "fps": 4
+  },
+  "cano": {
+   "linha": 8,
+   "quadros": 1,
+   "fps": 0
+  },
+  "sapato": {
+   "linha": 9,
+   "quadros": 1,
+   "fps": 0
+  },
+  "chapa": {
+   "linha": 10,
+   "quadros": 1,
+   "fps": 0
+  },
+  "galao": {
+   "linha": 11,
+   "quadros": 1,
+   "fps": 0
+  }
+ }
+}

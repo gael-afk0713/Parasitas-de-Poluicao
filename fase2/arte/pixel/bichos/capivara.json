@@ -1,0 +1,37 @@
+{
+ "celula": [
+  48,
+  32
+ ],
+ "pivo": [
+  24,
+  30
+ ],
+ "escala": 2,
+ "animacoes": {
+  "correr": {
+   "linha": 0,
+   "quadros": 6,
+   "fps": 12,
+   "repete": true
+  },
+  "andar": {
+   "linha": 1,
+   "quadros": 4,
+   "fps": 6,
+   "repete": true
+  },
+  "pastar": {
+   "linha": 2,
+   "quadros": 2,
+   "fps": 2,
+   "repete": true
+  },
+  "deitado": {
+   "linha": 3,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  }
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "celula": [
+  20,
+  18
+ ],
+ "pivo": [
+  10,
+  16
+ ],
+ "escala": 2,
+ "animacoes": {
+  "pousado": {
+   "linha": 0,
+   "quadros": 2,
+   "fps": 2,
+   "repete": true
+  },
+  "bicar": {
+   "linha": 1,
+   "quadros": 2,
+   "fps": 6,
+   "repete": false
+  },
+  "asas": {
+   "linha": 2,
+   "quadros": 2,
+   "fps": 4,
+   "repete": true
+  },
+  "decolar": {
+   "linha": 3,
+   "quadros": 2,
+   "fps": 10,
+   "repete": false
+  },
+  "voar": {
+   "linha": 4,
+   "quadros": 4,
+   "fps": 10,
+   "repete": true
+  }
+ }
+}
