@@ -1576,6 +1576,7 @@ def voronoi_faixa(rng, W, H, esp):
     d1 = np.full((H, W), 1e9)
     d2 = np.full((H, W), 1e9)
     bdx, bdy = np.zeros((H, W)), np.zeros((H, W))
+    bid = np.zeros((H, W), int)
     for oy in (-1, 0, 1):
         for ox in (-1, 0, 1):
             gx, gy = cx + ox, np.clip(cy + oy, 0, gh - 1)
@@ -1586,9 +1587,10 @@ def voronoi_faixa(rng, W, H, esp):
             menor = d < d1
             d2 = np.where(menor, d1, np.minimum(d2, d))
             bdx, bdy = np.where(menor, dx, bdx), np.where(menor, dy, bdy)
+            bid = np.where(menor, gy * gw + gx % gw, bid)
             d1 = np.where(menor, d, d1)
     local = np.clip(-(bdx * .45 + bdy * .9) / (cel * .7), -1, 1)
-    return local, (d2 - d1) < 1.0
+    return local, (d2 - d1) < 1.0, bid
 
 
 def harmonicos(rng, W, kmin, kmax, exp=1.2):
@@ -1648,14 +1650,18 @@ def desenhar_montanha(area, d, estado, T):
     tremor = harmonicos(rf, FH, 3, 14)[:, None] * 2.5
     lit = (dono_dx - (yy - dono_yp) * .42 + tremor) < 0
     face = np.where(lit, 1.0, -1.0) * np.exp(-np.clip(yy - topo[None, :], 0, None) / 38)
-    local, costura = voronoi_faixa(rf, FW, FH, TUFO[d])
+    local, costura, celula = voronoi_faixa(rf, FW, FH, TUFO[d])
+    sorteio_cel = np.random.default_rng(seed + 77).random(celula.max() + 1)[celula]
     sulcos = (np.sin((xx * .9 + yy * 1.6 + harmonicos(rf, FW, 2, 8)[None, :] * 9) * .35) > .82)
 
     floresta = estado == 'r'
     if floresta:
         c = T['r']['crista']
-        ramp = rampa([T['r']['terrenoFundo'], mix('#10281a', c, .2), mix('#1a3e22', c, .2),
-                      mix('#285a2a', c, .2), mix('#3a7430', c, .15), mix('#548c3a', c, .1)], 6)
+        ramp = rampa([T['r']['terrenoFundo'], mix('#0e2c18', c, .15), mix('#18461e', c, .15),
+                      mix('#286a24', c, .12), mix('#3e8a2c', c, .1), mix('#62aa3c', c, .08)], 6)
+        # tons vizinhos: copa amarelada e copa funda, sorteados por tufo
+        ramp_am = rampa([T['r']['terrenoFundo'], '#1c3414', '#324e1a', '#4e6e22', '#6e8c2c', '#94ac40'], 6)
+        ramp_fu = rampa([T['r']['terrenoFundo'], '#0a2420', '#123a30', '#1c5040', '#2c6a50', '#448a64'], 6)
         v = .5 + face * .16 + local * .2 - costura * .14
         # pico alto e íngreme fica de rocha mesmo restaurado
         rocha = corpo & (yy < topo[None, :] + 6) & (topo[None, :] < TOPO_CAMADA[d] + 6) & (area != 'varzea')
@@ -1672,6 +1678,9 @@ def desenhar_montanha(area, d, estado, T):
     v = .5 + (v - .5) * CONTRASTE[d]
     img = np.zeros((FH, FW, 4), np.uint8)
     aplicar(img, corpo, ramp, v)
+    if floresta:
+        aplicar(img, corpo & (sorteio_cel < .2), ramp_am, v)
+        aplicar(img, corpo & (sorteio_cel > .84), ramp_fu, v)
     if rocha.any():
         r_ramp = rampa([T['r']['borda'], T['r']['terreno'], mix(T['r']['terreno'], T['r']['crista'], .4),
                         mix(T['r']['crista'], '#9aa4a0', .4), mix(T['r']['luz'], '#9aa4a0', .4)], 5)
@@ -1803,6 +1812,69 @@ def desenhar_montanha(area, d, estado, T):
     if area == 'raizes' and not floresta and d < 2:       # manchas de cinza
         for y, x in np.argwhere(corpo & lit & (ruido2(rf, FH, FW, 6) > .3) & (rf.random((FH, FW)) < .25)):
             pxw(x, y, '#6a7280')
+
+    # --------- árvores soltas: na encosta e furando a linha da copa
+    if d < 3:
+        n_arv = [34, 44, 54][d] if floresta else [16, 20, 0][d]
+        R0 = [3.6, 2.6, 1.8][d]
+        floridas = [C(EXTRA[area]['flor3']), C(T['r']['luz']), C('#f0c860'), C('#c890e0')]
+        arvs = []
+        for _ in range(n_arv):
+            x = rf.uniform(0, FW)
+            xi = int(x) % FW
+            borda_arv = rf.random() < .35
+            y = topo[xi] - (R0 * rf.uniform(.6, 1.3) if borda_arv else -rf.uniform(2, 34 - d * 8))
+            arvs.append((y, x, borda_arv))
+        arvs.sort()
+        for y, x, borda_arv in arvs:
+            xi = int(x) % FW
+            if floresta:
+                if area == 'varzea' and borda_arv and rf.random() < .5:      # buriti
+                    hgt = int(R0 * 3)
+                    for j in range(hgt):
+                        pxw(x, topo[xi] - j, ramp[1])
+                    for a in (-1.2, -.6, 0, .6, 1.2):
+                        for j in range(1, int(R0 + 1)):
+                            pxw(x + math.sin(a) * j, topo[xi] - hgt - math.cos(a) * j * .6 + (j * j * .08),
+                                ramp[3 if a < 0 else 2])
+                    continue
+                R = R0 * rf.uniform(.8, 1.35)
+                if borda_arv:
+                    for j in range(int(topo[xi] - y) + 1):
+                        pxw(x, topo[xi] - j, ramp[1])
+                rr = ramp
+                if rf.random() < .14:
+                    fc = floridas[int(rf.integers(0, 4))]
+                    rr = rampa([mix(fc, '#000000', .75), mix(fc, '#000000', .5), mix(fc, '#000000', .3),
+                                mix(fc, '#000000', .12), fc, mix(fc, '#ffffff', .25)], 6)
+                elif rf.random() < .3:
+                    rr = ramp_am if rf.random() < .5 else ramp_fu
+                yy2, xx2 = np.mgrid[0:FH, 0:FW] + .5
+                m = vazio(FH, FW)
+                loc = np.zeros((FH, FW))
+                for off in (-FW, 0, FW):
+                    dd = np.hypot(xx2 - x - off, yy2 - y)
+                    th = np.arctan2(yy2 - y, xx2 - x - off)
+                    dentro = dd <= R + .5 * np.sin(th * 5 + x)
+                    m |= dentro
+                    loc = np.where(dentro, -((xx2 - x - off) * .45 + (yy2 - y) * .9) / R, loc)
+                sombra = (desloca(m, 1, 0) | desloca(m, 1, 1)) & ~m & (img[..., 3] > 0)
+                img[sombra, :3] = rr[1]
+                aplicar(img, m, rr, .5 + ((.52 + loc * .38) - .5) * CONTRASTE[d])
+                corpo = corpo | m
+            else:                                                   # árvore morta
+                if not borda_arv:
+                    continue
+                hgt = int(R0 * rf.uniform(2, 3.4))
+                for j in range(hgt):
+                    pxw(x, topo[xi] - j, ramp[1])
+                    if d == 0 and j < hgt // 2:
+                        pxw(x + 1, topo[xi] - j, ramp[0])
+                for k in range(int(rf.integers(2, 4))):
+                    j0 = int(hgt * rf.uniform(.45, .9))
+                    sgn = rf.choice([-1, 1])
+                    for j in range(1, int(R0) + 1):
+                        pxw(x + sgn * j, topo[xi] - j0 - j // 2, ramp[1])
 
     # --------- bruma azulada: camada inteira + névoa subindo do pé, em faixas
     img[..., :3] = (img[..., :3] * ESCURO[d]).astype(np.uint8)

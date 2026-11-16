@@ -1446,6 +1446,12 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   facetada + extras por área (cinza; várzea com lâmina d'água oleosa/limpa e
   morros redondos; linha de fogo abafada e fumaça na clareira; corte raso no
   dossel; veios e cacos tóxicos no coração).
+  Restaurado tem árvores soltas na encosta e furando a crista (14% floridas,
+  tons de copa sorteados por tufo; buriti na várzea); poluído, árvores mortas.
+- **Teste de parallax** (`fase2/arte/pixel/_previa/parallax.html`, abrir pelo
+  `fase2-dev`): céu do tema + as 4 camadas + chão sorteado + personagem
+  provisório. Velocidades em relação ao chão: camada 4 10%, 3 22%, 2 38%,
+  1 58%. É o ponto de partida dos números quando isso entrar no jogo.
 
 ### Decisões que custaram caro e não devem ser refeitas
 
