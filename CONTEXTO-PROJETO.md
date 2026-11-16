@@ -1423,6 +1423,10 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   (cinza, óleo, brasa, pó, gosma); restaurado ganha capa de grama com franja,
   samambaia/junco/bromélia/broto, cipó e flor (caverna: musgo e fios de
   musgo). Formas naturais, nada liso e reto.
+- **Paleta única** (pedido do autor): árvore usa a MESMA família das ilhas e
+  do chão — casca `CASCA` (marrom-quente das raízes/galhos) e copa no verde
+  da capa de grama (`grama_rampa`). Poluída: mesma casca acinzentada com a
+  cor da área (`cores_arvore`); Clareira continua carbonizada.
 - **Chão em pedaços** (`<area>/chao/`, folhas `chao.png` e
   `chao-preenchimento.png`): pra sortear a ordem e mudar o tamanho à vontade.
   Topo 32x48 (2x3 tiles, superfície na linha 16 = linha do tile): `borda-esq`,

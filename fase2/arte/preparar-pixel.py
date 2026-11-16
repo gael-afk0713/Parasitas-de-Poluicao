@@ -445,8 +445,30 @@ def palmeira(rng, estado, mats, img_w):
                 pontas=[(tx, ty, 0)], tronco=[(bx, by - 30, 0, 2.4)])
 
 
+CASCA = ['#120b07', '#24170e', '#3a2717', '#523a24', '#6e5234', '#8c6c48']
+
+
+def cores_arvore(mats, T, estado, area):
+    """Árvore na MESMA família de cor das ilhas e do chão aprovados: casca
+    marrom-quente das raízes/galhos e copa no verde da capa de grama. No
+    poluído a casca é a mesma, só acinzentada com a cor da área (a Clareira
+    continua carbonizada)."""
+    if estado == 'r':
+        g = grama_rampa(T)
+        mats['madeira'] = rampa(CASCA, 6)
+        mats['folha'] = g
+        mats['musgo'] = rampa([g[2], mix(g[3], '#8aa830', .3), mix(g[4], '#b0c840', .3), mix(g[5], '#d8e880', .3)], 4)
+    elif area != 'clareira':
+        tema = rampa([T['p']['borda'], T['p']['terreno'], mix(T['p']['terreno'], T['p']['crista'], .5),
+                      T['p']['crista'], mix(T['p']['crista'], '#a8a8a8', .3), mix(T['p']['crista'], '#c0c0c0', .4)], 6)
+        casca = rampa(CASCA, 6)
+        mats['madeira'] = np.clip(casca * .55 + tema * .45, 0, 255).astype(np.uint8)
+        mats['seco'] = rampa([CASCA[0], CASCA[2], mix(CASCA[4], '#8a7a5a', .4), mix(CASCA[5], '#a89870', .4)], 4)
+    return mats
+
+
 def desenhar_arvore(area, idx, tipo, estado, T):
-    mats = materiais(T, estado, area)
+    mats = cores_arvore(materiais(T, estado, area), T, estado, area)
     seed = NOMES.index(area) * 100 + idx * 7 + 3
     suj = EXTRA[area]['sujeira']
     H, W = AH, AW
