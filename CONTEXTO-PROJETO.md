@@ -1400,6 +1400,30 @@ por enquanto ("depois te peço outras áreas"), como SILHUETA TINGIDA:
   cheia sai colocando cada imagem (`insert_fill`) numa página do tamanho
   exato no design técnico "Página técnica em branco" e exportando em PNG.
 
+### Repaginada em pixel art (nov/2026, PROPOSTA aprovada, ainda FORA do jogo)
+
+O autor quer migrar o visual da Fase 2 pra pixel art. Os assets já foram
+aprovados, mas por pedido dele **ainda não entram no jogo** — nenhum arquivo
+do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
+`python fase2/arte/preparar-pixel.py` (cores lidas de `render/paleta.js`).
+- **Grade fixa**: 1 px de arte = 2 px do jogo (tile = 16 px de arte).
+  Árvore 64x96 (4x6 tiles); plataforma 64x48 (4x3 tiles) com o chão pisável
+  na linha y=14 — o que fica acima é grama/flor, decorativo.
+- Por área: **5 árvores** (alta, torta, bifurcada, sumaúma + uma própria:
+  jovem, buriti, emergente, ancestral), **5 ilhas de terra** (referência do
+  autor: terra em torrões, pedras, pontas pendentes; cada área com solo,
+  inclusões e formas próprias) e **3 lajes de caverna** (pedra angular com
+  estalactites). Arquivos `<area>/arvore-N-*`, `plataforma-N-*`,
+  `caverna-N-*` (`-poluida`/`-restaurada`) e folhas `arvores.png`,
+  `plataformas.png`, `cavernas.png` (linha 0 poluída, 1 restaurada).
+  Prévias ampliadas em `_previa/`.
+- Regras que o autor fixou: mesma forma/semente nos dois estados; a TERRA
+  (e a pedra) de baixo é idêntica poluída e restaurada; **nenhuma vegetação
+  antes da restauração** — poluído só tem terra seca e a sujeira da área
+  (cinza, óleo, brasa, pó, gosma); restaurado ganha capa de grama com franja,
+  samambaia/junco/bromélia/broto, cipó e flor (caverna: musgo e fios de
+  musgo). Formas naturais, nada liso e reto.
+
 ### Decisões que custaram caro e não devem ser refeitas
 
 - **Terreno: grade de tiles pra COLISÃO, contorno orgânico pra DESENHO.** A
