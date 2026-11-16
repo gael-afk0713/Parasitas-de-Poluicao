@@ -1423,6 +1423,18 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   (cinza, óleo, brasa, pó, gosma); restaurado ganha capa de grama com franja,
   samambaia/junco/bromélia/broto, cipó e flor (caverna: musgo e fios de
   musgo). Formas naturais, nada liso e reto.
+- **Chão em pedaços** (`<area>/chao/`, folhas `chao.png` e
+  `chao-preenchimento.png`): pra sortear a ordem e mudar o tamanho à vontade.
+  Topo 32x48 (2x3 tiles, superfície na linha 16 = linha do tile): `borda-esq`,
+  `meio-1..3`, `borda-dir`. Preenchimento 32x32 pra empilhar embaixo:
+  `preenchimento-1..3`, `-esq`, `-dir`. Encaixe sem costura porque a textura
+  da terra é PERIÓDICA (Voronoi num toro de 32 px) e tudo que não é periódico
+  (pedra, planta, bicho, sujeira) fica longe da borda do pedaço; o
+  escurecimento de profundidade estabiliza na linha 40, que é o valor que o
+  preenchimento mantém. Preenchimento tem 3 variações porque um só repetido
+  formava grade de pedras. Restaurado: capim, flores e bichos por área
+  (caramujo/cogumelo, sapo/aguapé/junco, borboleta/joaninha/broto,
+  besouro/bromélia, vaga-lume/cogumelo que brilha); poluído: nada vivo.
 
 ### Decisões que custaram caro e não devem ser refeitas
 

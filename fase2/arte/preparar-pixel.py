@@ -4,7 +4,9 @@ Uso:  python fase2/arte/preparar-pixel.py
 Grava fase2/arte/pixel/<area>/arvore-N-<estado>.png      (64x96)
       fase2/arte/pixel/<area>/plataforma-N-<estado>.png       (64x48)
       fase2/arte/pixel/<area>/caverna-N-<estado>.png          (64x48, pedra)
-      fase2/arte/pixel/<area>/arvores.png, plataformas.png e cavernas.png (folhas: linha 0
+      fase2/arte/pixel/<area>/chao/<peca>-<estado>.png       (32x48 topo, 32x32 preench.)
+      fase2/arte/pixel/<area>/arvores.png, plataformas.png, cavernas.png,
+      chao.png e chao-preenchimento.png (folhas: linha 0
       poluída, linha 1 restaurada)
       fase2/arte/pixel/_previa/<area>.png e todas.png (ampliadas, pra revisar)
 
@@ -1179,6 +1181,372 @@ def desenhar_caverna(area, k, estado, T):
     return img
 
 
+# ------------------------------------------------------------- chão
+# Tileset do chão em PEDAÇOS que encaixam em qualquer ordem: 3 meios
+# (variações), borda esquerda/direita, e preenchimento (miolo e lados) pra
+# empilhar em profundidade. O segredo do encaixe: a textura da terra é uma
+# função PERIÓDICA de período 32 nos dois eixos (Voronoi num toro), então a
+# coluna 31 de qualquer pedaço continua a coluna 0 de qualquer outro, e o
+# preenchimento continua o fundo do pedaço de cima. Tudo que não é periódico
+# (pedras, plantas, bichos, sujeira) fica longe das bordas do pedaço.
+
+CW, CH, CF = 32, 48, 32      # largura do pedaço, altura, altura do preenchimento
+SUPC = 16                    # superfície na linha do tile (16 px de arte = 1 tile)
+AO_FUNDO = .22               # escurecimento que o fundo atinge e o preenchimento mantém
+
+
+def textura_periodica(area):
+    rng = np.random.default_rng(900 + NOMES.index(area))
+    g = max(4, round(32 / CEL[area]))
+    cel = 32 / g
+    P = np.array([(gx * cel + rng.uniform(0, cel), gy * cel + rng.uniform(0, cel * .9))
+                  for gy in range(g) for gx in range(g)])
+    yy, xx = np.mgrid[0:32, 0:32] + .5
+    dx = (xx[..., None] - P[:, 0] + 16) % 32 - 16
+    dy = (yy[..., None] - P[:, 1] + 16) % 32 - 16
+    d = np.hypot(dx, dy)
+    o = np.argsort(d, 2)
+    d1 = np.take_along_axis(d, o[..., :1], 2)[..., 0]
+    d2 = np.take_along_axis(d, o[..., 1:2], 2)[..., 0]
+    ldx = np.take_along_axis(dx, o[..., :1], 2)[..., 0]
+    ldy = np.take_along_axis(dy, o[..., :1], 2)[..., 0]
+    local = np.clip(-(ldx * .45 + ldy * .9) / (cel * .7), -1, 1)
+    costura = (d2 - d1) < 1.0
+    nz = rng.random((32, 32))
+    nz = (nz + np.roll(nz, 1, 0) + np.roll(nz, -1, 0) + np.roll(nz, 1, 1) + np.roll(nz, -1, 1)) / 5 - .5
+    return local, costura, nz
+
+
+def valor_pad(mask, raio=2, k=3.2):
+    p = 8
+    m = np.pad(mask, p, mode='edge')
+    return valor(m, raio, k)[p:-p, p:-p]
+
+
+def lado(y, fase):
+    t = 2 * math.pi * (y % 32) / 32
+    return 4 + 1.3 * math.sin(t + fase) + .8 * math.sin(2 * t + fase * 1.7)
+
+
+def mascara_chao(peca, var, H, oy):
+    """peca: meio|esq|dir|fill|fill-esq|fill-dir. oy = y absoluto da linha 0."""
+    m = vazio(H, CW)
+    for y in range(H):
+        ya = y + oy
+        if ya < SUPC:
+            continue
+        x0, x1 = 0, CW - 1
+        if peca in ('esq', 'fill-esq'):
+            x0 = int(round(lado(ya, .7)))
+            if ya < SUPC + 6:
+                x0 += int(round(4 * (1 - (ya - SUPC) / 6) ** 2))
+        if peca in ('dir', 'fill-dir'):
+            x1 = CW - 1 - int(round(lado(ya, 2.4)))
+            if ya < SUPC + 6:
+                x1 -= int(round(4 * (1 - (ya - SUPC) / 6) ** 2))
+        m[y, x0:x1 + 1] = True
+    if peca == 'meio' and var == 1:      # monte suave de 1 px
+        m[SUPC - 1, 9:23] = True
+    if peca == 'meio' and var == 2:      # degrauzinho
+        m[SUPC - 1, 18:27] = True
+    return m
+
+
+def desenhar_chao(area, peca, var, estado, T):
+    H = CF if peca.startswith('fill') else CH
+    oy = CH if peca.startswith('fill') else 0
+    seed = NOMES.index(area) * 100 + ['meio', 'esq', 'dir', 'fill', 'fill-esq', 'fill-dir'].index(peca) * 17 + var * 5 + 2001
+    rf = np.random.default_rng(seed)
+    rd = np.random.default_rng(seed + (1 if estado == 'p' else 2) * 7919)
+    img = np.zeros((H, CW, 4), np.uint8)
+    yy, xx = np.mgrid[0:H, 0:CW]
+    solo = rampa(SOLO[area], 6)
+    corpo = mascara_chao(peca, var, H, oy)
+    local, costura, nz = textura_periodica(area)
+    ya = (yy + oy) % 32
+    ao = np.clip(((yy + oy) - SUPC) / 24, 0, 1) * AO_FUNDO
+    vg = valor_pad(corpo, 2) * .55 + .22
+    v = vg + local[ya, xx] * .3 - costura[ya, xx] * .3 + nz[ya, xx] * .2 - ao + .12
+    if area == 'varzea':
+        v = v - .05
+    aplicar(img, corpo, solo, v)
+
+    # inclusões (longe das bordas do pedaço)
+    pedras, raizes = vazio(H, CW), vazio(H, CW)
+    yminc = 2 if peca.startswith('fill') else SUPC + 4
+    xs_ok = (6, CW - 7)
+    n_pedras = int(rf.integers(0, 2)) if peca.startswith('fill') else int(rf.integers(1, 3))
+    for i in range(n_pedras):
+        cx, cy = rf.uniform(*xs_ok), rf.uniform(yminc + 2, H - 5)
+        rx, ry = rf.uniform(2.2, 3.6), rf.uniform(1.8, 2.8)
+        e = (((xx + .5 - cx) / rx) ** 2 + ((yy + .5 - cy) / ry) ** 2) <= 1
+        if (e & corpo).sum() == e.sum():
+            pedras |= e
+    if peca in ('esq', 'dir'):           # pedra saindo pela lateral
+        ys = SUPC + rf.uniform(8, 14)
+        lx = lado(ys, .7) + .5 if peca == 'esq' else CW - 1 - lado(ys, 2.4) + .5
+        e = (((xx + .5 - lx) / 3.2) ** 2 + ((yy + .5 - ys) / 2.5) ** 2) <= 1
+        pedras |= e & (xx >= 1) & (xx <= CW - 2)
+    if area == 'raizes' and peca == 'meio':
+        x, y, rr = rf.uniform(8, 24), SUPC + 4, 1.1
+        for j in range(int(rf.integers(5, 9))):
+            nx, ny = min(CW - 5, max(4, x + rf.uniform(-1.4, 1.4))), y + 2.5
+            capsula(raizes, x, y, nx, ny, rr, max(.45, rr - .08))
+            x, y, rr = nx, ny, max(.45, rr - .08)
+        raizes &= corpo & (yy < H - 2)
+    if area == 'clareira':
+        carvao = vazio(H, CW)
+        for _ in range(3):
+            circulo(carvao, rf.uniform(*xs_ok), rf.uniform(yminc, H - 3), rf.uniform(.8, 1.5))
+        aplicar(img, carvao & corpo, rampa(['#060404', '#120e0c', '#221c18', '#363028'], 4), v)
+    if area == 'coracao':
+        x, y = rf.uniform(*xs_ok), yminc + rf.uniform(0, 6)
+        cc = ['#5a1e7a', '#c65de8'] if estado == 'p' else ['#1a5a54', '#60d8b8']
+        for j in range(int(rf.integers(6, 11))):
+            if corpo[min(H - 1, int(y)), int(x)]:
+                px(img, x, y, cc[j % 3 == 0])
+            x = min(CW - 4, max(3, x + rf.choice([-1, 0, 1])))
+            y += 1
+    aplicar(img, raizes, rampa(RAIZ_COR[:3], 3), v)
+    aplicar(img, pedras, rampa(PEDRA_ILHA[area], 5), valor(pedras, 1, k=3) * .9 + .1)
+    anel = (desloca(pedras, 1, 0) | desloca(pedras, -1, 0) | desloca(pedras, 0, 1) | desloca(pedras, 0, -1)) & ~pedras & corpo
+    img[anel, :3] = solo[0]
+    if area == 'varzea':
+        for y, x in np.argwhere(corpo & (local[ya, xx] > .55) & (rf.random((H, CW)) < .22)):
+            px(img, x, y, solo[5])
+
+    uniao = corpo | pedras
+    topo = colunas_topo(corpo)
+    tem_topo = not peca.startswith('fill')
+    grama = grama_rampa(T)
+    if tem_topo and estado == 'r':
+        cap = vazio(H, CW)
+        nb = ruido1(rd, CW, 3)
+        lados = [x for x in range(CW) if topo[x] >= 0]
+        xa, xb = min(lados), max(lados)
+        for x in lados:
+            y0 = topo[x]
+            dente = int(rd.choice([1, 2, 3, 3, 4]))
+            e = min(x - xa if peca == 'esq' else 99, xb - x if peca == 'dir' else 99)
+            fim = y0 + 3 + dente + (4 - e + int(rd.integers(0, 3)) if e < 3 else 0)
+            cap[y0 - (1 if nb[x] > -.15 else 0):fim, x] = True
+        if peca == 'esq' and xa > 0:
+            cap[topo[xa]:topo[xa] + 3, xa - 1] = True
+        if peca == 'dir' and xb < CW - 1:
+            cap[topo[xb]:topo[xb] + 3, xb + 1] = True
+        vc = np.zeros((H, CW))
+        for x in range(CW):
+            col = np.where(cap[:, x])[0]
+            if len(col):
+                vc[col, x] = .92 - (col - col[0]) * .17
+        vc += (rd.random((H, CW)) < .18) * .17 - (rd.random((H, CW)) < .1) * .15
+        aplicar(img, cap, grama, vc, dither=.3)
+        uniao |= cap
+    elif tem_topo:
+        crosta = vazio(H, CW)
+        for x in range(CW):
+            if topo[x] >= 0:
+                crosta[topo[x], x] = True
+        aplicar(img, crosta, solo, np.full((H, CW), .78))
+        for x in range(3, CW - 3, 5):
+            if topo[x] >= 0:
+                px(img, x + int(rd.integers(0, 2)), topo[x], solo[1])
+    # contorno só nas bordas de verdade (não entre pedaços)
+    contorno(img, uniao, C(CONTORNO_ILHA))
+    if not tem_topo:
+        return img
+    if estado == 'r':
+        vida_chao(img, rd, area, topo, var, peca, T, grama)
+    else:
+        morte_chao(img, rd, area, topo, var, peca)
+    return img
+
+
+def vida_chao(img, rng, area, topo, var, peca, T, grama):
+    flores = [C(T['r']['luz']), C('#48d9a8'), C(EXTRA[area]['flor3'])]
+    cols = [x for x in range(2, CW - 2) if topo[x] >= 0]
+    # capim baixo em toda a largura (coluna a coluna: encaixa entre pedaços)
+    for x in cols:
+        if rng.random() < .45:
+            for j in range(int(rng.integers(1, 4))):
+                px(img, x, topo[x] - 2 - j, grama[min(5, 3 + j)])
+    meio = [x for x in cols if 8 <= x <= CW - 9]
+    if not meio:
+        meio = cols
+    x1 = int(rng.choice(meio))
+    y1 = topo[x1] - 2
+    if area == 'raizes':
+        samambaia(img, rng, x1, y1, grama, rng.uniform(7, 9))
+        cogumelo(img, int(rng.choice(cols)), rng, topo, ['#5a3a2a', '#b07050', '#e0a080'])
+        if var != 1:
+            caramujo(img, int(rng.choice(meio)), topo)
+    elif area == 'varzea':
+        aguape(img, rng, x1, y1, grama)
+        junco_baixo(img, rng, int(rng.choice(cols)), topo, grama)
+        if var != 2:
+            sapo(img, int(rng.choice(meio)), topo)
+    elif area == 'clareira':
+        broto(img, x1, y1 + 1, grama)
+        samambaia(img, rng, int(rng.choice(meio)), y1, grama, 6)
+        if var == 0:
+            borboleta(img, x1 + 3, y1 - 9, '#f0a050')
+        elif var == 2:
+            joaninha(img, int(rng.choice(cols)), topo)
+    elif area == 'dossel':
+        bromelia(img, rng, x1, y1, grama, C('#d84860'))
+        samambaia(img, rng, int(rng.choice(meio)), y1, grama, 6.5)
+        if var != 0:
+            besouro(img, int(rng.choice(meio)), topo)
+    elif area == 'coracao':
+        samambaia(img, rng, x1, y1, grama, 7.5)
+        cogumelo(img, int(rng.choice(cols)), rng, topo, ['#1a5a54', '#48d9a8', '#b8f8e0'])
+        vagalume(img, int(rng.integers(6, CW - 6)), int(rng.integers(3, 9)))
+        if var == 1:
+            vagalume(img, int(rng.integers(6, CW - 6)), int(rng.integers(2, 7)))
+    for x in rng.choice(cols, 2 + (var == 2), replace=False):
+        flor(img, x, topo[x] - 3 - int(rng.integers(0, 2)), flores[int(rng.integers(0, 3))], rng)
+
+
+def morte_chao(img, rng, area, topo, var, peca):
+    cols = [x for x in range(2, CW - 2) if topo[x] >= 0]
+    meio = [x for x in cols if 8 <= x <= CW - 9] or cols
+    if area == 'raizes':
+        for x in cols:
+            if rng.random() < .35:
+                px(img, x, topo[x], '#7a828e' if rng.random() < .5 else '#5e6672')
+        for x in rng.choice(cols, 2, replace=False):
+            px(img, x, topo[x] - 1, '#6b6040')
+            px(img, x + 1, topo[x] - 1, '#4e4630')
+    elif area == 'varzea':
+        for x in cols:
+            px(img, x, topo[x], '#0b0d0a')
+            px(img, x, topo[x] + 1, '#171a14' if x % 4 else '#0b0d0a')
+            if rng.random() < .12:
+                px(img, x, topo[x], '#4a3a5a' if rng.random() < .5 else '#3a5a4a')
+        x = int(rng.choice(meio))
+        y = topo[x] - 1
+        if var == 0:      # latinha
+            for dx, dy, c in ((0, 0, '#8a8e90'), (1, 0, '#a8acae'), (2, 0, '#6a6e70'),
+                              (0, -1, '#a8acae'), (1, -1, '#c4c8ca'), (2, -1, '#8a8e90')):
+                px(img, x + dx, y + dy, c)
+        elif var == 1:    # garrafa deitada
+            for dx in range(5):
+                px(img, x + dx, y, '#5a7a6a' if dx < 4 else '#3a4a40')
+                px(img, x + dx, y - 1, '#7a9a88' if dx < 3 else '#5a7a6a')
+        else:             # saco plástico murcho
+            for dx, dy in ((0, 0), (1, 0), (2, 0), (3, 0), (1, -1), (2, -1), (2, -2)):
+                px(img, x + dx, y + dy, '#a8aca0' if (dx + dy) % 2 else '#8a8e84')
+    elif area == 'clareira':
+        for x in cols:
+            px(img, x, topo[x], '#3a302a' if rng.random() < .6 else '#5a4c40')
+        H = img.shape[0]
+        for _ in range(7):
+            x = int(rng.choice(cols))
+            y = topo[x] + int(rng.integers(1, 7))
+            if y < H and img[y, x, 3]:
+                px(img, x, y, '#d2521c' if rng.random() < .7 else '#ff9a40')
+        for x in rng.choice(cols, 3, replace=False):
+            px(img, x, topo[x] - 1, '#1a120c')
+    elif area == 'dossel':
+        for x in cols:
+            if rng.random() < .5:
+                px(img, x, topo[x], '#8a9098' if rng.random() < .5 else '#a4aab2')
+        if var == 2:      # toquinho serrado
+            x = int(rng.choice(meio))
+            for dx in range(5):
+                for dy in range(1, 4):
+                    px(img, x + dx, topo[x] - dy, RAIZ_COR[1 + (dx < 2)])
+                px(img, x + dx, topo[x] - 4, '#c8bea0' if dx % 2 else '#9a8e70')
+    elif area == 'coracao':
+        xs = int(rng.choice(meio))
+        for x in range(max(2, xs - 5), min(CW - 2, xs + 5)):
+            if topo[x] >= 0:
+                px(img, x, topo[x], '#5a1e7a' if x % 3 else '#b03aa0')
+        if var != 1:      # caco de cristal tóxico brotando
+            x = int(rng.choice(meio))
+            for j in range(1, 5):
+                px(img, x, topo[x] - j, '#9a3ac8' if j < 4 else '#f4c0ff')
+                if j < 3:
+                    px(img, x + 1, topo[x] - j, '#5a1e7a')
+
+
+# ------------- bichos e plantas miúdas
+def cogumelo(img, x, rng, topo, cores):
+    y = topo[x] - 2
+    px(img, x, y, '#d8d0c0')
+    px(img, x, y - 1, '#d8d0c0')
+    for dx in (-1, 0, 1):
+        px(img, x + dx, y - 2, cores[1])
+    px(img, x, y - 3, cores[2])
+    px(img, x + 1, y - 2, cores[0])
+
+
+def caramujo(img, x, topo):
+    y = topo[x] - 2
+    for dx, c in ((-1, '#a8a08a'), (0, '#a8a08a'), (1, '#a8a08a'), (2, '#a8a08a'), (3, '#c8c0a8')):
+        px(img, x + dx, y, c)
+    px(img, x + 3, y - 1, '#c8c0a8')
+    for dx, dy, c in ((0, -1, '#8a5a3a'), (1, -1, '#b07a4a'), (0, -2, '#b07a4a'), (1, -2, '#5a3420')):
+        px(img, x + dx, y + dy, c)
+
+
+def sapo(img, x, topo):
+    y = topo[x] - 2
+    for dx, dy, c in ((0, 0, '#2a6a2a'), (1, 0, '#3a8a32'), (2, 0, '#3a8a32'), (3, 0, '#2a6a2a'),
+                      (1, -1, '#4aa03a'), (2, -1, '#4aa03a'), (2, -2, '#f0e080'), (0, -1, '#3a8a32')):
+        px(img, x + dx, y + dy, c)
+
+
+def borboleta(img, x, y, cor):
+    px(img, x, y, '#2a1a10')
+    px(img, x, y + 1, '#2a1a10')
+    for dx in (-1, 1):
+        px(img, x + dx, y, cor)
+        px(img, x + 2 * dx, y - 1, cor)
+        px(img, x + dx, y + 1, mix(cor, '#000000', .25))
+
+
+def joaninha(img, x, topo):
+    y = topo[x] - 2
+    px(img, x, y, '#c83a2a')
+    px(img, x + 1, y, '#e04a34')
+    px(img, x + 2, y, '#1a1010')
+    px(img, x + 1, y - 1, '#c83a2a')
+    px(img, x, y - 1, '#1a1010')
+
+
+def besouro(img, x, topo):
+    y = topo[x] - 2
+    for dx, dy, c in ((0, 0, '#1a3a34'), (1, 0, '#2a6a5a'), (2, 0, '#1a3a34'), (3, 0, '#0e1a18'),
+                      (1, -1, '#4ac0a0'), (2, -1, '#2a6a5a')):
+        px(img, x + dx, y + dy, c)
+
+
+def vagalume(img, x, y):
+    px(img, x, y, '#f0f8a0')
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        px(img, x + dx, y + dy, '#5a7a3a')
+
+
+def aguape(img, rng, x, y, grama):
+    for dx, dy in ((-2, 0), (-1, -1), (1, -1), (2, 0), (0, -1), (-1, 0), (1, 0), (0, 0)):
+        px(img, x + dx, y + dy, grama[3 if dy else 2])
+    px(img, x - 1, y - 1, grama[4])
+    for j in range(2, 6):
+        px(img, x, y - j, grama[2] if j < 4 else '#b090e0')
+    px(img, x + 1, y - 5, '#d0b8f0')
+    px(img, x - 1, y - 4, '#9070c8')
+
+
+def junco_baixo(img, rng, x, topo, grama):
+    y = topo[x] - 2
+    for k in range(3):
+        a = (k - 1) * .25 + rng.uniform(-.1, .1)
+        fx = x + k - 1
+        for j in range(int(rng.integers(5, 9))):
+            px(img, fx + math.sin(a) * j * .5, y - j, grama[3 if j < 4 else 4])
+
+
 # -------------------------------------------------------------- saída
 def salvar(arr, caminho):
     os.makedirs(os.path.dirname(caminho), exist_ok=True)
@@ -1243,6 +1611,26 @@ def main():
                 folha_c[r * PH:(r + 1) * PH, k * PW:(k + 1) * PW] = c
                 salvar(c, os.path.join(SAIDA, area, f'caverna-{k + 1}-{nome_e}.png'))
         salvar(folha_c, os.path.join(SAIDA, area, 'cavernas.png'))
+        # chão em pedaços: folha com 5 pedaços de topo (esq, meio1-3, dir) e
+        # 3 de preenchimento (esq, miolo, dir); linha 0 poluído, 1 restaurado
+        topo_p = [('esq', 0), ('meio', 0), ('meio', 1), ('meio', 2), ('dir', 0)]
+        fill_p = [('fill-esq', 0), ('fill', 0), ('fill', 1), ('fill', 2), ('fill-dir', 0)]
+        folha_t = np.zeros((CH * 2, CW * 5, 4), np.uint8)
+        folha_f = np.zeros((CF * 2, CW * 5, 4), np.uint8)
+        for r, (e, nome_e) in enumerate((('p', 'poluido'), ('r', 'restaurado'))):
+            for i, (pc, var) in enumerate(topo_p):
+                c = desenhar_chao(area, pc, var, e, T[area])
+                folha_t[r * CH:(r + 1) * CH, i * CW:(i + 1) * CW] = c
+                nome = f'meio-{var + 1}' if pc == 'meio' else f'borda-{pc}'
+                salvar(c, os.path.join(SAIDA, area, 'chao', f'{nome}-{nome_e}.png'))
+            for i, (pc, var) in enumerate(fill_p):
+                c = desenhar_chao(area, pc, var, e, T[area])
+                folha_f[r * CF:(r + 1) * CF, i * CW:(i + 1) * CW] = c
+                nome = {'fill': f'preenchimento-{var + 1}', 'fill-esq': 'preenchimento-esq',
+                        'fill-dir': 'preenchimento-dir'}[pc]
+                salvar(c, os.path.join(SAIDA, area, 'chao', f'{nome}-{nome_e}.png'))
+        salvar(folha_t, os.path.join(SAIDA, area, 'chao.png'))
+        salvar(folha_f, os.path.join(SAIDA, area, 'chao-preenchimento.png'))
         pp, pr = painel(T[area], 'p', arvs['p'], plats['p']), painel(T[area], 'r', arvs['r'], plats['r'])
         junto = Image.new('RGBA', (pp.width * 2 + 4, pp.height), (10, 10, 12, 255))
         junto.paste(pp, (0, 0))
