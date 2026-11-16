@@ -1,0 +1,37 @@
+{
+ "celula": [
+  32,
+  40
+ ],
+ "pivo": [
+  16,
+  39
+ ],
+ "escala": 2,
+ "animacoes": {
+  "rolar": {
+   "linha": 0,
+   "quadros": 4,
+   "fps": 8,
+   "repete": true
+  },
+  "pavio": {
+   "linha": 1,
+   "quadros": 3,
+   "fps": 8,
+   "repete": true
+  },
+  "explosao": {
+   "linha": 2,
+   "quadros": 5,
+   "fps": 14,
+   "repete": false
+  },
+  "dano": {
+   "linha": 3,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  }
+ }
+}

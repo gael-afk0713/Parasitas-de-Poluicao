@@ -1,0 +1,37 @@
+{
+ "celula": [
+  48,
+  24
+ ],
+ "pivo": [
+  24,
+  22
+ ],
+ "escala": 2,
+ "animacoes": {
+  "rastejar": {
+   "linha": 0,
+   "quadros": 4,
+   "fps": 6,
+   "repete": true
+  },
+  "ataque": {
+   "linha": 1,
+   "quadros": 3,
+   "fps": 10,
+   "repete": false
+  },
+  "dano": {
+   "linha": 2,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  },
+  "morte": {
+   "linha": 3,
+   "quadros": 3,
+   "fps": 8,
+   "repete": false
+  }
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "celula": [
+  40,
+  40
+ ],
+ "pivo": [
+  20,
+  20
+ ],
+ "escala": 2,
+ "animacoes": {
+  "flutuar": {
+   "linha": 0,
+   "quadros": 4,
+   "fps": 6,
+   "repete": true
+  },
+  "perseguir": {
+   "linha": 1,
+   "quadros": 2,
+   "fps": 6,
+   "repete": true
+  },
+  "ataque": {
+   "linha": 2,
+   "quadros": 3,
+   "fps": 10,
+   "repete": false
+  },
+  "dano": {
+   "linha": 3,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  },
+  "morte": {
+   "linha": 4,
+   "quadros": 4,
+   "fps": 8,
+   "repete": false
+  }
+ }
+}
