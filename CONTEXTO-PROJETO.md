@@ -1452,6 +1452,18 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   `fase2-dev`): céu do tema + as 4 camadas + chão sorteado + personagem
   provisório. Velocidades em relação ao chão: camada 4 10%, 3 22%, 2 38%,
   1 58%. É o ponto de partida dos números quando isso entrar no jogo.
+- **Guardião em pixel art** (`python fase2/arte/preparar-pixel-guardiao.py`,
+  importa os auxiliares do `preparar-pixel.py`): o modelo de IA foi só
+  referência de identidade. Aqui ele é um ESQUELETO de juntas (coxa, canela,
+  braço, as duas folhas, cauda de cipó) e cada pose é um punhado de ângulos,
+  então a forma não muda de quadro pra quadro. Célula 40x40, pivô no pé
+  (20, 37); quadros de chão assentados pelo pixel mais baixo. 17 animações /
+  49 quadros, uma por estado de `jogador.js` + ataque no ar, salto da parede,
+  aterrissar: atlas `pixel/guardiao/guardiao.png` + `guardiao.json` (linha,
+  quadros, fps, repete). Visualizador animado em `_previa/guardiao.html`; o
+  `parallax.html` já usa o Guardião correndo/parado. Efeitos que o jogo
+  desenha em código (arco do golpe, onda do canto) NÃO vão no sprite, como
+  já era com a folha de IA; só rastro curto da investida e brilho do canto.
 
 ### Decisões que custaram caro e não devem ser refeitas
 

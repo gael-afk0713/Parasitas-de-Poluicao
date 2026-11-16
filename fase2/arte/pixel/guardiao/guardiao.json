@@ -1,0 +1,112 @@
+{
+ "celula": 40,
+ "pivo": [
+  20,
+  37
+ ],
+ "escala": 2,
+ "animacoes": {
+  "parado": {
+   "linha": 0,
+   "quadros": 4,
+   "fps": 4,
+   "repete": true
+  },
+  "correndo": {
+   "linha": 1,
+   "quadros": 6,
+   "fps": 12,
+   "repete": true
+  },
+  "aterrissar": {
+   "linha": 2,
+   "quadros": 2,
+   "fps": 14,
+   "repete": false
+  },
+  "subindo": {
+   "linha": 3,
+   "quadros": 2,
+   "fps": 10,
+   "repete": true
+  },
+  "apice": {
+   "linha": 4,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  },
+  "caindo": {
+   "linha": 5,
+   "quadros": 2,
+   "fps": 8,
+   "repete": true
+  },
+  "salto-duplo": {
+   "linha": 6,
+   "quadros": 4,
+   "fps": 18,
+   "repete": false
+  },
+  "planeio": {
+   "linha": 7,
+   "quadros": 2,
+   "fps": 6,
+   "repete": true
+  },
+  "ataque": {
+   "linha": 8,
+   "quadros": 4,
+   "fps": 18,
+   "repete": false
+  },
+  "ataque-ar": {
+   "linha": 9,
+   "quadros": 3,
+   "fps": 16,
+   "repete": false
+  },
+  "investida": {
+   "linha": 10,
+   "quadros": 3,
+   "fps": 16,
+   "repete": true
+  },
+  "parede": {
+   "linha": 11,
+   "quadros": 2,
+   "fps": 6,
+   "repete": true
+  },
+  "salto-parede": {
+   "linha": 12,
+   "quadros": 2,
+   "fps": 10,
+   "repete": false
+  },
+  "canto": {
+   "linha": 13,
+   "quadros": 4,
+   "fps": 4,
+   "repete": false
+  },
+  "dano": {
+   "linha": 14,
+   "quadros": 2,
+   "fps": 12,
+   "repete": false
+  },
+  "atordoado": {
+   "linha": 15,
+   "quadros": 2,
+   "fps": 4,
+   "repete": true
+  },
+  "morte": {
+   "linha": 16,
+   "quadros": 4,
+   "fps": 6,
+   "repete": false
+  }
+ }
+}

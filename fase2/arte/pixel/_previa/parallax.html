@@ -27,7 +27,10 @@ const VEL = [0.58, 0.38, 0.22, 0.10];      // camada 1..4
 const W = 320, H = 180, CW = 32, SUP = 16, CHAO_Y = 126;   // linha do chão na tela
 const tela = document.getElementById('tela'), ctx = tela.getContext('2d');
 ctx.imageSmoothingEnabled = false;
-let area = 'raizes', estado = 'p', camX = 0, x = 0, auto = true, dir = 1;
+let area = 'raizes', estado = 'p', camX = 0, x = 0, auto = true, dir = 1, andando = false;
+const guard = { img: new Image(), meta: null };
+guard.img.src = '../guardiao/guardiao.png';
+fetch('../guardiao/guardiao.json').then(r => r.json()).then(m => guard.meta = m);
 const teclas = {};
 const cache = {};
 function img(src) {
@@ -59,15 +62,16 @@ function desenhar() {
     if (meio.complete) ctx.drawImage(meio, sx, CHAO_Y - SUP);
     if (fill.complete) ctx.drawImage(fill, sx, CHAO_Y - SUP + 48);
   }
-  // personagem provisório (só pra dar escala e referência de movimento)
-  const px = Math.floor(x - camX), py = CHAO_Y;
-  const passo = Math.floor(x / 6) % 2;
-  ctx.fillStyle = '#0a0a0c'; ctx.fillRect(px - 5, py - 23, 10, 23);
-  ctx.fillStyle = '#e8e4da'; ctx.fillRect(px - 4, py - 22, 8, 14);
-  ctx.fillStyle = '#d8a040'; ctx.fillRect(px - 4, py - 14, 8, 2);
-  ctx.fillStyle = '#0a0a0c'; ctx.fillRect(px + (dir > 0 ? 1 : -3), py - 19, 2, 2);
-  ctx.fillStyle = '#e8e4da';
-  ctx.fillRect(px - 3, py - 8, 2, passo ? 8 : 6); ctx.fillRect(px + 1, py - 8, 2, passo ? 6 : 8);
+  // Guardião em pixel art: parado ou correndo, virando pro lado do movimento
+  if (guard.meta && guard.img.complete) {
+    const S = guard.meta.celula, an = guard.meta.animacoes[andando ? 'correndo' : 'parado'];
+    const i = Math.floor(performance.now() / 1000 * an.fps) % an.quadros;
+    const px = Math.floor(x - camX), py = CHAO_Y;
+    ctx.save(); ctx.translate(px, py - guard.meta.pivo[1] - 1);
+    if (dir < 0) { ctx.scale(-1, 1); }
+    ctx.drawImage(guard.img, i * S, an.linha * S, S, S, -guard.meta.pivo[0], 0, S, S);
+    ctx.restore();
+  }
 }
 let antes = performance.now();
 function quadro(t) {
@@ -75,6 +79,7 @@ function quadro(t) {
   let v = 0;
   if (teclas.ArrowRight || teclas.d) v = 1; else if (teclas.ArrowLeft || teclas.a) v = -1; else if (auto) v = 1;
   if (v) dir = v;
+  andando = v !== 0;
   x += v * 60 * dt;
   camX += (x - W / 2 - camX) * Math.min(1, dt * 6);
   desenhar();

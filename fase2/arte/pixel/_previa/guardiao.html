@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guardião em pixel art</title>
+<style>
+  :root { --fundo: #0c0c0e; --cartao: #141a20; --texto: #e8e4da; --apagado: #8a8678; --linha: #2a2a2e; }
+  body { margin: 0; background: var(--fundo); color: var(--texto); font: 15px/1.4 system-ui, sans-serif; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  figure { margin: 0; background: var(--cartao); border: 1px solid var(--linha); border-radius: 4px; padding: 8px; }
+  canvas { width: 100%; image-rendering: pixelated; display: block; }
+  figcaption { color: var(--apagado); font-size: 13px; margin-top: 4px; }
+</style></head><body><main>
+<p>Cada animação na velocidade que vai ter no jogo (quadros por segundo no rótulo).</p>
+<div class="grade" id="grade"></div>
+</main>
+<script>
+(async () => {
+  const meta = await (await fetch('../guardiao/guardiao.json')).json();
+  const atlas = new Image(); atlas.src = '../guardiao/guardiao.png'; await atlas.decode();
+  const S = meta.celula, itens = [];
+  for (const [nome, a] of Object.entries(meta.animacoes)) {
+    const fig = document.createElement('figure');
+    const cv = document.createElement('canvas'); cv.width = S; cv.height = S;
+    const cap = document.createElement('figcaption');
+    cap.textContent = `${nome}, ${a.quadros} quadros, ${a.fps} por segundo`;
+    fig.append(cv, cap); document.getElementById('grade').append(fig);
+    itens.push({ a, ctx: cv.getContext('2d') });
+  }
+  const t0 = performance.now();
+  (function quadro(t) {
+    for (const { a, ctx } of itens) {
+      let i = Math.floor((t - t0) / 1000 * a.fps);
+      // as que não repetem seguram o último quadro um pouco e recomeçam
+      i = a.repete ? i % a.quadros : Math.min(i % (a.quadros + Math.ceil(a.fps * .6)), a.quadros - 1);
+      ctx.clearRect(0, 0, S, S);
+      ctx.fillStyle = 'rgba(72,217,168,.25)'; ctx.fillRect(0, meta.pivo[1] + 1, S, 1);
+      ctx.drawImage(atlas, i * S, a.linha * S, S, S, 0, 0, S, S);
+    }
+    requestAnimationFrame(quadro);
+  })(t0);
+})();
+</script></body></html>
