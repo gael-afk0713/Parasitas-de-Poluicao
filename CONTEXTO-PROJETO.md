@@ -1475,7 +1475,7 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   último); Cuspidor tem mirar/cuspir, Estopim pavio/explosão, Tecelão
   descer/subir. Leitura da ARQUITETURA: buraco preto + olho branco, uma
   máscara só por bicho, aro claro por dentro e anel preto por fora (a prévia
-  testa contra fundo escuro E claro). Chefes ainda não foram feitos.
+  testa contra fundo escuro E claro).
 - **Animais** (`preparar-pixel-bichos.py` -> `pixel/bichos/`): quadrúpedes
   por esqueleto (veado, capivara, tamanduá, quati, tatu: correr, andar,
   pastar, deitado), aves por parâmetro (ave pousada genérica, urubu, tucano,
@@ -1486,7 +1486,25 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   CASADA: o item N do lixo e o N da vida ocupam o mesmo lugar, pra restaurar
   trocar lixo por planta no mesmo ponto. Sacola, tambor, samambaia e flores
   têm quadros.
-- `_previa/animacoes.html` roda todas as animações de parasitas e animais.
+- **Chefes** (`preparar-pixel-chefes.py` -> `pixel/chefes/`), poses tiradas
+  dos estados de `entidades/chefes.js` (telégrafo do vão, flash de dano e luz
+  continuam em código):
+  - Mãe Afogada (112x80, pivô embaixo no meio): massa escura com 9 tentáculos
+    em leque, 7 fendas brancas em arco, algas e uma tira de sacola presas.
+    Animações: espera, emergir, cuspir (rasgo de gosma), mergulho, ressurgir
+    (respingo), ninhada (filhote brota das costas), dano, morte.
+  - Máquina (84x80, pivô no chão, virada pra direita): caldeira de metal
+    enferrujado MAIS CLARO que o chão, chaminé, apito, três rodas com biela,
+    fornalha acesa, válvulas que acendem com a pressão, infecção preta com
+    UMA fenda de olho. Animações: espera, apito (telégrafo), investida,
+    atordoada, salto, vapor, dano, morte (chaminé e rodas se soltam).
+  - Coração (128x128, pivô no centro): massa roxa em lobos com fissuras
+    magenta, tubos de ferro fundidos, cristais e 10 veias até a borda com
+    nódulos que acendem no batimento. Animações: bater (toque duplo), anel
+    (incha e solta onda), lança, transição (convulsão, cristais crescem),
+    dano, morte (racha e desfaz em cacos).
+- `_previa/animacoes.html` roda todas as animações de chefes, parasitas e
+  animais.
 
 ### Decisões que custaram caro e não devem ser refeitas
 

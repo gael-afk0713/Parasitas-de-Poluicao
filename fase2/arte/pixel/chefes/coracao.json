@@ -1,0 +1,49 @@
+{
+ "celula": [
+  128,
+  128
+ ],
+ "pivo": [
+  64,
+  64
+ ],
+ "escala": 2,
+ "animacoes": {
+  "bater": {
+   "linha": 0,
+   "quadros": 6,
+   "fps": 8,
+   "repete": true
+  },
+  "anel": {
+   "linha": 1,
+   "quadros": 5,
+   "fps": 6,
+   "repete": false
+  },
+  "lanca": {
+   "linha": 2,
+   "quadros": 3,
+   "fps": 6,
+   "repete": false
+  },
+  "transicao": {
+   "linha": 3,
+   "quadros": 4,
+   "fps": 8,
+   "repete": false
+  },
+  "dano": {
+   "linha": 4,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  },
+  "morte": {
+   "linha": 5,
+   "quadros": 6,
+   "fps": 6,
+   "repete": false
+  }
+ }
+}

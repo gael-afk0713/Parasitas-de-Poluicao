@@ -1,0 +1,61 @@
+{
+ "celula": [
+  112,
+  80
+ ],
+ "pivo": [
+  56,
+  79
+ ],
+ "escala": 2,
+ "animacoes": {
+  "espera": {
+   "linha": 0,
+   "quadros": 4,
+   "fps": 5,
+   "repete": true
+  },
+  "emergir": {
+   "linha": 1,
+   "quadros": 4,
+   "fps": 6,
+   "repete": false
+  },
+  "cuspir": {
+   "linha": 2,
+   "quadros": 4,
+   "fps": 7,
+   "repete": false
+  },
+  "mergulho": {
+   "linha": 3,
+   "quadros": 4,
+   "fps": 7,
+   "repete": false
+  },
+  "ressurgir": {
+   "linha": 4,
+   "quadros": 3,
+   "fps": 9,
+   "repete": false
+  },
+  "ninhada": {
+   "linha": 5,
+   "quadros": 3,
+   "fps": 5,
+   "repete": false
+  },
+  "dano": {
+   "linha": 6,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  },
+  "morte": {
+   "linha": 7,
+   "quadros": 5,
+   "fps": 7,
+   "repete": false
+  }
+ }
+}

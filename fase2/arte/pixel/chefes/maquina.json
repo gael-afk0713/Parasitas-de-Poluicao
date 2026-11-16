@@ -1,0 +1,61 @@
+{
+ "celula": [
+  84,
+  80
+ ],
+ "pivo": [
+  42,
+  79
+ ],
+ "escala": 2,
+ "animacoes": {
+  "espera": {
+   "linha": 0,
+   "quadros": 4,
+   "fps": 6,
+   "repete": true
+  },
+  "apito": {
+   "linha": 1,
+   "quadros": 3,
+   "fps": 5,
+   "repete": false
+  },
+  "investida": {
+   "linha": 2,
+   "quadros": 4,
+   "fps": 14,
+   "repete": true
+  },
+  "atordoada": {
+   "linha": 3,
+   "quadros": 3,
+   "fps": 6,
+   "repete": true
+  },
+  "salto": {
+   "linha": 4,
+   "quadros": 3,
+   "fps": 6,
+   "repete": false
+  },
+  "vapor": {
+   "linha": 5,
+   "quadros": 4,
+   "fps": 8,
+   "repete": false
+  },
+  "dano": {
+   "linha": 6,
+   "quadros": 1,
+   "fps": 1,
+   "repete": false
+  },
+  "morte": {
+   "linha": 7,
+   "quadros": 6,
+   "fps": 7,
+   "repete": false
+  }
+ }
+}
