@@ -5,7 +5,8 @@ Grava fase2/arte/pixel/<area>/arvore-N-<estado>.png      (64x96)
       fase2/arte/pixel/<area>/plataforma-N-<estado>.png       (64x48)
       fase2/arte/pixel/<area>/caverna-N-<estado>.png          (64x48, pedra)
       fase2/arte/pixel/<area>/chao/<peca>-<estado>.png       (32x48 topo, 32x32 preench.)
-      fase2/arte/pixel/<area>/arvores.png, plataformas.png, cavernas.png,
+      fase2/arte/pixel/<area>/montanhas/camada-N-<estado>.png (256x128, 1=perto 4=longe)
+      fase2/arte/pixel/<area>/arvores.png, plataformas.png, cavernas.png, montanhas.png,
       chao.png e chao-preenchimento.png (folhas: linha 0
       poluída, linha 1 restaurada)
       fase2/arte/pixel/_previa/<area>.png e todas.png (ampliadas, pra revisar)
@@ -1547,6 +1548,275 @@ def junco_baixo(img, rng, x, topo, grama):
             px(img, fx + math.sin(a) * j * .5, y - j, grama[3 if j < 4 else 4])
 
 
+# ---------------------------------------------------------- montanhas
+# Faixas de fundo pro parallax: 4 camadas por área (1 = perto .. 4 = longe),
+# cada uma emendável nas laterais (período = largura). Perspectiva
+# atmosférica em quatro frentes ao mesmo tempo (ARQUITETURA, princípio 2):
+# a camada longe sobe no céu, perde contraste, perde detalhe (tufo menor,
+# menos tons) e é comida por uma bruma AZULADA — a cor sai da `bruma` do tema
+# puxada pro azul. A névoa também sobe do pé de cada camada, em faixas
+# (posterizada) pra continuar pixel art.
+
+FW, FH = 256, 128
+NEVOA = [.10, .30, .50, .68]       # quanto cada camada mistura com a bruma
+CONTRASTE = [1.0, .8, .6, .45]
+TOPO_CAMADA = [62, 46, 30, 16]     # y aproximado dos picos
+TUFO = [5, 4, 4, 3]                # célula do Voronoi (copa) por camada
+ESCURO = [.52, .66, .82, 1.0]      # a frente é a mais escura (escada de valor)
+
+
+def voronoi_faixa(rng, W, H, esp):
+    """Voronoi periódico só em x (grade com jitter, vizinhança 3x3)."""
+    gw = max(1, round(W / esp))
+    cel = W / gw
+    gh = int(H / cel) + 3
+    jit = rng.random((gh, gw, 2))
+    yy, xx = np.mgrid[0:H, 0:W] + .5
+    cx, cy = np.floor(xx / cel).astype(int), np.floor(yy / cel).astype(int)
+    d1 = np.full((H, W), 1e9)
+    d2 = np.full((H, W), 1e9)
+    bdx, bdy = np.zeros((H, W)), np.zeros((H, W))
+    for oy in (-1, 0, 1):
+        for ox in (-1, 0, 1):
+            gx, gy = cx + ox, np.clip(cy + oy, 0, gh - 1)
+            j = jit[gy, gx % gw]
+            sx, sy = (gx + j[..., 0]) * cel, (gy + j[..., 1] * .9) * cel
+            dx, dy = xx - sx, yy - sy
+            d = np.hypot(dx, dy)
+            menor = d < d1
+            d2 = np.where(menor, d1, np.minimum(d2, d))
+            bdx, bdy = np.where(menor, dx, bdx), np.where(menor, dy, bdy)
+            d1 = np.where(menor, d, d1)
+    local = np.clip(-(bdx * .45 + bdy * .9) / (cel * .7), -1, 1)
+    return local, (d2 - d1) < 1.0
+
+
+def harmonicos(rng, W, kmin, kmax, exp=1.2):
+    x = np.arange(W)
+    h = np.zeros(W)
+    for k in range(kmin, kmax + 1):
+        h += rng.normal() * k ** -exp * np.sin(2 * np.pi * k * x / W + rng.uniform(0, 6.28))
+    return h / (np.abs(h).max() or 1)
+
+
+def perfil_montanha(rng, d, area):
+    """Picos sobrepostos de trás pra frente: cada pixel pertence a UM pico
+    (o da frente que o cobre), então a emenda entre dois morros segue a
+    encosta do da frente, nunca uma reta vertical."""
+    n = int(rng.integers(3, 5)) + d
+    xs = (np.arange(n) + rng.uniform(-.3, .3, n)) * FW / n
+    base = TOPO_CAMADA[d]
+    yy, xx = np.mgrid[0:FH, 0:FW]
+    redondo = area == 'varzea'
+    picos = []
+    for xi in xs:
+        yp = base + rng.uniform(0, 22)
+        s = rng.uniform(.45, .85) if not redondo else rng.uniform(.006, .012)
+        if area == 'coracao':
+            s *= 1.25
+        picos.append((xi, yp, s))
+    picos.sort(key=lambda p: p[1])           # mais alto atrás, mais baixo na frente
+    dono_dx = np.zeros((FH, FW))
+    dono_yp = np.zeros((FH, FW))
+    corpo = vazio(FH, FW)
+    aresta = vazio(FH, FW)
+    for xi, yp, s in picos:
+        dx = (np.arange(FW) - xi + FW / 2) % FW - FW / 2
+        y = yp + (np.abs(dx) * s if not redondo else dx * dx * s)
+        y = y + harmonicos(rng, FW, 6, 30) * (2 + d * .3) + harmonicos(rng, FW, 31, 60) * 1.2
+        y = np.maximum(y, 4)
+        m = yy >= y[None, :]
+        topo_m = m & ~desloca(m, 1, 0)
+        aresta = (aresta & ~m) | (topo_m & corpo)        # crista do da frente sobre o de trás
+        corpo |= m
+        dono_dx = np.where(m, dx[None, :], dono_dx)
+        dono_yp = np.where(m, yp, dono_yp)
+    topo = colunas_topo(corpo)
+    return topo, corpo, dono_dx, dono_yp, aresta
+
+
+def desenhar_montanha(area, d, estado, T):
+    seed = NOMES.index(area) * 100 + d * 19 + 3001
+    rf = np.random.default_rng(seed)
+    rd = np.random.default_rng(seed + (1 if estado == 'p' else 2) * 7919)
+    tema = T[estado]
+    yy, xx = np.mgrid[0:FH, 0:FW]
+    topo, corpo, dono_dx, dono_yp, aresta = perfil_montanha(rf, d, area)
+
+    # face iluminada (esquerda do cume) x sombra: a aresta desce INCLINADA do
+    # cume, tremida, e a diferença entre as faces se dilui perto do pé
+    tremor = harmonicos(rf, FH, 3, 14)[:, None] * 2.5
+    lit = (dono_dx - (yy - dono_yp) * .42 + tremor) < 0
+    face = np.where(lit, 1.0, -1.0) * np.exp(-np.clip(yy - topo[None, :], 0, None) / 38)
+    local, costura = voronoi_faixa(rf, FW, FH, TUFO[d])
+    sulcos = (np.sin((xx * .9 + yy * 1.6 + harmonicos(rf, FW, 2, 8)[None, :] * 9) * .35) > .82)
+
+    floresta = estado == 'r'
+    if floresta:
+        c = T['r']['crista']
+        ramp = rampa([T['r']['terrenoFundo'], mix('#10281a', c, .2), mix('#1a3e22', c, .2),
+                      mix('#285a2a', c, .2), mix('#3a7430', c, .15), mix('#548c3a', c, .1)], 6)
+        v = .5 + face * .16 + local * .2 - costura * .14
+        # pico alto e íngreme fica de rocha mesmo restaurado
+        rocha = corpo & (yy < topo[None, :] + 6) & (topo[None, :] < TOPO_CAMADA[d] + 6) & (area != 'varzea')
+    else:
+        p = T['p']
+        ramp = rampa([p['borda'], p['terreno'], mix(p['terreno'], p['crista'], .35),
+                      mix(p['terreno'], p['crista'], .6), p['crista'], mix(p['crista'], p['luz'], .15)], 6)
+        if area == 'clareira':
+            ramp = rampa(['#0a0605', '#1c120e', '#2e2019', '#443026', '#5c4434', '#76584a'], 6)
+        v = .5 + face * .2 + local * .1 - sulcos * (~lit) * .12 - costura * .08
+        rocha = vazio(FH, FW)
+    v += (corpo & ~desloca(corpo, 1, 0)) * lit * .2          # luz na crista
+    v += aresta * np.where(lit, .14, -.1)                     # crista do morro da frente
+    v = .5 + (v - .5) * CONTRASTE[d]
+    img = np.zeros((FH, FW, 4), np.uint8)
+    aplicar(img, corpo, ramp, v)
+    if rocha.any():
+        r_ramp = rampa([T['r']['borda'], T['r']['terreno'], mix(T['r']['terreno'], T['r']['crista'], .4),
+                        mix(T['r']['crista'], '#9aa4a0', .4), mix(T['r']['luz'], '#9aa4a0', .4)], 5)
+        rv = .5 + face * .2
+        aplicar(img, rocha & (rf.random((FH, FW)) > .2 + (yy - topo[None, :]) * .12), r_ramp,
+                .5 + (rv - .5) * CONTRASTE[d])
+
+    def pxw(x, y, cor):
+        px(img, int(round(x)) % FW, y, cor)
+
+    # --------- silhueta do topo: copa (restaurado) ou paus secos (poluído)
+    if floresta and d < 3:
+        R = [3.2, 2.4, 1.7][d]
+        cop = vazio(FH, FW)
+        x = 0.0
+        while x < FW:
+            y = topo[int(x) % FW]
+            if not rocha[min(FH - 1, y + 1), int(x) % FW]:
+                for off in (-FW, 0, FW):
+                    circulo(cop, x + off, y + R * .5, R * rf.uniform(.8, 1.2))
+            x += rf.uniform(R * .9, R * 1.8)
+        cop &= ~corpo
+        vc = .62 + local * .3
+        aplicar(img, cop, ramp, .5 + (vc - .5) * CONTRASTE[d])
+        corpo = corpo | cop
+    elif not floresta and d < 2:
+        for x in range(FW):
+            if rf.random() < [.10, .06][d]:
+                h = int(rf.integers(2, [7, 4][d]))
+                for j in range(1, h):
+                    pxw(x, topo[x] - j, ramp[1])
+                if h > 3:
+                    pxw(x + 1, topo[x] - h + 2, ramp[1])
+
+    # --------- extras por área (sempre com x periódico)
+    cols = np.arange(FW)
+    if area == 'varzea' and d < 2:
+        agua = yy >= FH - [16, 10][d]
+        if floresta:
+            aramp = rampa(['#0a2a34', '#14404a', '#22606a', '#4a9aa0', '#a8e0d8'], 5)
+        else:
+            aramp = rampa(['#14120c', '#24200f', '#38321c', '#5a5030', '#7a6e48'], 5)
+        av = .45 + ruido2(rf, FH, FW, 8, 1) * .3 + ((yy % 3) == 0) * .15
+        aplicar(img, agua, aramp, av)
+        for x in range(0, FW, 3):
+            if rf.random() < .25:
+                y = int(rf.integers(FH - [16, 10][d] + 1, FH))
+                pxw(x, y, aramp[4] if floresta else '#4a3a5a')
+                pxw(x + 1, y, aramp[3] if floresta else '#3a5a4a')
+        corpo = corpo | agua
+    if area == 'clareira' and not floresta:
+        if d >= 2:      # linha de fogo abafada no horizonte (sem núcleo claro)
+            fogo = harmonicos(rf, FW, 2, 6) > .1
+            for x in cols[fogo]:
+                pxw(x, topo[x], '#a8381a' if x % 3 else '#c8501e')
+                if rf.random() < .5:
+                    pxw(x, topo[x] - 1, '#7a2a14')
+        if d in (1, 2):  # colunas de fumaça
+            for _ in range(2):
+                x0 = rf.uniform(0, FW)
+                y = topo[int(x0) % FW]
+                fum = vazio(FH, FW)
+                for k in range(12):
+                    rr = 1.5 + k * 1.05
+                    for off in (-FW, 0, FW):
+                        circulo(fum, x0 + k * k * .22 + off, y - k * 2.6, rr)
+                        circulo(fum, x0 + k * k * .22 + rr * .7 + off, y - k * 2.6 + rr * .4, rr * .7)
+                # borda esgarçada: a fumaça se desfaz, não termina em bola
+                fum &= (yy < y + 2) & ~((ruido2(rf, FH, FW, 2) < -.12) & ~(caixa(caixa(fum.astype(float), 2), 2) > .97))
+                fv = .4 + valor(fum, 2) * .5 + ruido2(rf, FH, FW, 3) * .2
+                aplicar(img, fum & (img[..., 3] == 0) | fum & ~corpo,
+                        rampa(['#2a2220', '#3a302c', '#4e4440', '#665a54'], 4), fv)
+                corpo = corpo | fum
+    if area == 'clareira' and floresta and d < 2:
+        for _ in range([40, 22][d]):
+            x = int(rf.integers(0, FW))
+            y = topo[x] + int(rf.integers(0, 8))
+            pxw(x, y, '#e890b0' if rf.random() < .5 else '#f0c860')
+    if area == 'dossel' and not floresta and d < 2:      # corte raso nas encostas
+        for _ in range([3, 2][d]):
+            x0, y0 = rf.uniform(0, FW), 0
+            w, h = rf.uniform(14, 26), rf.uniform(8, 16)
+            y0 = topo[int(x0) % FW] + rf.uniform(4, 10)
+            for y in range(int(y0), int(min(FH, y0 + h))):
+                sh = (y - y0) * .4
+                for x in range(int(x0 + sh), int(x0 + w + sh)):
+                    if corpo[y, x % FW]:
+                        pxw(x, y, '#5a4630' if (x + y) % 5 else '#3a2c1e')
+                        if (x * 7 + y * 3) % 11 == 0:
+                            pxw(x, y, '#2a1e14')
+    if area == 'dossel' and floresta and d < 2:          # emergentes acima da copa
+        for _ in range([5, 4][d]):
+            x = int(rf.integers(0, FW))
+            hgt = [9, 6][d]
+            y = topo[x]
+            for j in range(hgt):
+                pxw(x, y - j, ramp[1])
+            em = vazio(FH, FW)
+            for off in (-FW, 0, FW):
+                circulo(em, x + off, y - hgt, [3.5, 2.5][d])
+                circulo(em, x + off + 2, y - hgt + 1, [2.6, 1.8][d])
+            em &= (img[..., 3] == 0) | ~corpo
+            aplicar(img, em, ramp, .5 + (.6 + local * .3 - .5) * CONTRASTE[d])
+            corpo = corpo | em
+    if area == 'coracao' and d < 3:
+        cor = ['#5a1e7a', '#b03aa0'] if not floresta else ['#1a5a54', '#3aa890']
+        for _ in range([5, 4, 3][d]):
+            x = rf.uniform(0, FW)
+            y = topo[int(x) % FW] + 2
+            for j in range(int(rf.integers(8, 20))):
+                pxw(x, y, cor[j % 4 == 0])
+                x += rf.choice([-1, 0, 1])
+                y += 1
+                if y >= FH:
+                    break
+        if not floresta:
+            for i in range(FW):
+                if i % 37 == 5:
+                    for j in range(1, [6, 4, 3][d]):
+                        pxw(i, topo[i] - j, '#7e3aa4' if j < 3 else '#c65de8')
+    if area == 'raizes' and floresta and d == 1:          # cachoeira
+        x = int(rf.integers(0, FW))
+        y0 = topo[x] + 2
+        for y in range(y0, FH):
+            pxw(x, y, '#c8e8e8' if y % 3 else '#8ab8c0')
+            pxw(x + 1, y, '#8ab8c0')
+        for dx in range(-2, 4):
+            pxw(x + dx, FH - 1, '#e0f4f0')
+    if area == 'raizes' and not floresta and d < 2:       # manchas de cinza
+        for y, x in np.argwhere(corpo & lit & (ruido2(rf, FH, FW, 6) > .3) & (rf.random((FH, FW)) < .25)):
+            pxw(x, y, '#6a7280')
+
+    # --------- bruma azulada: camada inteira + névoa subindo do pé, em faixas
+    img[..., :3] = (img[..., :3] * ESCURO[d]).astype(np.uint8)
+    bruma = mix(tema.get('bruma', tema['ceuBase']), '#6c86b4', .6)
+    pe = np.clip((yy - (topo[None, :] + 26 - d * 4)) / 70, 0, 1) * .4
+    f = np.clip(NEVOA[d] + pe * (d > 0) + pe * .5 * (d == 0), 0, .92)
+    f = np.round(f * 10) / 10
+    tem = img[..., 3] > 0
+    rgb = img[..., :3].astype(float)
+    rgb = rgb * (1 - f[..., None]) + bruma[None, None, :] * f[..., None]
+    img[..., :3] = np.where(tem[..., None], np.clip(rgb, 0, 255), img[..., :3]).astype(np.uint8)
+    return img
+
+
 # -------------------------------------------------------------- saída
 def salvar(arr, caminho):
     os.makedirs(os.path.dirname(caminho), exist_ok=True)
@@ -1631,6 +1901,14 @@ def main():
                 salvar(c, os.path.join(SAIDA, area, 'chao', f'{nome}-{nome_e}.png'))
         salvar(folha_t, os.path.join(SAIDA, area, 'chao.png'))
         salvar(folha_f, os.path.join(SAIDA, area, 'chao-preenchimento.png'))
+        # montanhas de fundo: 4 camadas (1 perto .. 4 longe); linha 0 poluída
+        folha_m = np.zeros((FH * 2, FW * 4, 4), np.uint8)
+        for r, (e, nome_e) in enumerate((('p', 'poluida'), ('r', 'restaurada'))):
+            for dd in range(4):
+                c = desenhar_montanha(area, dd, e, T[area])
+                folha_m[r * FH:(r + 1) * FH, dd * FW:(dd + 1) * FW] = c
+                salvar(c, os.path.join(SAIDA, area, 'montanhas', f'camada-{dd + 1}-{nome_e}.png'))
+        salvar(folha_m, os.path.join(SAIDA, area, 'montanhas.png'))
         pp, pr = painel(T[area], 'p', arvs['p'], plats['p']), painel(T[area], 'r', arvs['r'], plats['r'])
         junto = Image.new('RGBA', (pp.width * 2 + 4, pp.height), (10, 10, 12, 255))
         junto.paste(pp, (0, 0))

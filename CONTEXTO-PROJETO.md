@@ -1435,6 +1435,17 @@ do jogo lê `fase2/arte/pixel/`. Tudo sai de código:
   formava grade de pedras. Restaurado: capim, flores e bichos por área
   (caramujo/cogumelo, sapo/aguapé/junco, borboleta/joaninha/broto,
   besouro/bromélia, vaga-lume/cogumelo que brilha); poluído: nada vivo.
+- **Montanhas de fundo** (`<area>/montanhas/camada-N-*.png`, 256x128,
+  emendáveis nas laterais): 4 camadas por área, 1 = perto .. 4 = longe. A
+  longe sobe no céu, perde contraste, tufo e tons, e mistura com a `bruma` do
+  tema puxada pro AZUL; névoa sobe do pé em faixas. A frente é a MAIS ESCURA
+  (`ESCURO`) — a primeira versão saiu com a escada de valor invertida (o erro
+  nº 1 da ARQUITETURA). Picos desenhados de trás pra frente, cada pixel com um
+  dono, pra emenda entre morros seguir a encosta (com uma reta vertical por
+  vale parecia painel). Restaurado = floresta em tufos; poluído = rocha
+  facetada + extras por área (cinza; várzea com lâmina d'água oleosa/limpa e
+  morros redondos; linha de fogo abafada e fumaça na clareira; corte raso no
+  dossel; veios e cacos tóxicos no coração).
 
 ### Decisões que custaram caro e não devem ser refeitas
 
